@@ -33,9 +33,10 @@ yarn-error.*
 # local env files
 .env*.local
 
-# Firebase config (contains API keys, restrict via Google Cloud Console)
-google-services.json
-GoogleService-Info.plist
+# Firebase config files (google-services.json + GoogleService-Info.plist)
+# Boleh di-commit di repo PRIVATE — API keys sudah di-restrict di Google Cloud
+# (terbatas ke Bundle ID id.afresto.hub saja). Untuk repo public, jangan commit
+# dan pakai EAS Secrets sebagai gantinya.
 
 # typescript
 *.tsbuildinfo
