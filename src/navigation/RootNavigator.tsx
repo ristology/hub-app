@@ -3,8 +3,8 @@ import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../store/auth';
-import LoginScreen from '../screens/auth/LoginScreen';
-import HomeScreen  from '../screens/home/HomeScreen';
+import LoginScreen        from '../screens/auth/LoginScreen';
+import BottomTabNavigator from './BottomTabNavigator';
 
 const Stack = createNativeStackNavigator();
 
@@ -27,7 +27,7 @@ export default function RootNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {token
-          ? <Stack.Screen name="Home"  component={HomeScreen} />
+          ? <Stack.Screen name="Main"  component={BottomTabNavigator} />
           : <Stack.Screen name="Login" component={LoginScreen} />
         }
       </Stack.Navigator>
