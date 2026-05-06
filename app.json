@@ -13,21 +13,62 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "id.afresto.hub",
+      "supportsTablet": true,
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Aplikasi membutuhkan akses kamera untuk memposting foto ke Feed.",
+        "NSPhotoLibraryUsageDescription": "Aplikasi membutuhkan akses galeri untuk memilih foto.",
+        "NSLocationWhenInUseUsageDescription": "Aplikasi membutuhkan lokasi untuk menandai lokasi posting Feed."
+      }
     },
     "android": {
+      "package": "id.afresto.hub",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
-    ]
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Aplikasi membutuhkan akses galeri untuk memilih foto.",
+          "cameraPermission": "Aplikasi membutuhkan akses kamera untuk memposting foto ke Feed."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Aplikasi membutuhkan lokasi untuk menandai lokasi posting Feed."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#3b82f6",
+          "defaultChannel": "default"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "210a5516-9b22-4214-bb41-7896eb6bf56c"
+      }
+    },
+    "owner": "ristonoraga"
   }
 }

@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import HomeScreen     from '../screens/home/HomeScreen';
-import FeedScreen     from '../screens/feed/FeedScreen';
+import FeedStack      from './FeedStack';
 import ChatScreen     from '../screens/chat/ChatScreen';
 import TaskScreen     from '../screens/task/TaskScreen';
 import KalenderScreen from '../screens/kalender/KalenderScreen';
@@ -53,7 +53,7 @@ export default function BottomTabNavigator() {
       })}
     >
       <Tab.Screen name="Beranda"  component={HomeScreen} />
-      <Tab.Screen name="Feed"     component={FeedScreen} />
+      <Tab.Screen name="Feed"     component={FeedStack} />
       <Tab.Screen name="Chat"     component={ChatScreen} />
       <Tab.Screen name="Task"     component={TaskScreen} />
       <Tab.Screen name="Kalender" component={KalenderScreen} />

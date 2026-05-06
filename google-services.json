@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "995852841982",
+    "project_id": "afresto-hub",
+    "storage_bucket": "afresto-hub.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:995852841982:android:a7dde69320f4db51de46af",
+        "android_client_info": {
+          "package_name": "id.afresto.hub"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "995852841982-fvem5f4fg5oo51i0eb0s9okc32go3hai.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBz2Jpvor3PUkALj5iWUgNPat7mUEzacvo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "995852841982-fvem5f4fg5oo51i0eb0s9okc32go3hai.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

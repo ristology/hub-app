@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { authApi, type User } from '../api/auth';
 import { STORAGE_KEYS } from '../config/api';
+import { registerDeviceWithBackend, unregisterDeviceWithBackend } from '../utils/notifications';
 
 type AuthState = {
   user: User | null;
@@ -27,6 +28,9 @@ export const useAuth = create<AuthState>((set) => ({
       await SecureStore.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, token);
       await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
       set({ user, token, isLoading: false });
+
+      // Register FCM/APNs token di background — tidak block UI kalau gagal
+      registerDeviceWithBackend().catch(() => {});
     } catch (e) {
       set({ isLoading: false });
       throw e;
@@ -34,6 +38,9 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   logout: async () => {
+    // Unregister FCM token dulu sebelum hapus auth (butuh Bearer token aktif)
+    await unregisterDeviceWithBackend().catch(() => {});
+
     try {
       await authApi.logout();
     } catch {
@@ -50,6 +57,9 @@ export const useAuth = create<AuthState>((set) => ({
 
     if (token && userRaw) {
       set({ token, user: JSON.parse(userRaw), isInitializing: false });
+
+      // Re-register FCM token (token bisa berubah / device baru install)
+      registerDeviceWithBackend().catch(() => {});
     } else {
       set({ isInitializing: false });
     }
