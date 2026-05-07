@@ -6,6 +6,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { feedApi, type KaryawanRingkas } from '../api/feed';
 
+type SearchFn = (q: string) => Promise<{ data: KaryawanRingkas[] }>;
+
 type Props = {
   visible: boolean;
   onClose: () => void;
@@ -15,15 +17,20 @@ type Props = {
   selectedIds?: number[];
   onPick: (karyawan: KaryawanRingkas) => void;
   title?: string;
+  /** Default pakai feedApi.searchKaryawan. Override untuk modul lain (mis. tugasApi.searchKaryawan). */
+  searchFn?: SearchFn;
 };
 
 export default function KaryawanPicker({
   visible, onClose, mode = 'multiple',
   selectedIds = [], onPick, title = 'Pilih Karyawan',
+  searchFn,
 }: Props) {
   const [search, setSearch]   = useState('');
   const [results, setResults] = useState<KaryawanRingkas[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const doSearch: SearchFn = searchFn ?? feedApi.searchKaryawan;
 
   // Debounced search
   useEffect(() => {
@@ -31,7 +38,7 @@ export default function KaryawanPicker({
     setLoading(true);
     const handle = setTimeout(async () => {
       try {
-        const { data } = await feedApi.searchKaryawan(search);
+        const { data } = await doSearch(search);
         setResults(data);
       } finally {
         setLoading(false);

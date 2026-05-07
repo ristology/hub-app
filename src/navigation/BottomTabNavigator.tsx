@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import HomeScreen     from '../screens/home/HomeScreen';
 import FeedStack      from './FeedStack';
 import ChatScreen     from '../screens/chat/ChatScreen';
-import TaskScreen     from '../screens/task/TaskScreen';
+import TaskStack      from './TaskStack';
 import KalenderScreen from '../screens/kalender/KalenderScreen';
 
 type TabIconName = keyof typeof Ionicons.glyphMap;
@@ -55,7 +55,7 @@ export default function BottomTabNavigator() {
       <Tab.Screen name="Beranda"  component={HomeScreen} />
       <Tab.Screen name="Feed"     component={FeedStack} />
       <Tab.Screen name="Chat"     component={ChatScreen} />
-      <Tab.Screen name="Task"     component={TaskScreen} />
+      <Tab.Screen name="Task"     component={TaskStack} />
       <Tab.Screen name="Kalender" component={KalenderScreen} />
     </Tab.Navigator>
   );

@@ -29,8 +29,10 @@ export const useAuth = create<AuthState>((set) => ({
       await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
       set({ user, token, isLoading: false });
 
-      // Register FCM/APNs token di background — tidak block UI kalau gagal
-      registerDeviceWithBackend().catch(() => {});
+      console.warn('[Auth] login sukses, panggil registerDeviceWithBackend...');
+      registerDeviceWithBackend()
+        .then(() => console.warn('[Auth] registerDeviceWithBackend selesai'))
+        .catch((e) => console.warn('[Auth] registerDeviceWithBackend gagal:', e));
     } catch (e) {
       set({ isLoading: false });
       throw e;

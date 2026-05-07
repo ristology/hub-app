@@ -19,7 +19,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Aplikasi membutuhkan akses kamera untuk memposting foto ke Feed.",
         "NSPhotoLibraryUsageDescription": "Aplikasi membutuhkan akses galeri untuk memilih foto.",
-        "NSLocationWhenInUseUsageDescription": "Aplikasi membutuhkan lokasi untuk menandai lokasi posting Feed."
+        "NSLocationWhenInUseUsageDescription": "Aplikasi membutuhkan lokasi untuk menandai lokasi posting Feed.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

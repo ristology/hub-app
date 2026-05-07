@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 import { deviceApi } from '../api/device';
 
 const STORAGE_KEY_DEVICE_TOKEN = 'fcm_device_token';
@@ -47,7 +48,7 @@ export async function getNativePushToken(): Promise<string | null> {
     return null;
   }
 
-  // Minta permission
+  // Permission check
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
 
@@ -61,10 +62,23 @@ export async function getNativePushToken(): Promise<string | null> {
     return null;
   }
 
-  // Ambil native token (FCM untuk Android, APNs untuk iOS)
+  // Strategy:
+  //   Android → getDevicePushTokenAsync (returns FCM token, dikirim via FCM v1 API)
+  //   iOS     → getExpoPushTokenAsync   (returns Expo token, dikirim via Expo Push API)
+  //
+  // Kenapa beda? iOS native getDevicePushTokenAsync return APNs token mentah
+  // yang tidak bisa langsung dikirim ke FCM API. Pakai Expo Push API supaya
+  // routing ke APNs dilakukan otomatis oleh Expo backend.
   try {
+    if (Platform.OS === 'ios') {
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId
+                     ?? (Constants as any).easConfig?.projectId;
+      const result = await Notifications.getExpoPushTokenAsync({ projectId });
+      return result.data; // format: "ExponentPushToken[xxxxx]"
+    }
+
     const result = await Notifications.getDevicePushTokenAsync();
-    return result.data;
+    return result.data; // format: FCM token
   } catch (e) {
     console.error('Gagal ambil device push token:', e);
     return null;
@@ -76,23 +90,32 @@ export async function getNativePushToken(): Promise<string | null> {
  * Dipanggil setelah user login sukses.
  */
 export async function registerDeviceWithBackend(): Promise<void> {
+  console.warn('[Push] registerDeviceWithBackend start');
   await setupAndroidChannel();
 
   const token = await getNativePushToken();
-  if (!token) return;
+  console.warn('[Push] token result:', token ? token.substring(0, 30) + '...' : 'NULL');
+  if (!token) {
+    console.warn('[Push] Token null — skip register');
+    return;
+  }
 
-  // Cek apakah token sudah pernah register (skip kalau sama)
   const cached = await SecureStore.getItemAsync(STORAGE_KEY_DEVICE_TOKEN);
-  if (cached === token) return;
+  if (cached === token) {
+    console.warn('[Push] Token sudah cached, skip API call');
+    return;
+  }
 
   const platform   = Platform.OS === 'ios' ? 'ios' : 'android';
   const deviceName = `${Device.brand ?? Platform.OS}-${Device.modelName ?? 'unknown'}`;
+  console.warn('[Push] POST /device/register | platform=' + platform);
 
   try {
     await deviceApi.register(token, platform, deviceName);
     await SecureStore.setItemAsync(STORAGE_KEY_DEVICE_TOKEN, token);
-  } catch (e) {
-    console.error('Gagal register device token ke backend:', e);
+    console.warn('[Push] Register sukses');
+  } catch (e: any) {
+    console.error('[Push] Gagal register:', e.message, e.response?.data);
   }
 }
 
