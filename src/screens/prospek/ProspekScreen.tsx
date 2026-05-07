@@ -90,8 +90,12 @@ export default function ProspekScreen() {
       )}
 
       {/* Filter chips */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScroll}>
-        <View style={styles.filters}>
+      <View style={styles.filtersWrap}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filtersContent}
+        >
           {FILTER_OPTIONS.map((opt) => (
             <TouchableOpacity
               key={opt.key}
@@ -103,8 +107,8 @@ export default function ProspekScreen() {
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
 
       <FlatList
         data={data?.data ?? []}
@@ -159,15 +163,25 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 20, fontWeight: '700' },
   statLabel: { color: '#8a94a6', fontSize: 10, marginTop: 2 },
 
-  filtersScroll: { flexGrow: 0, marginBottom: 8 },
-  filters: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 4 },
+  filtersWrap: { marginBottom: 8 },
+  filtersContent: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    alignItems: 'center',
+  },
   chip: {
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    justifyContent: 'center',
   },
   chipActive: { backgroundColor: 'rgba(59,130,246,0.20)', borderColor: '#3b82f6' },
-  chipText:   { color: '#8a94a6', fontSize: 12, lineHeight: 16, includeFontPadding: false },
+  chipText:   { color: '#c5cdd9', fontSize: 13 },
   chipTextActive: { color: '#3b82f6', fontWeight: '600' },
 
   list:  { padding: 16, paddingTop: 8 },
