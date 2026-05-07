@@ -9,7 +9,7 @@ import ChatStack       from './ChatStack';
 import TaskStack       from './TaskStack';
 import MenuStack       from './MenuStack';
 import ErrorLogStack   from './ErrorLogStack';
-import ProspekScreen   from '../screens/prospek/ProspekScreen';
+import ProspekStack    from './ProspekStack';
 
 type TabIconName = keyof typeof Ionicons.glyphMap;
 
@@ -53,7 +53,7 @@ export default function BottomTabNavigator() {
       })}
     >
       <Tab.Screen name="Feed"     component={FeedStack} />
-      <Tab.Screen name="Prospek"  component={ProspekScreen} />
+      <Tab.Screen name="Prospek"  component={ProspekStack} />
       <Tab.Screen name="Pesan"    component={ChatStack} />
       <Tab.Screen name="Task"     component={TaskStack} />
       <Tab.Screen name="ErrorLog" component={ErrorLogStack}  options={{ tabBarLabel: 'Error Log' }} />
