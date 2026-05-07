@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   header:    { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
   title:     { color: '#fff', fontSize: 24, fontWeight: '700' },
 
-  statsScroll: { marginBottom: 12, maxHeight: 70 },
+  statsScroll: { marginBottom: 12, flexGrow: 0 },
   statsRow:    { flexDirection: 'row', gap: 8, paddingHorizontal: 16 },
   statBox: {
     backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 10,
@@ -159,15 +159,15 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 20, fontWeight: '700' },
   statLabel: { color: '#8a94a6', fontSize: 10, marginTop: 2 },
 
-  filtersScroll: { maxHeight: 40, marginBottom: 4 },
-  filters: { flexDirection: 'row', gap: 6, paddingHorizontal: 16 },
+  filtersScroll: { flexGrow: 0, marginBottom: 8 },
+  filters: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 4 },
   chip: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
   },
   chipActive: { backgroundColor: 'rgba(59,130,246,0.20)', borderColor: '#3b82f6' },
-  chipText:   { color: '#8a94a6', fontSize: 11 },
+  chipText:   { color: '#8a94a6', fontSize: 12, lineHeight: 16, includeFontPadding: false },
   chipTextActive: { color: '#3b82f6', fontWeight: '600' },
 
   list:  { padding: 16, paddingTop: 8 },
