@@ -4,29 +4,29 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import HomeScreen     from '../screens/home/HomeScreen';
-import FeedStack      from './FeedStack';
-import ChatStack      from './ChatStack';
-import TaskStack      from './TaskStack';
-import KalenderScreen from '../screens/kalender/KalenderScreen';
+import FeedStack       from './FeedStack';
+import ChatStack       from './ChatStack';
+import TaskStack       from './TaskStack';
+import MenuStack       from './MenuStack';
+import ErrorLogStack   from './ErrorLogStack';
+import ProspekScreen   from '../screens/prospek/ProspekScreen';
 
 type TabIconName = keyof typeof Ionicons.glyphMap;
 
 const Tab = createBottomTabNavigator();
 
 const tabConfig: Record<string, { icon: TabIconName; iconFocused: TabIconName }> = {
-  Beranda:  { icon: 'home-outline',         iconFocused: 'home' },
   Feed:     { icon: 'newspaper-outline',    iconFocused: 'newspaper' },
-  Chat:     { icon: 'chatbubbles-outline',  iconFocused: 'chatbubbles' },
+  Prospek:  { icon: 'people-outline',       iconFocused: 'people' },
+  Pesan:    { icon: 'chatbubbles-outline',  iconFocused: 'chatbubbles' },
   Task:     { icon: 'checkbox-outline',     iconFocused: 'checkbox' },
-  Kalender: { icon: 'calendar-outline',     iconFocused: 'calendar' },
+  ErrorLog: { icon: 'bug-outline',          iconFocused: 'bug' },
+  Menu:     { icon: 'grid-outline',         iconFocused: 'grid' },
 };
 
 export default function BottomTabNavigator() {
   const insets = useSafeAreaInsets();
 
-  // Android nav bar / iOS home indicator butuh padding bottom dari safe area.
-  // Minimum 8 supaya tetap ada breathing room di device tanpa inset.
   const bottomPad    = Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 4);
   const tabBarHeight = 56 + bottomPad;
 
@@ -49,14 +49,15 @@ export default function BottomTabNavigator() {
           paddingTop:      6,
           paddingBottom:   bottomPad,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
       })}
     >
-      <Tab.Screen name="Beranda"  component={HomeScreen} />
       <Tab.Screen name="Feed"     component={FeedStack} />
-      <Tab.Screen name="Chat"     component={ChatStack} />
+      <Tab.Screen name="Prospek"  component={ProspekScreen} />
+      <Tab.Screen name="Pesan"    component={ChatStack} />
       <Tab.Screen name="Task"     component={TaskStack} />
-      <Tab.Screen name="Kalender" component={KalenderScreen} />
+      <Tab.Screen name="ErrorLog" component={ErrorLogStack}  options={{ tabBarLabel: 'Error Log' }} />
+      <Tab.Screen name="Menu"     component={MenuStack} />
     </Tab.Navigator>
   );
 }
