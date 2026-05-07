@@ -79,14 +79,18 @@ export default function ProspekScreen() {
 
       {/* Stats */}
       {stats && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statsScroll}>
-          <View style={styles.statsRow}>
+        <View style={styles.statsWrap}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.statsContent}
+          >
             <StatBox label="Aktif"    value={stats.prospek + stats.follow_up + stats.proposal + stats.negosiasi + stats.trial} color="#3b82f6" />
             <StatBox label="Kontrak"  value={stats.kontrak}  color="#22c55e" />
             <StatBox label="Overdue"  value={stats.overdue}  color="#ef4444" />
             <StatBox label="Batal"    value={stats.batal}    color="#6b7280" />
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </View>
       )}
 
       {/* Filter chips */}
@@ -152,36 +156,45 @@ const styles = StyleSheet.create({
   header:    { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
   title:     { color: '#fff', fontSize: 24, fontWeight: '700' },
 
-  statsScroll: { marginBottom: 12, flexGrow: 0 },
-  statsRow:    { flexDirection: 'row', gap: 8, paddingHorizontal: 16 },
+  statsWrap: { marginBottom: 10 },
+  statsContent: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
   statBox: {
-    backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 10,
-    paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
     minWidth: 80,
   },
   statValue: { fontSize: 20, fontWeight: '700' },
-  statLabel: { color: '#8a94a6', fontSize: 10, marginTop: 2 },
+  statLabel: { color: '#8a94a6', fontSize: 11, marginTop: 2 },
 
   filtersWrap: { marginBottom: 8 },
   filtersContent: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     paddingHorizontal: 16,
     paddingVertical: 4,
     alignItems: 'center',
   },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.10)',
     justifyContent: 'center',
   },
   chipActive: { backgroundColor: 'rgba(59,130,246,0.20)', borderColor: '#3b82f6' },
-  chipText:   { color: '#c5cdd9', fontSize: 13 },
+  chipText:   { color: '#c5cdd9', fontSize: 12 },
   chipTextActive: { color: '#3b82f6', fontWeight: '600' },
 
   list:  { padding: 16, paddingTop: 8 },
