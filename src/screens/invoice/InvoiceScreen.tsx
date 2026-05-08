@@ -1,16 +1,17 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
-  TouchableOpacity, ScrollView,
+  TouchableOpacity, ScrollView, Alert, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as ImagePicker from 'expo-image-picker';
 
 import { invoiceApi, type Invoice, type StatusBayar } from '../../api/invoice';
-import InvoiceCard from './components/InvoiceCard';
+import SwipeableInvoiceCard from './components/SwipeableInvoiceCard';
 
 type ParamList = {
   InvoiceList: undefined;
@@ -34,8 +35,11 @@ function formatRupiahCompact(n: number): string {
 
 export default function InvoiceScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ParamList>>();
+  const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('semua');
+  const [openId, setOpenId] = useState<number | null>(null);
+  const [pendingId, setPendingId] = useState<number | null>(null);
 
   const { data, isLoading, refetch, error } = useQuery({
     queryKey: ['invoice', filter],
@@ -57,10 +61,81 @@ export default function InvoiceScreen() {
     setRefreshing(false);
   }, [refetch]);
 
+  const toggleMut = useMutation({
+    mutationFn: ({ id, bukti }: { id: number; bukti?: { uri: string; name: string; type: string } }) =>
+      invoiceApi.toggleLunas(id, bukti),
+    onSettled: () => {
+      setPendingId(null);
+      queryClient.invalidateQueries({ queryKey: ['invoice'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice-stats'] });
+    },
+    onError: (e: any) => {
+      const msg = e.response?.data?.message
+        ?? Object.values(e.response?.data?.errors ?? {}).flat().join('\n')
+        ?? 'Gagal update status bayar.';
+      Alert.alert('Error', msg);
+    },
+  });
+
+  const pickAndUpload = async (id: number, source: 'camera' | 'gallery') => {
+    const perm = source === 'camera'
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Izin ditolak', 'Aplikasi butuh akses kamera/galeri.');
+      return;
+    }
+    const result = source === 'camera'
+      ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    setPendingId(id);
+    toggleMut.mutate({
+      id,
+      bukti: {
+        uri:  asset.uri,
+        name: asset.fileName ?? `bukti_${Date.now()}.jpg`,
+        type: asset.mimeType ?? 'image/jpeg',
+      },
+    });
+  };
+
+  const handleToggleLunas = (inv: Invoice) => {
+    setOpenId(null);
+    if (inv.status_bayar === 'lunas') {
+      Alert.alert('Reset ke Belum Bayar', `Reset status invoice ${inv.no_invoice}? Bukti transfer akan dihapus.`, [
+        { text: 'Batal' },
+        { text: 'Reset', style: 'destructive', onPress: () => {
+            setPendingId(inv.id);
+            toggleMut.mutate({ id: inv.id });
+          },
+        },
+      ]);
+    } else {
+      Alert.alert('Tandai Lunas', `Upload bukti transfer untuk invoice ${inv.no_invoice}.`, [
+        { text: 'Batal' },
+        { text: 'Foto Kamera',  onPress: () => pickAndUpload(inv.id, 'camera') },
+        { text: 'Pilih Galeri', onPress: () => pickAndUpload(inv.id, 'gallery') },
+      ]);
+    }
+  };
+
+  const handlePreview = (inv: Invoice) => {
+    setOpenId(null);
+    Linking.openURL(inv.view_url);
+  };
+
   const renderItem = ({ item }: { item: Invoice }) => (
-    <InvoiceCard
+    <SwipeableInvoiceCard
       invoice={item}
+      isOpen={openId === item.id}
+      isPending={pendingId === item.id}
       onPress={() => navigation.navigate('InvoiceDetail', { id: item.id })}
+      onSwipeOpen={() => setOpenId(item.id)}
+      onSwipeClose={() => setOpenId(null)}
+      onToggleLunas={() => handleToggleLunas(item)}
+      onPreview={() => handlePreview(item)}
     />
   );
 

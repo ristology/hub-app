@@ -120,6 +120,9 @@ export default function InvoiceDetailScreen() {
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.topTitle}>Detail Invoice</Text>
+        <TouchableOpacity onPress={() => Linking.openURL(inv.view_url)} style={styles.iconBtn}>
+          <Ionicons name="eye-outline" size={22} color="#3b82f6" />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => Linking.openURL(inv.pdf_url)} style={styles.iconBtn}>
           <Ionicons name="download-outline" size={22} color="#3b82f6" />
         </TouchableOpacity>
