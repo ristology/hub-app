@@ -129,7 +129,7 @@ export default function ChatRoomScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={{ flex: 1, paddingBottom: Math.max(insets.bottom, kbHeight) }}>
+      <View style={{ flex: 1, paddingBottom: insets.bottom + kbHeight }}>
         {/* Top bar */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
