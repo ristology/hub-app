@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, Image,
-  StyleSheet, ActivityIndicator, Platform, Keyboard, Alert,
+  StyleSheet, ActivityIndicator, Platform, Keyboard, Alert, Modal,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,6 +40,8 @@ export default function ChatRoomScreen() {
 
   const { roomId, nama, foto } = route.params;
   const [pesan, setPesan] = useState('');
+  const [pendingImage, setPendingImage] = useState<{ uri: string; name: string; type: string } | null>(null);
+  const [caption, setCaption] = useState('');
   const flatListRef = useRef<FlatList>(null);
 
   const { data, isLoading, refetch } = useQuery({
@@ -58,6 +60,8 @@ export default function ChatRoomScreen() {
     mutationFn: (payload: { pesan?: string; foto?: any }) => chatApi.send(roomId, payload),
     onSuccess: () => {
       setPesan('');
+      setPendingImage(null);
+      setCaption('');
       queryClient.invalidateQueries({ queryKey: ['chat-room', roomId] });
       queryClient.invalidateQueries({ queryKey: ['chat-rooms'] });
     },
@@ -85,15 +89,26 @@ export default function ChatRoomScreen() {
 
     if (!result.canceled && result.assets[0]) {
       const a = result.assets[0];
-      sendMutation.mutate({
-        pesan: pesan.trim() || undefined,
-        foto: {
-          uri: a.uri,
-          name: a.fileName ?? `chat-${Date.now()}.jpg`,
-          type: a.mimeType ?? 'image/jpeg',
-        },
+      setPendingImage({
+        uri: a.uri,
+        name: a.fileName ?? `chat-${Date.now()}.jpg`,
+        type: a.mimeType ?? 'image/jpeg',
       });
+      setCaption('');
     }
+  };
+
+  const sendPendingImage = () => {
+    if (!pendingImage) return;
+    sendMutation.mutate({
+      pesan: caption.trim() || undefined,
+      foto: pendingImage,
+    });
+  };
+
+  const cancelPendingImage = () => {
+    setPendingImage(null);
+    setCaption('');
   };
 
   const messages = (data?.messages.data ?? []) as ChatMessage[];
@@ -200,6 +215,56 @@ export default function ChatRoomScreen() {
           <View style={{ height: insets.bottom, backgroundColor: '#0a0f1a' }} />
         )}
       </View>
+
+      {/* Image preview modal — ala WhatsApp: preview + caption sebelum kirim */}
+      <Modal
+        visible={!!pendingImage}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={cancelPendingImage}
+      >
+        <SafeAreaView style={previewStyles.container} edges={['top']}>
+          <View style={previewStyles.topBar}>
+            <TouchableOpacity onPress={cancelPendingImage} style={previewStyles.iconBtn}>
+              <Ionicons name="close" size={26} color="#fff" />
+            </TouchableOpacity>
+            <Text style={previewStyles.title}>Kirim Foto</Text>
+          </View>
+
+          <View style={previewStyles.imageWrap}>
+            {pendingImage && (
+              <Image source={{ uri: pendingImage.uri }} style={previewStyles.image} resizeMode="contain" />
+            )}
+          </View>
+
+          <View style={[previewStyles.inputBar, {
+            paddingBottom: kbHeight > 0
+              ? 8 + (Platform.OS === 'android' ? insets.bottom : 0)
+              : 8 + insets.bottom,
+            marginBottom: kbHeight,
+          }]}>
+            <TextInput
+              style={previewStyles.input}
+              placeholder="Tambah keterangan (opsional)..."
+              placeholderTextColor="#6b7280"
+              value={caption}
+              onChangeText={setCaption}
+              multiline
+              maxLength={5000}
+            />
+            <TouchableOpacity
+              style={previewStyles.sendBtn}
+              onPress={sendPendingImage}
+              disabled={sendMutation.isPending}
+            >
+              {sendMutation.isPending
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Ionicons name="send" size={20} color="#fff" />
+              }
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -260,6 +325,34 @@ const styles = StyleSheet.create({
   },
   sendBtn: {
     width: 38, height: 38, borderRadius: 19, backgroundColor: '#3b82f6',
+    alignItems: 'center', justifyContent: 'center',
+  },
+});
+
+const previewStyles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#000' },
+  topBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 8, paddingVertical: 8,
+  },
+  iconBtn: { padding: 8 },
+  title:   { color: '#fff', fontSize: 16, fontWeight: '600' },
+  imageWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  image:   { width: '100%', height: '100%' },
+  inputBar: {
+    flexDirection: 'row', alignItems: 'flex-end', gap: 8,
+    paddingHorizontal: 12, paddingTop: 8,
+    backgroundColor: '#0a0f1a',
+  },
+  input: {
+    flex: 1, maxHeight: 120,
+    backgroundColor: 'rgba(255,255,255,0.06)', color: '#fff',
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 22,
+    fontSize: 15,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  sendBtn: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#3b82f6',
     alignItems: 'center', justifyContent: 'center',
   },
 });
