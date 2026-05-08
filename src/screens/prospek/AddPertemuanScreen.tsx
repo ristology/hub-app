@@ -9,6 +9,8 @@ import { useRoute, useNavigation, type RouteProp } from '@react-navigation/nativ
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { prospekApi } from '../../api/prospek';
+import DatePickerInput from '../../components/DatePickerInput';
+import { useToast } from '../../components/Toast';
 
 type RouteParams = { id: number };
 
@@ -22,6 +24,7 @@ export default function AddPertemuanScreen() {
   const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const navigation = useNavigation();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { id } = route.params;
 
   const [tanggal, setTanggal]                 = useState('');
@@ -37,7 +40,7 @@ export default function AddPertemuanScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['prospek', id] });
       queryClient.invalidateQueries({ queryKey: ['prospek'] });
-      Alert.alert('Berhasil', 'Pertemuan dicatat.');
+      toast.success('Pertemuan dicatat.');
       navigation.goBack();
     },
     onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal catat pertemuan.'),
@@ -72,15 +75,11 @@ export default function AddPertemuanScreen() {
 
         <ScrollView contentContainerStyle={styles.scroll}>
           <Field label="Tanggal Pertemuan *">
-            <TextInput style={styles.input} placeholder="YYYY-MM-DD"
-              placeholderTextColor="#6b7280" value={tanggal} onChangeText={setTanggal}
-              keyboardType="numbers-and-punctuation" />
+            <DatePickerInput value={tanggal} onChange={setTanggal} />
           </Field>
 
           <Field label="Tanggal Pertemuan Berikutnya (opsional)">
-            <TextInput style={styles.input} placeholder="YYYY-MM-DD"
-              placeholderTextColor="#6b7280" value={tanggalBerikutnya} onChangeText={setTanggalBerikutnya}
-              keyboardType="numbers-and-punctuation" />
+            <DatePickerInput value={tanggalBerikutnya} onChange={setTanggalBerikutnya} />
           </Field>
 
           <Field label="Keterangan / Notes *">

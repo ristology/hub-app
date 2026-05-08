@@ -13,6 +13,7 @@ import {
   type KaryawanRingkas as KalenderKaryawanRingkas,
 } from '../../api/kalender';
 import KaryawanPicker from '../../components/KaryawanPicker';
+import DatePickerInput from '../../components/DatePickerInput';
 import type { KaryawanRingkas } from '../../api/feed';
 
 type RouteParams = { id?: number };
@@ -194,21 +195,17 @@ export default function CreateKegiatanScreen() {
           </TouchableOpacity>
 
           <Text style={styles.label}>Mulai <Text style={styles.req}>*</Text></Text>
-          <TextInput
-            style={styles.input}
+          <DatePickerInput
             value={mulaiAt}
-            onChangeText={setMulaiAt}
-            placeholder="YYYY-MM-DDTHH:MM"
-            placeholderTextColor="#6b7280"
+            onChange={setMulaiAt}
+            mode={seharian ? 'date' : 'datetime'}
           />
 
           <Text style={styles.label}>Selesai <Text style={styles.req}>*</Text></Text>
-          <TextInput
-            style={styles.input}
+          <DatePickerInput
             value={selesaiAt}
-            onChangeText={setSelesaiAt}
-            placeholder="YYYY-MM-DDTHH:MM"
-            placeholderTextColor="#6b7280"
+            onChange={setSelesaiAt}
+            mode={seharian ? 'date' : 'datetime'}
           />
 
           <Text style={styles.label}>Lokasi</Text>

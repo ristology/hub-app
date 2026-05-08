@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location    from 'expo-location';
 import { feedApi, type Kategori, type KaryawanRingkas } from '../../api/feed';
 import KaryawanPicker from '../../components/KaryawanPicker';
+import { useToast } from '../../components/Toast';
 
 const MAX_PHOTOS = 6;
 
@@ -19,6 +20,7 @@ type Foto = { uri: string; name: string; type: string };
 export default function CreateFeedScreen() {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [konten, setKonten]       = useState('');
   const [lokasi, setLokasi]       = useState('');
@@ -52,7 +54,7 @@ export default function CreateFeedScreen() {
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
-      Alert.alert('Berhasil', 'Posting berhasil dipublikasikan.');
+      toast.success('Posting berhasil dipublikasikan.');
       navigation.goBack();
     },
     onError: (e: any) => {

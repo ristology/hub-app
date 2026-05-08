@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../store/auth';
 import LoginScreen        from '../screens/auth/LoginScreen';
 import BottomTabNavigator from './BottomTabNavigator';
+import { navigationRef, setupDeepLinkHandler } from '../utils/deepLink';
 
 const Stack = createNativeStackNavigator();
 
@@ -15,6 +16,12 @@ export default function RootNavigator() {
     bootstrap();
   }, []);
 
+  // Setup deep link handler — listen tap notif & navigate ke detail screen
+  useEffect(() => {
+    if (!token) return;
+    return setupDeepLinkHandler();
+  }, [token]);
+
   if (isInitializing) {
     return (
       <View style={{ flex: 1, backgroundColor: '#0d1421', justifyContent: 'center' }}>
@@ -24,7 +31,7 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {token
           ? <Stack.Screen name="Main"  component={BottomTabNavigator} />

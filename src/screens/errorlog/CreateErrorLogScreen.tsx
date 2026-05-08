@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 
 import { errorLogApi } from '../../api/errorLog';
+import { useToast } from '../../components/Toast';
 
 const MAX_PHOTOS = 6;
 type Foto = { uri: string; name: string; type: string };
@@ -17,6 +18,7 @@ type Foto = { uri: string; name: string; type: string };
 export default function CreateErrorLogScreen() {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [klienId, setKlienId]     = useState<number | null>(null);
   const [kategoriId, setKategoriId] = useState<number | null>(null);
@@ -42,7 +44,7 @@ export default function CreateErrorLogScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['error-log'] });
       queryClient.invalidateQueries({ queryKey: ['error-log-stats'] });
-      Alert.alert('Berhasil', 'Laporan error berhasil dibuat.');
+      toast.success('Laporan error berhasil dibuat.');
       navigation.goBack();
     },
     onError: (e: any) => {

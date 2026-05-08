@@ -11,6 +11,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { tugasApi, type TugasPrioritas, type TugasStatus } from '../../api/tugas';
 import { type KaryawanRingkas } from '../../api/feed';
 import KaryawanPicker from '../../components/KaryawanPicker';
+import DatePickerInput from '../../components/DatePickerInput';
+import { useToast } from '../../components/Toast';
 
 const PRIORITAS_OPTIONS: { key: TugasPrioritas; label: string; color: string }[] = [
   { key: 'rendah', label: 'Rendah', color: '#6b7280' },
@@ -34,6 +36,7 @@ function isValidDate(s: string): boolean {
 export default function CreateTaskScreen() {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [judul, setJudul]         = useState('');
   const [deskripsi, setDeskripsi] = useState('');
@@ -60,7 +63,7 @@ export default function CreateTaskScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tugas'] });
       queryClient.invalidateQueries({ queryKey: ['tugas-stats'] });
-      Alert.alert('Berhasil', 'Task berhasil dibuat.');
+      toast.success('Task berhasil dibuat.');
       navigation.goBack();
     },
     onError: (e: any) => {
@@ -201,26 +204,12 @@ export default function CreateTaskScreen() {
           <View style={styles.dateRow}>
             <View style={{ flex: 1 }}>
               <Field label="Tgl Mulai">
-                <TextInput
-                  style={styles.input}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#6b7280"
-                  value={tglMulai}
-                  onChangeText={setTglMulai}
-                  keyboardType="numbers-and-punctuation"
-                />
+                <DatePickerInput value={tglMulai} onChange={setTglMulai} />
               </Field>
             </View>
             <View style={{ flex: 1 }}>
               <Field label="Tgl Selesai">
-                <TextInput
-                  style={styles.input}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#6b7280"
-                  value={tglSelesai}
-                  onChangeText={setTglSelesai}
-                  keyboardType="numbers-and-punctuation"
-                />
+                <DatePickerInput value={tglSelesai} onChange={setTglSelesai} />
               </Field>
             </View>
           </View>

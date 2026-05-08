@@ -13,6 +13,7 @@ import {
   type KaryawanRingkas as PerfKaryawanRingkas,
 } from '../../api/performance';
 import KaryawanPicker from '../../components/KaryawanPicker';
+import DatePickerInput from '../../components/DatePickerInput';
 import type { KaryawanRingkas } from '../../api/feed';
 
 type RouteParams = { id?: number };
@@ -181,33 +182,15 @@ export default function CreatePerformanceScreen() {
           </TouchableOpacity>
 
           <Text style={styles.label}>Tanggal <Text style={styles.req}>*</Text></Text>
-          <TextInput
-            style={styles.input}
-            value={tanggal}
-            onChangeText={setTanggal}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor="#6b7280"
-          />
+          <DatePickerInput value={tanggal} onChange={setTanggal} />
 
           {jenis === 'kontrak' && (
             <>
               <Text style={styles.label}>Tanggal Mulai Kontrak <Text style={styles.req}>*</Text></Text>
-              <TextInput
-                style={styles.input}
-                value={tglMulai}
-                onChangeText={setTglMulai}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#6b7280"
-              />
+              <DatePickerInput value={tglMulai} onChange={setTglMulai} />
 
               <Text style={styles.label}>Tanggal Berakhir Kontrak <Text style={styles.req}>*</Text></Text>
-              <TextInput
-                style={styles.input}
-                value={tglBerakhir}
-                onChangeText={setTglBerakhir}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#6b7280"
-              />
+              <DatePickerInput value={tglBerakhir} onChange={setTglBerakhir} />
 
               <Text style={styles.label}>Nilai Kontrak (opsional)</Text>
               <TextInput

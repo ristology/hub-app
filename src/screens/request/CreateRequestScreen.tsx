@@ -9,6 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { requestApi, type CreateRequestPayload, type KlienRingkas } from '../../api/clientRequest';
+import DatePickerInput from '../../components/DatePickerInput';
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -75,22 +76,10 @@ export default function CreateRequestScreen() {
           </TouchableOpacity>
 
           <Text style={styles.label}>Tanggal Request <Text style={styles.req}>*</Text></Text>
-          <TextInput
-            style={styles.input}
-            value={tanggalRequest}
-            onChangeText={setTglReq}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor="#6b7280"
-          />
+          <DatePickerInput value={tanggalRequest} onChange={setTglReq} />
 
           <Text style={styles.label}>Deadline</Text>
-          <TextInput
-            style={styles.input}
-            value={deadline}
-            onChangeText={setDeadline}
-            placeholder="YYYY-MM-DD (opsional)"
-            placeholderTextColor="#6b7280"
-          />
+          <DatePickerInput value={deadline} onChange={setDeadline} placeholder="Pilih deadline (opsional)" />
 
           <Text style={styles.label}>Keterangan <Text style={styles.req}>*</Text></Text>
           <TextInput

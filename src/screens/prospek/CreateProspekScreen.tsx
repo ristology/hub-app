@@ -9,6 +9,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { prospekApi, type ProspekStatus } from '../../api/prospek';
+import DatePickerInput from '../../components/DatePickerInput';
+import { useToast } from '../../components/Toast';
 
 const STATUS_OPTIONS: { key: ProspekStatus; label: string; color: string }[] = [
   { key: 'prospek',   label: 'Prospek',   color: '#8a94a6' },
@@ -26,6 +28,7 @@ function isValidDate(s: string): boolean {
 export default function CreateProspekScreen() {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [namaKlien,    setNamaKlien]    = useState('');
   const [alamat,       setAlamat]       = useState('');
@@ -52,7 +55,7 @@ export default function CreateProspekScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['prospek'] });
       queryClient.invalidateQueries({ queryKey: ['prospek-stats'] });
-      Alert.alert('Berhasil', 'Prospek berhasil dibuat.');
+      toast.success('Prospek berhasil dibuat.');
       navigation.goBack();
     },
     onError: (e: any) => {
@@ -152,16 +155,12 @@ export default function CreateProspekScreen() {
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <View style={{ flex: 1 }}>
               <Field label="Pertemuan Pertama">
-                <TextInput style={styles.input} placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#6b7280" value={tglPertama} onChangeText={setTglPertama}
-                  keyboardType="numbers-and-punctuation" />
+                <DatePickerInput value={tglPertama} onChange={setTglPertama} />
               </Field>
             </View>
             <View style={{ flex: 1 }}>
               <Field label="Pertemuan Berikutnya">
-                <TextInput style={styles.input} placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#6b7280" value={tglBerikutnya} onChangeText={setTglBerikutnya}
-                  keyboardType="numbers-and-punctuation" />
+                <DatePickerInput value={tglBerikutnya} onChange={setTglBerikutnya} />
               </Field>
             </View>
           </View>
