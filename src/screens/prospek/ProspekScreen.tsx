@@ -1,10 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
   TouchableOpacity, TextInput, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -36,14 +36,23 @@ export default function ProspekScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('semua');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusOpen, setStatusOpen] = useState(false);
 
+  // Debounce search 300ms — supaya tidak refetch tiap keystroke (yg bikin keyboard hilang)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['prospek', filter, search],
+    queryKey: ['prospek', filter, debouncedSearch],
     queryFn:  () => prospekApi.list({
       ...(filter === 'semua' ? {} : { status: filter }),
-      ...(search.trim() ? { search: search.trim() } : {}),
+      ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
     }),
+    // Keep old data sementara fetch baru jalan — supaya tidak unmount loading screen
+    placeholderData: keepPreviousData,
   });
 
   const { data: stats } = useQuery({
