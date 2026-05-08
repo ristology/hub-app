@@ -74,6 +74,11 @@ export const chatApi = {
     return data;
   },
 
+  /** Soft-delete pesan (hanya pengirim) */
+  deleteMessage: async (roomId: number, messageId: number): Promise<void> => {
+    await apiClient.delete(`/chat/rooms/${roomId}/messages/${messageId}`);
+  },
+
   /** Tandai semua pesan sebagai dibaca */
   markRead: async (roomId: number): Promise<void> => {
     await apiClient.post(`/chat/rooms/${roomId}/read`);

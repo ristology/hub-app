@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl,
+  View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -73,9 +73,13 @@ export default function HomeScreen() {
               <Text style={styles.role}>{user.departemen}</Text>
             )}
           </View>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{userInitial}</Text>
-          </View>
+          {user?.foto ? (
+            <Image source={{ uri: user.foto }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{userInitial}</Text>
+            </View>
+          )}
         </View>
 
         {/* Hari Ini */}

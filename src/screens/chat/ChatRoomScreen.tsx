@@ -113,8 +113,29 @@ export default function ChatRoomScreen() {
 
   const messages = (data?.messages.data ?? []) as ChatMessage[];
 
+  const handleLongPressMessage = (msg: ChatMessage) => {
+    if (msg.user_id !== user?.id || msg.dihapus_at) return;
+    Alert.alert('Hapus pesan?', 'Pesan akan dihapus untuk semua orang di room ini.', [
+      { text: 'Batal', style: 'cancel' },
+      {
+        text: 'Hapus',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await chatApi.deleteMessage(roomId, msg.id);
+            queryClient.invalidateQueries({ queryKey: ['chat-room', roomId] });
+            queryClient.invalidateQueries({ queryKey: ['chat-rooms'] });
+          } catch (e: any) {
+            Alert.alert('Error', e.response?.data?.message ?? 'Gagal hapus pesan.');
+          }
+        },
+      },
+    ]);
+  };
+
   const renderMessage = ({ item }: { item: ChatMessage }) => {
-    const isMine = item.user_id === user?.id;
+    const isMine   = item.user_id === user?.id;
+    const isHapus  = !!item.dihapus_at;
     return (
       <View style={[styles.bubbleRow, isMine ? styles.bubbleRowRight : styles.bubbleRowLeft]}>
         {!isMine && (
@@ -126,18 +147,30 @@ export default function ChatRoomScreen() {
             </View>
           )
         )}
-        <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleOther]}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onLongPress={() => handleLongPressMessage(item)}
+          delayLongPress={350}
+          style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleOther,
+            isHapus && styles.bubbleDeleted]}
+        >
           {!isMine && <Text style={styles.bubbleSender}>{item.user.nama}</Text>}
-          {item.foto_url && (
-            <Image source={{ uri: item.foto_url }} style={styles.bubbleImage} resizeMode="cover" />
-          )}
-          {item.pesan && (
-            <Text style={[styles.bubbleText, isMine ? { color: '#fff' } : { color: '#fff' }]}>
-              {item.pesan}
+          {isHapus ? (
+            <Text style={styles.bubbleDeletedText}>
+              <Ionicons name="ban-outline" size={11} color="#8a94a6" /> Pesan ini dihapus
             </Text>
+          ) : (
+            <>
+              {item.foto_url && (
+                <Image source={{ uri: item.foto_url }} style={styles.bubbleImage} resizeMode="cover" />
+              )}
+              {item.pesan && (
+                <Text style={styles.bubbleText}>{item.pesan}</Text>
+              )}
+            </>
           )}
           <Text style={styles.bubbleTime}>{formatTime(item.created_at)}</Text>
-        </View>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -304,7 +337,9 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 4,
   },
   bubbleSender: { color: '#a8b6ff', fontSize: 11, fontWeight: '600', marginBottom: 2 },
-  bubbleText:   { fontSize: 14, lineHeight: 19 },
+  bubbleText:   { fontSize: 14, lineHeight: 19, color: '#fff' },
+  bubbleDeleted:     { opacity: 0.6 },
+  bubbleDeletedText: { color: '#8a94a6', fontSize: 13, fontStyle: 'italic' },
   bubbleTime:   { color: 'rgba(255,255,255,0.5)', fontSize: 10, marginTop: 3, alignSelf: 'flex-end' },
   bubbleImage:  { width: 200, height: 200, borderRadius: 8, marginBottom: 4 },
 
