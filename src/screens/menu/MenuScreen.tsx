@@ -23,7 +23,7 @@ const MENU_ITEMS: MenuItem[] = [
   { icon: 'trending-up-outline',   label: 'Performance', color: '#22c55e', screen: 'Performance' },
   { icon: 'document-text-outline', label: 'Dokumen',     color: '#06b6d4', disabled: true },
   { icon: 'pulse-outline',         label: 'Aktivitas',   color: '#ec4899', screen: 'Aktivitas' },
-  { icon: 'receipt-outline',       label: 'Invoice',     color: '#f97316', disabled: true },
+  { icon: 'receipt-outline',       label: 'Invoice',     color: '#f97316', screen: 'Invoice' },
 ];
 
 export default function MenuScreen() {
