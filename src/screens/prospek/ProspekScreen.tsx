@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
-  TouchableOpacity, ScrollView,
+  TouchableOpacity, TextInput, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
@@ -20,25 +20,30 @@ type ProspekStackParamList = {
 
 type Filter = 'semua' | ProspekStatus;
 
-const FILTER_OPTIONS: { key: Filter; label: string }[] = [
-  { key: 'semua',     label: 'Semua' },
-  { key: 'prospek',   label: 'Prospek' },
-  { key: 'follow_up', label: 'Follow Up' },
-  { key: 'proposal',  label: 'Proposal' },
-  { key: 'negosiasi', label: 'Negosiasi' },
-  { key: 'trial',     label: 'Trial' },
-  { key: 'kontrak',   label: 'Kontrak' },
-  { key: 'batal',     label: 'Batal' },
+const FILTER_OPTIONS: { key: Filter; label: string; color: string }[] = [
+  { key: 'semua',     label: 'Semua',     color: '#3b82f6' },
+  { key: 'prospek',   label: 'Prospek',   color: '#8a94a6' },
+  { key: 'follow_up', label: 'Follow Up', color: '#06b6d4' },
+  { key: 'proposal',  label: 'Proposal',  color: '#3b82f6' },
+  { key: 'negosiasi', label: 'Negosiasi', color: '#f59e0b' },
+  { key: 'trial',     label: 'Trial',     color: '#a855f7' },
+  { key: 'kontrak',   label: 'Kontrak',   color: '#22c55e' },
+  { key: 'batal',     label: 'Batal',     color: '#ef4444' },
 ];
 
 export default function ProspekScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProspekStackParamList>>();
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('semua');
+  const [search, setSearch] = useState('');
+  const [statusOpen, setStatusOpen] = useState(false);
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['prospek', filter],
-    queryFn:  () => prospekApi.list(filter === 'semua' ? {} : { status: filter }),
+    queryKey: ['prospek', filter, search],
+    queryFn:  () => prospekApi.list({
+      ...(filter === 'semua' ? {} : { status: filter }),
+      ...(search.trim() ? { search: search.trim() } : {}),
+    }),
   });
 
   const { data: stats } = useQuery({
@@ -61,6 +66,8 @@ export default function ProspekScreen() {
     />
   );
 
+  const currentFilter = FILTER_OPTIONS.find((f) => f.key === filter) ?? FILTER_OPTIONS[0];
+
   if (isLoading && !data) {
     return (
       <SafeAreaView style={styles.container}>
@@ -77,41 +84,44 @@ export default function ProspekScreen() {
         <Text style={styles.title}>Prospek</Text>
       </View>
 
-      {/* Stats */}
+      {/* Stats — grid 4 kolom, span full width sejajar list */}
       {stats && (
-        <View style={styles.statsWrap}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.statsContent}
-          >
-            <StatBox label="Aktif"    value={stats.prospek + stats.follow_up + stats.proposal + stats.negosiasi + stats.trial} color="#3b82f6" />
-            <StatBox label="Kontrak"  value={stats.kontrak}  color="#22c55e" />
-            <StatBox label="Overdue"  value={stats.overdue}  color="#ef4444" />
-            <StatBox label="Batal"    value={stats.batal}    color="#6b7280" />
-          </ScrollView>
+        <View style={styles.statsRow}>
+          <StatBox label="Aktif" value={stats.prospek + stats.follow_up + stats.proposal + stats.negosiasi + stats.trial} color="#3b82f6" />
+          <StatBox label="Kontrak" value={stats.kontrak}  color="#22c55e" />
+          <StatBox label="Overdue" value={stats.overdue}  color="#ef4444" />
+          <StatBox label="Batal"   value={stats.batal}    color="#6b7280" />
         </View>
       )}
 
-      {/* Filter chips */}
-      <View style={styles.filtersWrap}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersContent}
+      {/* Status filter (bottom sheet trigger) + Search */}
+      <View style={styles.toolsRow}>
+        <TouchableOpacity
+          style={[styles.statusBtn, { borderColor: currentFilter.color + '60' }]}
+          onPress={() => setStatusOpen(true)}
         >
-          {FILTER_OPTIONS.map((opt) => (
-            <TouchableOpacity
-              key={opt.key}
-              onPress={() => setFilter(opt.key)}
-              style={[styles.chip, filter === opt.key && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, filter === opt.key && styles.chipTextActive]}>
-                {opt.label}
-              </Text>
+          <View style={[styles.statusDot, { backgroundColor: currentFilter.color }]} />
+          <Text style={styles.statusText} numberOfLines={1}>{currentFilter.label}</Text>
+          <Ionicons name="chevron-down" size={14} color="#8a94a6" />
+        </TouchableOpacity>
+
+        <View style={styles.searchBox}>
+          <Ionicons name="search" size={16} color="#6b7280" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Cari klien..."
+            placeholderTextColor="#6b7280"
+            value={search}
+            onChangeText={setSearch}
+            autoCapitalize="none"
+            returnKeyType="search"
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} hitSlop={6}>
+              <Ionicons name="close-circle" size={16} color="#6b7280" />
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+          )}
+        </View>
       </View>
 
       <FlatList
@@ -125,7 +135,9 @@ export default function ProspekScreen() {
         ListEmptyComponent={
           <View style={styles.center}>
             <Ionicons name="people-outline" size={48} color="#3b3f4a" />
-            <Text style={styles.empty}>Belum ada prospek.</Text>
+            <Text style={styles.empty}>
+              {search ? `Tidak ada hasil untuk "${search}"` : 'Belum ada prospek.'}
+            </Text>
           </View>
         }
       />
@@ -137,6 +149,35 @@ export default function ProspekScreen() {
       >
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
+
+      {/* Bottom sheet untuk pilih status */}
+      <Modal visible={statusOpen} transparent animationType="slide" onRequestClose={() => setStatusOpen(false)}>
+        <TouchableOpacity
+          style={styles.sheetBackdrop}
+          activeOpacity={1}
+          onPress={() => setStatusOpen(false)}
+        >
+          <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Filter Status</Text>
+            {FILTER_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.sheetItem, filter === opt.key && { backgroundColor: opt.color + '15' }]}
+                onPress={() => { setFilter(opt.key); setStatusOpen(false); }}
+              >
+                <View style={[styles.sheetDot, { backgroundColor: opt.color }]} />
+                <Text style={[styles.sheetItemText, filter === opt.key && { color: opt.color, fontWeight: '700' }]}>
+                  {opt.label}
+                </Text>
+                {filter === opt.key && (
+                  <Ionicons name="checkmark" size={18} color={opt.color} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -156,49 +197,48 @@ const styles = StyleSheet.create({
   header:    { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
   title:     { color: '#fff', fontSize: 24, fontWeight: '700' },
 
-  statsWrap: { marginBottom: 10 },
-  statsContent: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 4,
+  statsRow: {
+    flexDirection: 'row', gap: 8,
+    paddingHorizontal: 16, marginBottom: 12,
   },
   statBox: {
+    flex: 1,
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
-    minWidth: 80,
   },
-  statValue: { fontSize: 20, fontWeight: '700' },
-  statLabel: { color: '#8a94a6', fontSize: 11, marginTop: 2 },
+  statValue: { fontSize: 22, fontWeight: '700' },
+  statLabel: { color: '#8a94a6', fontSize: 11, marginTop: 4 },
 
-  filtersWrap: { marginBottom: 8 },
-  filtersContent: {
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    alignItems: 'center',
+  toolsRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 16, marginBottom: 8,
   },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 16,
+  statusBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 9,
     backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    justifyContent: 'center',
+    borderRadius: 10, borderWidth: 1,
+    minWidth: 130,
   },
-  chipActive: { backgroundColor: 'rgba(59,130,246,0.20)', borderColor: '#3b82f6' },
-  chipText:   { color: '#c5cdd9', fontSize: 12 },
-  chipTextActive: { color: '#3b82f6', fontWeight: '600' },
+  statusDot:  { width: 8, height: 8, borderRadius: 4 },
+  statusText: { color: '#fff', fontSize: 13, fontWeight: '600', flex: 1 },
+
+  searchBox: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 10,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  searchInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 0 },
 
   list:  { padding: 16, paddingTop: 8 },
-  empty: { color: '#8a94a6', fontSize: 14 },
+  empty: { color: '#8a94a6', fontSize: 14, textAlign: 'center' },
+
   fab: {
     position: 'absolute', right: 20, bottom: 20,
     width: 56, height: 56, borderRadius: 28,
@@ -207,4 +247,28 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3, shadowRadius: 6, elevation: 6,
   },
+
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: '#1c2333',
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingBottom: 30, paddingHorizontal: 12, paddingTop: 8,
+  },
+  sheetHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.20)',
+    alignSelf: 'center', marginBottom: 12,
+  },
+  sheetTitle: {
+    color: '#8a94a6', fontSize: 12, fontWeight: '700',
+    letterSpacing: 0.8, marginBottom: 8, paddingHorizontal: 8,
+    textTransform: 'uppercase',
+  },
+  sheetItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 12, paddingHorizontal: 12,
+    borderRadius: 10,
+  },
+  sheetDot: { width: 10, height: 10, borderRadius: 5 },
+  sheetItemText: { color: '#fff', fontSize: 14, flex: 1 },
 });
