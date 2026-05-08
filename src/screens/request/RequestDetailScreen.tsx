@@ -14,9 +14,10 @@ import {
 import PhotoCarousel  from '../../components/PhotoCarousel';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
+import { useKomentarHighlight } from '../../hooks/useKomentarHighlight';
 import type { KaryawanRingkas } from '../../api/feed';
 
-type RouteParams = { id: number };
+type RouteParams = { id: number; highlightKomentarId?: number | null };
 
 const STATUS_STYLE = {
   menunggu: { bg: 'rgba(107,114,128,0.20)', color: '#8a94a6', label: 'Menunggu' },
@@ -43,8 +44,9 @@ function formatDateTime(s: string): string {
 export default function RequestDetailScreen() {
   const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const navigation = useNavigation<any>();
-  const { id } = route.params;
+  const { id, highlightKomentarId } = route.params;
   const queryClient = useQueryClient();
+  const { scrollRef, registerKomRef, highlightedId } = useKomentarHighlight(highlightKomentarId);
 
   const [komentar, setKomentar] = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -141,7 +143,7 @@ export default function RequestDetailScreen() {
           <Text style={styles.topTitle}>Detail Request</Text>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll}>
           <Text style={styles.namaKlien}>{r.nama_klien}</Text>
           <View style={[styles.statusPill, { backgroundColor: statusStyle.bg }]}>
             <Text style={[styles.statusText, { color: statusStyle.color }]}>{statusStyle.label}</Text>
@@ -269,7 +271,13 @@ export default function RequestDetailScreen() {
           {/* Komentar */}
           <Text style={styles.sectionLabel}>KOMENTAR ({komentarList.length})</Text>
           {komentarList.length > 0 ? (
-            komentarList.map((k) => <KomentarItem key={k.id} k={k} />)
+            komentarList.map((k) => (
+              <KomentarItem
+                key={k.id} k={k}
+                bindRef={registerKomRef(k.id)}
+                highlighted={highlightedId === k.id}
+              />
+            ))
           ) : (
             <Text style={styles.emptyText}>Belum ada komentar.</Text>
           )}
@@ -369,9 +377,13 @@ function UserRow({ label, nama, foto }: { label: string; nama: string; foto: str
   );
 }
 
-function KomentarItem({ k }: { k: RequestKomentar }) {
+function KomentarItem({ k, bindRef, highlighted }: {
+  k: RequestKomentar;
+  bindRef?: (v: View | null) => void;
+  highlighted?: boolean;
+}) {
   return (
-    <View style={komStyles.item}>
+    <View ref={bindRef} style={[komStyles.item, highlighted && komStyles.itemHighlight]}>
       {k.foto ? (
         <Image source={{ uri: k.foto }} style={komStyles.avatar} />
       ) : (
@@ -650,7 +662,11 @@ const infoStyles = StyleSheet.create({
 });
 
 const komStyles = StyleSheet.create({
-  item:    { flexDirection: 'row', marginBottom: 12 },
+  item:    { flexDirection: 'row', marginBottom: 12, padding: 8, borderRadius: 8 },
+  itemHighlight: {
+    backgroundColor: 'rgba(59,130,246,0.15)',
+    borderWidth: 1, borderColor: 'rgba(59,130,246,0.40)',
+  },
   avatar:  { width: 32, height: 32, borderRadius: 16, backgroundColor: '#1c2333' },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#fff', fontWeight: '700' },

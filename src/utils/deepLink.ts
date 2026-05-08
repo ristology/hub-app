@@ -22,22 +22,26 @@ function resolveTarget(data: NotifData): { tab: string; screen?: string; params?
   const modelId   = data.model_id ? Number(data.model_id) : null;
   const url       = String(data.url ?? '');
 
+  // Extract komentar id dari URL hash `#kom-{id}` untuk highlight
+  const komMatch = url.match(/#kom-(\d+)/);
+  const komId    = komMatch ? Number(komMatch[1]) : null;
+
   // 1) Explicit dari payload (cara utama — backend sudah kirim tipe+model_id)
   if (tipe && modelId) {
     if (tipe === 'komentar_feed' || tipe === 'feed_post' || tipe === 'feed_tag' || tipe === 'komentar_balas') {
-      return { tab: 'Feed', screen: 'FeedDetail', params: { id: modelId } };
+      return { tab: 'Feed', screen: 'FeedDetail', params: { id: modelId, highlightKomentarId: komId } };
     }
     if (tipe === 'komentar_prospek' || tipe.startsWith('prospek_')) {
-      return { tab: 'Prospek', screen: 'ProspekDetail', params: { id: modelId } };
+      return { tab: 'Prospek', screen: 'ProspekDetail', params: { id: modelId, highlightKomentarId: komId } };
     }
     if (tipe === 'komentar_error_log' || tipe.startsWith('error_log_')) {
-      return { tab: 'ErrorLog', screen: 'ErrorLogDetail', params: { id: modelId } };
+      return { tab: 'ErrorLog', screen: 'ErrorLogDetail', params: { id: modelId, highlightKomentarId: komId } };
     }
     if (tipe === 'komentar_request' || tipe.startsWith('request_')) {
       return {
         tab: 'Menu',
         screen: 'Request',
-        params: { screen: 'RequestDetail', params: { id: modelId } },
+        params: { screen: 'RequestDetail', params: { id: modelId, highlightKomentarId: komId } },
       };
     }
     if (tipe === 'kalender' || tipe.startsWith('kalender_')) {
@@ -49,6 +53,18 @@ function resolveTarget(data: NotifData): { tab: string; screen?: string; params?
     }
     if (tipe.startsWith('task_')) {
       return { tab: 'Task', screen: 'TaskDetail', params: { id: modelId } };
+    }
+    // Chat: model_id = message_id, tapi navigasi butuh room_id dari URL
+    if (tipe === 'chat_message') {
+      const roomMatch = url.match(/\/chat\/(\d+)/);
+      if (roomMatch) {
+        return {
+          tab: 'Pesan',
+          screen: 'ChatRoom',
+          params: { roomId: Number(roomMatch[1]), nama: 'Pesan', foto: null },
+        };
+      }
+      return { tab: 'Pesan' };
     }
   }
 

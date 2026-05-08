@@ -11,13 +11,15 @@ import { feedApi, type FeedKomentar, type KaryawanRingkas } from '../../api/feed
 import PhotoCarousel  from '../../components/PhotoCarousel';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
+import { useKomentarHighlight } from '../../hooks/useKomentarHighlight';
 
-type RouteParams = { id: number };
+type RouteParams = { id: number; highlightKomentarId?: number | null };
 
 export default function FeedDetailScreen() {
   const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const navigation = useNavigation();
-  const { id } = route.params;
+  const { id, highlightKomentarId } = route.params;
+  const { scrollRef, registerKomRef, highlightedId } = useKomentarHighlight(highlightKomentarId);
   const queryClient = useQueryClient();
   const [komentar, setKomentar]       = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -96,7 +98,7 @@ export default function FeedDetailScreen() {
           <Text style={styles.topTitle}>Detail Feed</Text>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll}>
           {/* Header — pengirim */}
           <View style={styles.header}>
             {feed.karyawan.foto ? (
@@ -155,7 +157,13 @@ export default function FeedDetailScreen() {
           <View style={styles.comments}>
             <Text style={styles.commentsTitle}>Komentar</Text>
             {feed.komentar?.length ? (
-              feed.komentar.map((k) => <CommentItem key={k.id} k={k} />)
+              feed.komentar.map((k) => (
+                <CommentItem
+                  key={k.id} k={k}
+                  bindRef={registerKomRef(k.id)}
+                  highlighted={highlightedId === k.id}
+                />
+              ))
             ) : (
               <Text style={styles.empty}>Belum ada komentar.</Text>
             )}
@@ -203,9 +211,13 @@ export default function FeedDetailScreen() {
   );
 }
 
-function CommentItem({ k }: { k: FeedKomentar }) {
+function CommentItem({ k, bindRef, highlighted }: {
+  k: FeedKomentar;
+  bindRef?: (v: View | null) => void;
+  highlighted?: boolean;
+}) {
   return (
-    <View style={styles.commentItem}>
+    <View ref={bindRef} style={[styles.commentItem, highlighted && styles.commentHighlight]}>
       <Image source={{ uri: k.foto }} style={styles.commentAvatar} />
       <View style={{ flex: 1, marginLeft: 10 }}>
         <Text style={styles.commentName}>{k.nama}</Text>
@@ -249,7 +261,11 @@ const styles = StyleSheet.create({
   actionText:{ color: '#8a94a6', fontSize: 13 },
   comments:  { marginTop: 16 },
   commentsTitle: { color: '#fff', fontWeight: '700', fontSize: 14, marginBottom: 10 },
-  commentItem:   { flexDirection: 'row', marginBottom: 12 },
+  commentItem:   { flexDirection: 'row', marginBottom: 12, padding: 8, borderRadius: 8 },
+  commentHighlight: {
+    backgroundColor: 'rgba(59,130,246,0.15)',
+    borderWidth: 1, borderColor: 'rgba(59,130,246,0.40)',
+  },
   commentAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#1c2333' },
   commentName:   { color: '#fff', fontWeight: '600', fontSize: 13 },
   commentText:   { color: '#c5cdd9', fontSize: 13, marginTop: 2, lineHeight: 18 },
