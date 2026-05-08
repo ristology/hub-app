@@ -155,6 +155,28 @@ export default function ProspekDetailScreen() {
     ]);
   };
 
+  const destroyProspekMut = useMutation({
+    mutationFn: () => prospekApi.destroy(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['prospek'] });
+      queryClient.invalidateQueries({ queryKey: ['prospek-stats'] });
+      toast.success('Prospek dihapus.');
+      navigation.goBack();
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal hapus prospek.'),
+  });
+
+  const confirmDeleteProspek = () => {
+    Alert.alert(
+      'Hapus Prospek?',
+      `Hapus prospek "${data?.data.nama_klien ?? ''}" beserta semua pertemuan dan komentarnya? Aksi ini tidak bisa dibatalkan.`,
+      [
+        { text: 'Batal' },
+        { text: 'Hapus', style: 'destructive', onPress: () => destroyProspekMut.mutate() },
+      ],
+    );
+  };
+
   if (isLoading || !data) {
     return (
       <SafeAreaView style={styles.container}>
@@ -183,9 +205,14 @@ export default function ProspekDetailScreen() {
           </TouchableOpacity>
           <Text style={styles.topTitle}>Detail Prospek</Text>
           {p.can_edit && (
-            <TouchableOpacity onPress={() => setPertemuanOpen(true)} style={styles.addBtn}>
-              <Ionicons name="add-circle-outline" size={22} color="#3b82f6" />
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity onPress={() => setPertemuanOpen(true)} style={styles.addBtn}>
+                <Ionicons name="add-circle-outline" size={22} color="#3b82f6" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={confirmDeleteProspek} style={styles.addBtn}>
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              </TouchableOpacity>
+            </>
           )}
         </View>
 
@@ -202,22 +229,35 @@ export default function ProspekDetailScreen() {
 
           {/* Status switcher */}
           <Text style={styles.sectionLabel}>STATUS</Text>
-          <View style={styles.statusGroup}>
-            {STATUS_OPTIONS.map((s) => (
-              <TouchableOpacity
-                key={s.key}
-                onPress={() => statusMutation.mutate(s.key)}
-                disabled={statusMutation.isPending || p.status === s.key}
-                style={[styles.statusBtn, p.status === s.key && {
-                  backgroundColor: s.color + '30', borderColor: s.color,
-                }]}
-              >
-                <Text style={[styles.statusBtnText, p.status === s.key && {
-                  color: s.color, fontWeight: '700',
-                }]}>{s.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {p.can_edit ? (
+            <View style={styles.statusGroup}>
+              {STATUS_OPTIONS.map((s) => (
+                <TouchableOpacity
+                  key={s.key}
+                  onPress={() => statusMutation.mutate(s.key)}
+                  disabled={statusMutation.isPending || p.status === s.key}
+                  style={[styles.statusBtn, p.status === s.key && {
+                    backgroundColor: s.color + '30', borderColor: s.color,
+                  }]}
+                >
+                  <Text style={[styles.statusBtnText, p.status === s.key && {
+                    color: s.color, fontWeight: '700',
+                  }]}>{s.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            // Read-only: tampilkan status sekarang saja (tidak bisa diubah)
+            (() => {
+              const cur = STATUS_OPTIONS.find((s) => s.key === p.status);
+              return cur ? (
+                <View style={[styles.statusBtn, { alignSelf: 'flex-start',
+                  backgroundColor: cur.color + '30', borderColor: cur.color }]}>
+                  <Text style={[styles.statusBtnText, { color: cur.color, fontWeight: '700' }]}>{cur.label}</Text>
+                </View>
+              ) : null;
+            })()
+          )}
 
           {/* Kontak */}
           <Text style={styles.sectionLabel}>KONTAK</Text>
