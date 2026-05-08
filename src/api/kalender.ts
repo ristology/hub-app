@@ -100,4 +100,9 @@ export const kalenderApi = {
     const { data } = await apiClient.get('/kalender/karyawan/search', { params: { q } });
     return data;
   },
+
+  googleStatus: async (): Promise<{ connected: boolean; expires_at: string | null }> => {
+    const { data } = await apiClient.get('/kalender/google/status');
+    return data;
+  },
 };

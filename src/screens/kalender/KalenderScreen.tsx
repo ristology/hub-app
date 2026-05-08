@@ -65,6 +65,11 @@ export default function KalenderScreen() {
     queryFn:  kalenderApi.stats,
   });
 
+  const { data: googleStatus } = useQuery({
+    queryKey: ['kalender-google-status'],
+    queryFn:  kalenderApi.googleStatus,
+  });
+
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
   const onRefresh = useCallback(async () => {
@@ -115,6 +120,24 @@ export default function KalenderScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Kalender</Text>
+        {googleStatus && (
+          <View style={[
+            styles.googleBadge,
+            googleStatus.connected ? styles.googleConnected : styles.googleDisconnected,
+          ]}>
+            <Ionicons
+              name={googleStatus.connected ? 'cloud-done' : 'cloud-offline'}
+              size={11}
+              color={googleStatus.connected ? '#22c55e' : '#8a94a6'}
+            />
+            <Text style={[
+              styles.googleText,
+              { color: googleStatus.connected ? '#22c55e' : '#8a94a6' },
+            ]}>
+              {googleStatus.connected ? 'Google Sync' : 'Not Connected'}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.monthNav}>
@@ -190,8 +213,19 @@ function StatBox({ label, value, color }: { label: string; value: number; color:
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0d1421' },
   center:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
-  header:    { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
+  header:    {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8,
+  },
   title:     { color: '#fff', fontSize: 24, fontWeight: '700' },
+  googleBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12,
+    borderWidth: 1,
+  },
+  googleConnected:    { backgroundColor: 'rgba(34,197,94,0.10)', borderColor: 'rgba(34,197,94,0.30)' },
+  googleDisconnected: { backgroundColor: 'rgba(138,148,166,0.10)', borderColor: 'rgba(138,148,166,0.25)' },
+  googleText: { fontSize: 10, fontWeight: '600' },
 
   monthNav: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
