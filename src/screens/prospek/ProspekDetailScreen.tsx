@@ -126,6 +126,23 @@ export default function ProspekDetailScreen() {
     pertemuanMutation.mutate();
   };
 
+  const destroyPertemuanMut = useMutation({
+    mutationFn: (pertemuanId: number) => prospekApi.destroyPertemuan(id, pertemuanId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['prospek', id] });
+      queryClient.invalidateQueries({ queryKey: ['prospek'] });
+      toast.success('Pertemuan dihapus.');
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal hapus pertemuan.'),
+  });
+
+  const confirmDeletePertemuan = (pertemuanId: number) => {
+    Alert.alert('Hapus Pertemuan?', 'Catatan pertemuan ini akan dihapus permanen.', [
+      { text: 'Batal' },
+      { text: 'Hapus', style: 'destructive', onPress: () => destroyPertemuanMut.mutate(pertemuanId) },
+    ]);
+  };
+
   if (isLoading || !data) {
     return (
       <SafeAreaView style={styles.container}>
@@ -148,9 +165,11 @@ export default function ProspekDetailScreen() {
             <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.topTitle}>Detail Prospek</Text>
-          <TouchableOpacity onPress={() => setPertemuanOpen(true)} style={styles.addBtn}>
-            <Ionicons name="add-circle-outline" size={22} color="#3b82f6" />
-          </TouchableOpacity>
+          {p.can_edit && (
+            <TouchableOpacity onPress={() => setPertemuanOpen(true)} style={styles.addBtn}>
+              <Ionicons name="add-circle-outline" size={22} color="#3b82f6" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <ScrollView
@@ -213,9 +232,16 @@ export default function ProspekDetailScreen() {
           </Text>
           {p.pertemuan && p.pertemuan.length > 0 && p.pertemuan.map((pt) => (
             <View key={pt.id} style={styles.pertemuanItem}>
-              <View style={styles.pertemuanDate}>
-                <Ionicons name="calendar" size={14} color="#3b82f6" />
-                <Text style={styles.pertemuanDateText}>{formatDate(pt.tanggal)}</Text>
+              <View style={styles.pertemuanRow}>
+                <View style={styles.pertemuanDate}>
+                  <Ionicons name="calendar" size={14} color="#3b82f6" />
+                  <Text style={styles.pertemuanDateText}>{formatDate(pt.tanggal)}</Text>
+                </View>
+                {p.can_edit && (
+                  <TouchableOpacity onPress={() => confirmDeletePertemuan(pt.id)} hitSlop={6}>
+                    <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                  </TouchableOpacity>
+                )}
               </View>
               <Text style={styles.pertemuanKet}>{pt.keterangan}</Text>
               {pt.tanggal_berikutnya && (
@@ -225,10 +251,12 @@ export default function ProspekDetailScreen() {
               )}
             </View>
           ))}
-          <TouchableOpacity style={styles.addPertemuanBtn} onPress={() => setPertemuanOpen(true)}>
-            <Ionicons name="add-circle" size={18} color="#3b82f6" />
-            <Text style={styles.addPertemuanText}>Tambah catatan pertemuan</Text>
-          </TouchableOpacity>
+          {p.can_edit && (
+            <TouchableOpacity style={styles.addPertemuanBtn} onPress={() => setPertemuanOpen(true)}>
+              <Ionicons name="add-circle" size={18} color="#3b82f6" />
+              <Text style={styles.addPertemuanText}>Tambah catatan pertemuan</Text>
+            </TouchableOpacity>
+          )}
 
           {/* Komentar */}
           <Text style={styles.sectionLabel}>KOMENTAR ({komentarList.length})</Text>
@@ -306,11 +334,11 @@ export default function ProspekDetailScreen() {
       {/* Bottom sheet: Tambah catatan pertemuan */}
       <Modal visible={pertemuanOpen} transparent animationType="slide" onRequestClose={() => setPertemuanOpen(false)}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior="padding"
           style={styles.sheetBackdrop}
         >
           <TouchableOpacity activeOpacity={1} style={{ flex: 1 }} onPress={() => setPertemuanOpen(false)} />
-          <View style={[styles.sheet, { paddingBottom: 24 }]} onStartShouldSetResponder={() => true}>
+          <View style={[styles.sheet, { paddingBottom: 24, maxHeight: '85%' }]} onStartShouldSetResponder={() => true}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>Catatan Pertemuan</Text>
@@ -319,39 +347,41 @@ export default function ProspekDetailScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.sheetLabel}>Tanggal Pertemuan <Text style={styles.sheetReq}>*</Text></Text>
-            <DatePickerInput value={pertTanggal} onChange={setPertTanggal} />
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <Text style={styles.sheetLabel}>Tanggal Pertemuan <Text style={styles.sheetReq}>*</Text></Text>
+              <DatePickerInput value={pertTanggal} onChange={setPertTanggal} />
 
-            <Text style={styles.sheetLabel}>Tanggal Pertemuan Berikutnya</Text>
-            <DatePickerInput value={pertBerikutnya} onChange={setPertBerikutnya} placeholder="Opsional" />
+              <Text style={styles.sheetLabel}>Tanggal Pertemuan Berikutnya</Text>
+              <DatePickerInput value={pertBerikutnya} onChange={setPertBerikutnya} placeholder="Opsional" />
 
-            <Text style={styles.sheetLabel}>Keterangan <Text style={styles.sheetReq}>*</Text></Text>
-            <TextInput
-              style={[styles.sheetInput, { minHeight: 110 }]}
-              value={pertKeterangan}
-              onChangeText={setPertKeterangan}
-              placeholder="Hasil pertemuan, kesepakatan, follow-up..."
-              placeholderTextColor="#6b7280"
-              multiline
-              textAlignVertical="top"
-              maxLength={2000}
-            />
+              <Text style={styles.sheetLabel}>Keterangan <Text style={styles.sheetReq}>*</Text></Text>
+              <TextInput
+                style={[styles.sheetInput, { minHeight: 110 }]}
+                value={pertKeterangan}
+                onChangeText={setPertKeterangan}
+                placeholder="Hasil pertemuan, kesepakatan, follow-up..."
+                placeholderTextColor="#6b7280"
+                multiline
+                textAlignVertical="top"
+                maxLength={2000}
+              />
 
-            <TouchableOpacity
-              style={styles.sheetSubmit}
-              onPress={submitPertemuan}
-              disabled={pertemuanMutation.isPending}
-            >
-              {pertemuanMutation.isPending
-                ? <ActivityIndicator size="small" color="#fff" />
-                : (
-                  <>
-                    <Ionicons name="checkmark-circle" size={18} color="#fff" />
-                    <Text style={styles.sheetSubmitText}>Simpan Pertemuan</Text>
-                  </>
-                )
-              }
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.sheetSubmit}
+                onPress={submitPertemuan}
+                disabled={pertemuanMutation.isPending}
+              >
+                {pertemuanMutation.isPending
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                      <Text style={styles.sheetSubmitText}>Simpan Pertemuan</Text>
+                    </>
+                  )
+                }
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -463,6 +493,7 @@ const styles = StyleSheet.create({
   pertemuanDate: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   pertemuanDateText: { color: '#3b82f6', fontSize: 12, fontWeight: '600' },
   pertemuanKet: { color: '#d6dce6', fontSize: 13, lineHeight: 19 },
+  pertemuanRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   pertemuanNext: { color: '#22c55e', fontSize: 11, marginTop: 4 },
   addPertemuanBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

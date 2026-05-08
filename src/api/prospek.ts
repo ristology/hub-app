@@ -4,6 +4,8 @@ export type ProspekStatus = 'prospek' | 'follow_up' | 'proposal' | 'negosiasi' |
 
 export type Prospek = {
   id: number;
+  milikku: boolean;
+  can_edit: boolean;
   nama_klien: string;
   alamat: string | null;
   kota: string | null;
@@ -106,6 +108,11 @@ export const prospekApi = {
     keterangan: string;
   }): Promise<{ data: Prospek }> => {
     const { data } = await apiClient.post(`/prospek/${id}/pertemuan`, payload);
+    return data;
+  },
+
+  destroyPertemuan: async (prospekId: number, pertemuanId: number): Promise<{ data: Prospek }> => {
+    const { data } = await apiClient.delete(`/prospek/${prospekId}/pertemuan/${pertemuanId}`);
     return data;
   },
 
