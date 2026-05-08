@@ -129,7 +129,14 @@ export default function ChatRoomScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={{ flex: 1, paddingBottom: kbHeight }}>
+      <View style={{
+        flex: 1,
+        // Android edge-to-edge: kbHeight tidak include nav bar inset, perlu ditambah
+        // iOS: kbHeight sudah include home indicator
+        paddingBottom: kbHeight > 0
+          ? kbHeight + (Platform.OS === 'android' ? insets.bottom : 0)
+          : 0,
+      }}>
         {/* Top bar */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
