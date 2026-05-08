@@ -9,7 +9,10 @@ import { useRoute, useNavigation, type RouteProp } from '@react-navigation/nativ
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { errorLogApi, type ErrorLogStatus, type ErrorLogKomentar } from '../../api/errorLog';
-import PhotoCarousel from '../../components/PhotoCarousel';
+import PhotoCarousel  from '../../components/PhotoCarousel';
+import KaryawanPicker from '../../components/KaryawanPicker';
+import MentionText    from '../../components/MentionText';
+import type { KaryawanRingkas } from '../../api/feed';
 
 type RouteParams = { id: number };
 
@@ -33,6 +36,31 @@ export default function ErrorLogDetailScreen() {
   const { id } = route.params;
   const queryClient = useQueryClient();
   const [komentar, setKomentar] = useState('');
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionAt,   setMentionAt]   = useState<number | null>(null);
+
+  const handleKomentarChange = (next: string) => {
+    if (next.length > komentar.length) {
+      const lastChar = next.charAt(next.length - 1);
+      if (lastChar === '@') {
+        setMentionAt(next.length - 1);
+        setMentionOpen(true);
+      }
+    }
+    setKomentar(next);
+  };
+
+  const insertMention = (k: KaryawanRingkas) => {
+    const tag = '@' + k.nama.replace(/\s+/g, '_') + ' ';
+    if (mentionAt !== null) {
+      const before = komentar.substring(0, mentionAt);
+      const after  = komentar.substring(mentionAt + 1);
+      setKomentar(before + tag + after);
+    } else {
+      setKomentar((prev) => (prev ? `${prev} ${tag}` : tag));
+    }
+    setMentionAt(null);
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['error-log', id],
@@ -73,7 +101,7 @@ export default function ErrorLogDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         {/* Top bar */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -189,12 +217,15 @@ export default function ErrorLogDetailScreen() {
 
         {/* Input komentar */}
         <View style={styles.inputBar}>
+          <TouchableOpacity style={styles.mentionBtn} onPress={() => setMentionOpen(true)}>
+            <Ionicons name="at" size={18} color="#3b82f6" />
+          </TouchableOpacity>
           <TextInput
             style={styles.input}
-            placeholder="Tulis komentar..."
+            placeholder="Tulis komentar... ketik @ untuk mention"
             placeholderTextColor="#6b7280"
             value={komentar}
-            onChangeText={setKomentar}
+            onChangeText={handleKomentarChange}
             multiline
           />
           <TouchableOpacity
@@ -209,6 +240,14 @@ export default function ErrorLogDetailScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      <KaryawanPicker
+        visible={mentionOpen}
+        onClose={() => { setMentionOpen(false); setMentionAt(null); }}
+        mode="single"
+        onPick={insertMention}
+        title="Mention Karyawan"
+      />
     </SafeAreaView>
   );
 }
@@ -253,7 +292,7 @@ function KomentarItem({ k }: { k: ErrorLogKomentar }) {
       )}
       <View style={{ flex: 1, marginLeft: 10 }}>
         <Text style={komStyles.nama}>{k.nama}</Text>
-        <Text style={komStyles.text}>{k.komentar}</Text>
+        <MentionText text={k.komentar} style={komStyles.text} />
       </View>
     </View>
   );
@@ -329,6 +368,12 @@ const styles = StyleSheet.create({
   },
   sendBtn: {
     width: 38, height: 38, borderRadius: 19, backgroundColor: '#3b82f6',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  mentionBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(59,130,246,0.10)',
+    borderWidth: 1, borderColor: 'rgba(59,130,246,0.25)',
     alignItems: 'center', justifyContent: 'center',
   },
 });
