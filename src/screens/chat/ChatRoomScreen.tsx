@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, Image,
-  StyleSheet, ActivityIndicator, KeyboardAvoidingView, Alert,
+  StyleSheet, ActivityIndicator, Platform, Keyboard, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, type RouteProp } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -25,6 +25,18 @@ export default function ChatRoomScreen() {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const [kbHeight, setKbHeight] = useState(0);
+
+  // Track keyboard height manually — lebih reliable dari KAV behavior
+  // di Android edge-to-edge (KAV punya bug residual padding saat hide).
+  useEffect(() => {
+    const showName = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideName = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showName, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideName, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   const { roomId, nama, foto } = route.params;
   const [pesan, setPesan] = useState('');
@@ -116,11 +128,8 @@ export default function ChatRoomScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView
-        behavior="padding"
-        style={{ flex: 1 }}
-      >
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={{ flex: 1, paddingBottom: Math.max(insets.bottom, kbHeight) }}>
         {/* Top bar */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -177,7 +186,7 @@ export default function ChatRoomScreen() {
             }
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
