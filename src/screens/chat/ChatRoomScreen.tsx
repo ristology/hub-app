@@ -129,7 +129,7 @@ export default function ChatRoomScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={{ flex: 1, paddingBottom: insets.bottom + kbHeight }}>
+      <View style={{ flex: 1, paddingBottom: kbHeight }}>
         {/* Top bar */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -186,6 +186,12 @@ export default function ChatRoomScreen() {
             }
           </TouchableOpacity>
         </View>
+
+        {/* Spacer warna sama dgn input bar, mengisi safe area bawah saat
+            keyboard tidak aktif — supaya input bar tidak terlihat floating */}
+        {kbHeight === 0 && (
+          <View style={{ height: insets.bottom, backgroundColor: '#0a0f1a' }} />
+        )}
       </View>
     </SafeAreaView>
   );
