@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, Image, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Platform, Keyboard, Alert, Modal, FlatList, Linking,
+  ActivityIndicator, KeyboardAvoidingView, Platform, Keyboard, Alert, Modal, FlatList, Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToast } from '../../components/Toast';
