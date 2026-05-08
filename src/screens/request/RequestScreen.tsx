@@ -72,6 +72,9 @@ export default function RequestScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={22} color="#fff" />
+        </TouchableOpacity>
         <Text style={styles.title}>Request</Text>
       </View>
 
@@ -150,8 +153,12 @@ function StatBox({ label, value, color }: { label: string; value: number; color:
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0d1421' },
   center:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
-  header:    { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
-  title:     { color: '#fff', fontSize: 24, fontWeight: '700' },
+  header:    {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 8, paddingTop: 8, paddingBottom: 12, gap: 4,
+  },
+  backBtn:   { padding: 8 },
+  title:     { color: '#fff', fontSize: 22, fontWeight: '700', flex: 1 },
 
   statsWrap: { marginBottom: 10 },
   statsContent: {

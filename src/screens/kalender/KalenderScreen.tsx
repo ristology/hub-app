@@ -119,6 +119,9 @@ export default function KalenderScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={22} color="#fff" />
+        </TouchableOpacity>
         <Text style={styles.title}>Kalender</Text>
         {googleStatus && (
           <View style={[
@@ -214,10 +217,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0d1421' },
   center:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
   header:    {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 8, paddingTop: 8, paddingBottom: 8, gap: 4,
   },
-  title:     { color: '#fff', fontSize: 24, fontWeight: '700' },
+  backBtn:   { padding: 8 },
+  title:     { color: '#fff', fontSize: 22, fontWeight: '700', flex: 1 },
   googleBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12,
