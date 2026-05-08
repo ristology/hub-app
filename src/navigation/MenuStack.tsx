@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MenuScreen     from '../screens/menu/MenuScreen';
 import HomeScreen     from '../screens/home/HomeScreen';
 import AktivitasScreen   from '../screens/aktivitas/AktivitasScreen';
+import DokumenStack      from './DokumenStack';
 import InvoiceStack      from './InvoiceStack';
 import KalenderStack     from './KalenderStack';
 import PerformanceStack  from './PerformanceStack';
@@ -19,6 +20,7 @@ export default function MenuStack() {
       <Stack.Screen name="Request"     component={RequestStack} />
       <Stack.Screen name="Performance" component={PerformanceStack} />
       <Stack.Screen name="Invoice"     component={InvoiceStack} />
+      <Stack.Screen name="Dokumen"     component={DokumenStack} />
       <Stack.Screen name="Aktivitas"   component={AktivitasScreen} />
     </Stack.Navigator>
   );
