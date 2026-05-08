@@ -1,21 +1,7 @@
 import React from 'react';
-import { Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-
-/**
- * Traversal manual ke route paling dalam — getFocusedRouteNameFromRoute
- * kadang berhenti di nested Stack name (mis. 'Request') alih-alih turun ke
- * 'RequestDetail' di nested-of-nested stack.
- */
-function getDeepestRouteName(route: any): string | undefined {
-  let r = route;
-  while (r?.state) {
-    r = r.state.routes[r.state.index ?? 0];
-  }
-  return r?.name;
-}
 
 import FeedStack       from './FeedStack';
 import ChatStack       from './ChatStack';
@@ -23,6 +9,7 @@ import TaskStack       from './TaskStack';
 import MenuStack       from './MenuStack';
 import ErrorLogStack   from './ErrorLogStack';
 import ProspekStack    from './ProspekStack';
+import { useTabBarStyle } from './useTabBarStyle';
 
 type TabIconName = keyof typeof Ionicons.glyphMap;
 
@@ -38,19 +25,7 @@ const tabConfig: Record<string, { icon: TabIconName; iconFocused: TabIconName }>
 };
 
 export default function BottomTabNavigator() {
-  const insets = useSafeAreaInsets();
-
-  const bottomPad    = Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 4);
-  const tabBarHeight = 56 + bottomPad;
-
-  const tabBarStyle = {
-    backgroundColor: '#0a0f1a',
-    borderTopColor:  'rgba(255,255,255,0.08)',
-    borderTopWidth:  1,
-    height:          tabBarHeight,
-    paddingTop:      6,
-    paddingBottom:   bottomPad,
-  };
+  const tabBarStyle = useTabBarStyle();
 
   return (
     <Tab.Navigator
@@ -73,7 +48,7 @@ export default function BottomTabNavigator() {
         component={ProspekStack}
         options={({ route }) => ({
           // Sembunyikan tab bar di ProspekDetail (full-screen UX dgn komentar input)
-          tabBarStyle: getDeepestRouteName(route) === 'ProspekDetail'
+          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'ProspekDetail'
             ? { display: 'none' }
             : tabBarStyle,
         })}
@@ -83,7 +58,7 @@ export default function BottomTabNavigator() {
         component={ChatStack}
         options={({ route }) => ({
           // Sembunyikan tab bar saat user di ChatRoom (full-screen messaging UX)
-          tabBarStyle: getDeepestRouteName(route) === 'ChatRoom'
+          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'ChatRoom'
             ? { display: 'none' }
             : tabBarStyle,
         })}
@@ -94,20 +69,12 @@ export default function BottomTabNavigator() {
         component={ErrorLogStack}
         options={({ route }) => ({
           tabBarLabel: 'Error Log',
-          tabBarStyle: getDeepestRouteName(route) === 'ErrorLogDetail'
+          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'ErrorLogDetail'
             ? { display: 'none' }
             : tabBarStyle,
         })}
       />
-      <Tab.Screen
-        name="Menu"
-        component={MenuStack}
-        options={({ route }) => ({
-          tabBarStyle: getDeepestRouteName(route) === 'RequestDetail'
-            ? { display: 'none' }
-            : tabBarStyle,
-        })}
-      />
+      <Tab.Screen name="Menu" component={MenuStack} />
     </Tab.Navigator>
   );
 }

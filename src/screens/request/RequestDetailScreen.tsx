@@ -6,7 +6,8 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToast } from '../../components/Toast';
 import { Ionicons } from '@expo/vector-icons';
-import { useRoute, useNavigation, type RouteProp } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect, type RouteProp } from '@react-navigation/native';
+import { useTabBarStyle } from '../../navigation/useTabBarStyle';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import {
@@ -49,6 +50,21 @@ export default function RequestDetailScreen() {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const toast = useToast();
+  const tabBarStyle = useTabBarStyle();
+
+  // Sembunyikan bottom tab bar saat di Request detail (full-screen UX dgn komentar input).
+  // Pakai useFocusEffect karena RequestDetail ada di nested stack 2 level
+  // (Menu Tab → MenuStack → Request → RequestStack → RequestDetail) yg tidak
+  // ter-handle oleh getFocusedRouteNameFromRoute (1-level traversal saja).
+  useFocusEffect(React.useCallback(() => {
+    let nav: any = navigation.getParent();
+    while (nav && nav.getState?.()?.type !== 'tab') {
+      nav = nav.getParent?.();
+    }
+    if (!nav) return;
+    nav.setOptions({ tabBarStyle: { display: 'none' } });
+    return () => nav.setOptions({ tabBarStyle });
+  }, [navigation, tabBarStyle]));
   const [kbHeight, setKbHeight] = useState(0);
   useEffect(() => {
     const showName = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
