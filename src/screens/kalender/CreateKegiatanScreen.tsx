@@ -33,16 +33,24 @@ const VISIBILITAS_OPTIONS: { key: Visibilitas; label: string; icon: any }[] = [
   { key: 'publik',  label: 'Publik',  icon: 'globe-outline' },
 ];
 
-function nowISO(): string {
-  const d = new Date();
-  d.setSeconds(0, 0);
-  return d.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+function pad(n: number): string {
+  return String(n).padStart(2, '0');
 }
 
-function plusHourISO(s: string): string {
+function toLocalDatetime(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function nowLocal(): string {
+  const d = new Date();
+  d.setSeconds(0, 0);
+  return toLocalDatetime(d);
+}
+
+function plusHourLocal(s: string): string {
   const d = new Date(s);
   d.setHours(d.getHours() + 1);
-  return d.toISOString().slice(0, 16);
+  return toLocalDatetime(d);
 }
 
 export default function CreateKegiatanScreen() {
@@ -54,8 +62,8 @@ export default function CreateKegiatanScreen() {
   const [judul, setJudul]           = useState('');
   const [deskripsi, setDeskripsi]   = useState('');
   const [lokasi, setLokasi]         = useState('');
-  const [mulaiAt, setMulaiAt]       = useState(nowISO());
-  const [selesaiAt, setSelesaiAt]   = useState(plusHourISO(nowISO()));
+  const [mulaiAt, setMulaiAt]       = useState(nowLocal());
+  const [selesaiAt, setSelesaiAt]   = useState(plusHourLocal(nowLocal()));
   const [seharian, setSeharian]     = useState(false);
   const [kategori, setKategori]     = useState<KategoriKegiatan>('kegiatan');
   const [visibilitas, setVisibilitas] = useState<Visibilitas>('tim');
@@ -75,8 +83,8 @@ export default function CreateKegiatanScreen() {
     setJudul(k.judul);
     setDeskripsi(k.deskripsi ?? '');
     setLokasi(k.lokasi ?? '');
-    setMulaiAt(k.mulai_at.slice(0, 16));
-    setSelesaiAt(k.selesai_at.slice(0, 16));
+    setMulaiAt(toLocalDatetime(new Date(k.mulai_at)));
+    setSelesaiAt(toLocalDatetime(new Date(k.selesai_at)));
     setSeharian(k.seharian);
     setKategori(k.kategori);
     setVisibilitas(k.visibilitas);
