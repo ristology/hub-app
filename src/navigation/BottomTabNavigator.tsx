@@ -56,7 +56,16 @@ export default function BottomTabNavigator() {
       })}
     >
       <Tab.Screen name="Feed"     component={FeedStack} />
-      <Tab.Screen name="Prospek"  component={ProspekStack} />
+      <Tab.Screen
+        name="Prospek"
+        component={ProspekStack}
+        options={({ route }) => ({
+          // Sembunyikan tab bar di ProspekDetail (full-screen UX dgn komentar input)
+          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'ProspekDetail'
+            ? { display: 'none' }
+            : tabBarStyle,
+        })}
+      />
       <Tab.Screen
         name="Pesan"
         component={ChatStack}

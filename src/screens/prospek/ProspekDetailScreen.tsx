@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, Image, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Linking, Modal,
+  ActivityIndicator, KeyboardAvoidingView, Platform, Keyboard, Alert, Linking, Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, type RouteProp } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -45,6 +45,18 @@ export default function ProspekDetailScreen() {
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
   const [replyTo,     setReplyTo]     = useState<{ id: number; nama: string } | null>(null);
+
+  const insets = useSafeAreaInsets();
+  const [kbHeight, setKbHeight] = useState(0);
+
+  // Manual keyboard listener — pattern sama dgn ChatRoomScreen
+  useEffect(() => {
+    const showName = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideName = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showName, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideName, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   // Bottom sheet "Tambah catatan pertemuan"
   const [pertemuanOpen, setPertemuanOpen] = useState(false);
@@ -158,7 +170,12 @@ export default function ProspekDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View style={{
+        flex: 1,
+        paddingBottom: kbHeight > 0
+          ? kbHeight + (Platform.OS === 'android' ? insets.bottom : 0)
+          : 0,
+      }}>
         {/* Top bar */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -321,7 +338,12 @@ export default function ProspekDetailScreen() {
             }
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+
+        {/* Spacer warna sama dgn input bar — supaya tidak floating saat keyboard tidak aktif */}
+        {kbHeight === 0 && (
+          <View style={{ height: insets.bottom, backgroundColor: '#0a0f1a' }} />
+        )}
+      </View>
 
       <KaryawanPicker
         visible={mentionOpen}
