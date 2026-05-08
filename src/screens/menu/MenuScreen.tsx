@@ -20,7 +20,7 @@ const MENU_ITEMS: MenuItem[] = [
   { icon: 'home-outline',          label: 'Beranda',     color: '#3b82f6', screen: 'Beranda' },
   { icon: 'calendar-outline',      label: 'Kalender',    color: '#8b5cf6', screen: 'Kalender' },
   { icon: 'mail-outline',          label: 'Request',     color: '#f59e0b', screen: 'Request' },
-  { icon: 'trending-up-outline',   label: 'Performance', color: '#22c55e', disabled: true },
+  { icon: 'trending-up-outline',   label: 'Performance', color: '#22c55e', screen: 'Performance' },
   { icon: 'document-text-outline', label: 'Dokumen',     color: '#06b6d4', disabled: true },
   { icon: 'pulse-outline',         label: 'Aktivitas',   color: '#ec4899', screen: 'Aktivitas' },
   { icon: 'receipt-outline',       label: 'Invoice',     color: '#f97316', disabled: true },
