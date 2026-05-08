@@ -4,6 +4,9 @@ export type RequestStatus = 'menunggu' | 'diterima' | 'proses' | 'selesai' | 'di
 
 export type ClientRequest = {
   id: number;
+  milikku: boolean;
+  can_edit: boolean;
+  is_it_or_admin: boolean;
   nama_klien: string;
   klien_id: number | null;
   tanggal_request: string | null;

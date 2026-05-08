@@ -4,6 +4,9 @@ export type ErrorLogStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
 
 export type ErrorLog = {
   id: number;
+  milikku: boolean;
+  can_edit: boolean;
+  can_update_status: boolean;
   url: string | null;
   username: string | null;
   password: string | null;
@@ -115,6 +118,11 @@ export const errorLogApi = {
       status,
       catatan_penanganan: catatan,
     });
+    return data;
+  },
+
+  destroy: async (id: number) => {
+    const { data } = await apiClient.delete(`/error-log/${id}`);
     return data;
   },
 

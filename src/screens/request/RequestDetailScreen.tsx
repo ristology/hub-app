@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, Image, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Modal, FlatList, Linking,
+  ActivityIndicator, Platform, Keyboard, Alert, Modal, FlatList, Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useToast } from '../../components/Toast';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, type RouteProp } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -46,6 +47,16 @@ export default function RequestDetailScreen() {
   const navigation = useNavigation<any>();
   const { id, highlightKomentarId } = route.params;
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
+  const toast = useToast();
+  const [kbHeight, setKbHeight] = useState(0);
+  useEffect(() => {
+    const showName = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideName = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showName, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideName, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
   const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
 
   const [komentar, setKomentar] = useState('');
@@ -99,6 +110,24 @@ export default function RequestDetailScreen() {
     onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal kirim komentar.'),
   });
 
+  const destroyMut = useMutation({
+    mutationFn: () => requestApi.destroy(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['request'] });
+      queryClient.invalidateQueries({ queryKey: ['request-stats'] });
+      toast.success('Request dihapus.');
+      navigation.goBack();
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal hapus.'),
+  });
+
+  const confirmDelete = () => {
+    Alert.alert('Hapus Request?', 'Request beserta semua respon dan komentarnya akan dihapus permanen.', [
+      { text: 'Batal' },
+      { text: 'Hapus', style: 'destructive', onPress: () => destroyMut.mutate() },
+    ]);
+  };
+
   const handleKomentarChange = (next: string) => {
     if (next.length > komentar.length && next.charAt(next.length - 1) === '@') {
       setMentionAt(next.length - 1);
@@ -137,12 +166,22 @@ export default function RequestDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View style={{
+        flex: 1,
+        paddingBottom: kbHeight > 0
+          ? kbHeight + (Platform.OS === 'android' ? insets.bottom : 0)
+          : 0,
+      }}>
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.topTitle}>Detail Request</Text>
+          {r.can_edit && (
+            <TouchableOpacity onPress={confirmDelete} style={styles.backBtn}>
+              <Ionicons name="trash-outline" size={20} color="#ef4444" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <ScrollView
@@ -339,7 +378,11 @@ export default function RequestDetailScreen() {
             }
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+
+        {kbHeight === 0 && (
+          <View style={{ height: insets.bottom, backgroundColor: '#0a0f1a' }} />
+        )}
+      </View>
 
       <KaryawanPicker
         visible={mentionOpen}

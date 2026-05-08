@@ -77,8 +77,25 @@ export default function BottomTabNavigator() {
         })}
       />
       <Tab.Screen name="Task"     component={TaskStack} />
-      <Tab.Screen name="ErrorLog" component={ErrorLogStack}  options={{ tabBarLabel: 'Error Log' }} />
-      <Tab.Screen name="Menu"     component={MenuStack} />
+      <Tab.Screen
+        name="ErrorLog"
+        component={ErrorLogStack}
+        options={({ route }) => ({
+          tabBarLabel: 'Error Log',
+          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'ErrorLogDetail'
+            ? { display: 'none' }
+            : tabBarStyle,
+        })}
+      />
+      <Tab.Screen
+        name="Menu"
+        component={MenuStack}
+        options={({ route }) => ({
+          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'RequestDetail'
+            ? { display: 'none' }
+            : tabBarStyle,
+        })}
+      />
     </Tab.Navigator>
   );
 }

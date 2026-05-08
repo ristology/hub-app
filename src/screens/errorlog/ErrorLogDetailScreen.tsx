@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, Image, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, KeyboardAvoidingView, Platform, Alert,
+  ActivityIndicator, Platform, Keyboard, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useToast } from '../../components/Toast';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, type RouteProp } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -36,6 +37,16 @@ export default function ErrorLogDetailScreen() {
   const navigation = useNavigation();
   const { id, highlightKomentarId } = route.params;
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
+  const toast = useToast();
+  const [kbHeight, setKbHeight] = useState(0);
+  useEffect(() => {
+    const showName = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideName = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showName, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideName, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
   const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
   const [komentar, setKomentar] = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -91,6 +102,24 @@ export default function ErrorLogDetailScreen() {
     onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal kirim komentar.'),
   });
 
+  const destroyMut = useMutation({
+    mutationFn: () => errorLogApi.destroy(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['error-log'] });
+      queryClient.invalidateQueries({ queryKey: ['error-log-stats'] });
+      toast.success('Error log dihapus.');
+      navigation.goBack();
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal hapus.'),
+  });
+
+  const confirmDelete = () => {
+    Alert.alert('Hapus Error Log?', 'Laporan ini akan dihapus permanen.', [
+      { text: 'Batal' },
+      { text: 'Hapus', style: 'destructive', onPress: () => destroyMut.mutate() },
+    ]);
+  };
+
   if (isLoading || !data) {
     return (
       <SafeAreaView style={styles.container}>
@@ -106,13 +135,23 @@ export default function ErrorLogDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View style={{
+        flex: 1,
+        paddingBottom: kbHeight > 0
+          ? kbHeight + (Platform.OS === 'android' ? insets.bottom : 0)
+          : 0,
+      }}>
         {/* Top bar */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.topTitle}>Detail Error Log</Text>
+          {log.can_edit && (
+            <TouchableOpacity onPress={confirmDelete} style={styles.backBtn}>
+              <Ionicons name="trash-outline" size={20} color="#ef4444" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <ScrollView
@@ -161,26 +200,38 @@ export default function ErrorLogDetailScreen() {
 
           {/* Status switcher */}
           <Text style={styles.sectionLabel}>STATUS</Text>
-          <View style={styles.statusGroup}>
-            {STATUS_OPTIONS.map((s) => (
-              <TouchableOpacity
-                key={s.key}
-                onPress={() => statusMutation.mutate(s.key)}
-                disabled={statusMutation.isPending || log.status === s.key}
-                style={[
-                  styles.statusBtn,
-                  log.status === s.key && { backgroundColor: s.color + '30', borderColor: s.color },
-                ]}
-              >
-                <Text style={[
-                  styles.statusBtnText,
-                  log.status === s.key && { color: s.color, fontWeight: '700' },
-                ]}>
-                  {s.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {log.can_update_status ? (
+            <View style={styles.statusGroup}>
+              {STATUS_OPTIONS.map((s) => (
+                <TouchableOpacity
+                  key={s.key}
+                  onPress={() => statusMutation.mutate(s.key)}
+                  disabled={statusMutation.isPending || log.status === s.key}
+                  style={[
+                    styles.statusBtn,
+                    log.status === s.key && { backgroundColor: s.color + '30', borderColor: s.color },
+                  ]}
+                >
+                  <Text style={[
+                    styles.statusBtnText,
+                    log.status === s.key && { color: s.color, fontWeight: '700' },
+                  ]}>
+                    {s.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            (() => {
+              const cur = STATUS_OPTIONS.find((s) => s.key === log.status);
+              return cur ? (
+                <View style={[styles.statusBtn, { alignSelf: 'flex-start',
+                  backgroundColor: cur.color + '30', borderColor: cur.color }]}>
+                  <Text style={[styles.statusBtnText, { color: cur.color, fontWeight: '700' }]}>{cur.label}</Text>
+                </View>
+              ) : null;
+            })()
+          )}
 
           {/* Pelapor + handler */}
           <Text style={styles.sectionLabel}>PIHAK TERLIBAT</Text>
@@ -280,7 +331,11 @@ export default function ErrorLogDetailScreen() {
             }
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+
+        {kbHeight === 0 && (
+          <View style={{ height: insets.bottom, backgroundColor: '#0a0f1a' }} />
+        )}
+      </View>
 
       <KaryawanPicker
         visible={mentionOpen}
