@@ -1,6 +1,7 @@
 import React from 'react';
 import { Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -30,6 +31,15 @@ export default function BottomTabNavigator() {
   const bottomPad    = Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 4);
   const tabBarHeight = 56 + bottomPad;
 
+  const tabBarStyle = {
+    backgroundColor: '#0a0f1a',
+    borderTopColor:  'rgba(255,255,255,0.08)',
+    borderTopWidth:  1,
+    height:          tabBarHeight,
+    paddingTop:      6,
+    paddingBottom:   bottomPad,
+  };
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -41,20 +51,22 @@ export default function BottomTabNavigator() {
         },
         tabBarActiveTintColor:   '#3b82f6',
         tabBarInactiveTintColor: '#6b7280',
-        tabBarStyle: {
-          backgroundColor: '#0a0f1a',
-          borderTopColor:  'rgba(255,255,255,0.08)',
-          borderTopWidth:  1,
-          height:          tabBarHeight,
-          paddingTop:      6,
-          paddingBottom:   bottomPad,
-        },
+        tabBarStyle,
         tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
       })}
     >
       <Tab.Screen name="Feed"     component={FeedStack} />
       <Tab.Screen name="Prospek"  component={ProspekStack} />
-      <Tab.Screen name="Pesan"    component={ChatStack} />
+      <Tab.Screen
+        name="Pesan"
+        component={ChatStack}
+        options={({ route }) => ({
+          // Sembunyikan tab bar saat user di ChatRoom (full-screen messaging UX)
+          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'ChatRoom'
+            ? { display: 'none' }
+            : tabBarStyle,
+        })}
+      />
       <Tab.Screen name="Task"     component={TaskStack} />
       <Tab.Screen name="ErrorLog" component={ErrorLogStack}  options={{ tabBarLabel: 'Error Log' }} />
       <Tab.Screen name="Menu"     component={MenuStack} />

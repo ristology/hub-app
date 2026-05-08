@@ -26,13 +26,6 @@ export default function ChatRoomScreen() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  // Sembunyikan tab bar parent saat di ChatRoom (full-screen messaging UX)
-  useEffect(() => {
-    const parent = navigation.getParent();
-    parent?.setOptions({ tabBarStyle: { display: 'none' } });
-    return () => parent?.setOptions({ tabBarStyle: undefined });
-  }, [navigation]);
-
   const { roomId, nama, foto } = route.params;
   const [pesan, setPesan] = useState('');
   const flatListRef = useRef<FlatList>(null);
