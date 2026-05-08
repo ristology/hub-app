@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MenuScreen     from '../screens/menu/MenuScreen';
 import HomeScreen     from '../screens/home/HomeScreen';
+import AktivitasScreen from '../screens/aktivitas/AktivitasScreen';
 import KalenderStack from './KalenderStack';
 import RequestStack  from './RequestStack';
 
@@ -13,7 +14,8 @@ export default function MenuStack() {
       <Stack.Screen name="MenuList" component={MenuScreen} />
       <Stack.Screen name="Beranda"  component={HomeScreen} />
       <Stack.Screen name="Kalender" component={KalenderStack} />
-      <Stack.Screen name="Request"  component={RequestStack} />
+      <Stack.Screen name="Request"   component={RequestStack} />
+      <Stack.Screen name="Aktivitas" component={AktivitasScreen} />
     </Stack.Navigator>
   );
 }
