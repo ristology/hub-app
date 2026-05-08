@@ -1,9 +1,21 @@
 import React from 'react';
 import { Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+
+/**
+ * Traversal manual ke route paling dalam — getFocusedRouteNameFromRoute
+ * kadang berhenti di nested Stack name (mis. 'Request') alih-alih turun ke
+ * 'RequestDetail' di nested-of-nested stack.
+ */
+function getDeepestRouteName(route: any): string | undefined {
+  let r = route;
+  while (r?.state) {
+    r = r.state.routes[r.state.index ?? 0];
+  }
+  return r?.name;
+}
 
 import FeedStack       from './FeedStack';
 import ChatStack       from './ChatStack';
@@ -61,7 +73,7 @@ export default function BottomTabNavigator() {
         component={ProspekStack}
         options={({ route }) => ({
           // Sembunyikan tab bar di ProspekDetail (full-screen UX dgn komentar input)
-          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'ProspekDetail'
+          tabBarStyle: getDeepestRouteName(route) === 'ProspekDetail'
             ? { display: 'none' }
             : tabBarStyle,
         })}
@@ -71,7 +83,7 @@ export default function BottomTabNavigator() {
         component={ChatStack}
         options={({ route }) => ({
           // Sembunyikan tab bar saat user di ChatRoom (full-screen messaging UX)
-          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'ChatRoom'
+          tabBarStyle: getDeepestRouteName(route) === 'ChatRoom'
             ? { display: 'none' }
             : tabBarStyle,
         })}
@@ -82,7 +94,7 @@ export default function BottomTabNavigator() {
         component={ErrorLogStack}
         options={({ route }) => ({
           tabBarLabel: 'Error Log',
-          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'ErrorLogDetail'
+          tabBarStyle: getDeepestRouteName(route) === 'ErrorLogDetail'
             ? { display: 'none' }
             : tabBarStyle,
         })}
@@ -91,7 +103,7 @@ export default function BottomTabNavigator() {
         name="Menu"
         component={MenuStack}
         options={({ route }) => ({
-          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'RequestDetail'
+          tabBarStyle: getDeepestRouteName(route) === 'RequestDetail'
             ? { display: 'none' }
             : tabBarStyle,
         })}
