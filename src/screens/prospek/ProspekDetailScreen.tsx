@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, Image, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Linking,
+  ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Linking, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,8 @@ import { prospekApi, type ProspekStatus, type ProspekKomentar } from '../../api/
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
 import { useKomentarHighlight } from '../../hooks/useKomentarHighlight';
+import DatePickerInput from '../../components/DatePickerInput';
+import { useToast } from '../../components/Toast';
 import type { KaryawanRingkas } from '../../api/feed';
 
 type RouteParams = { id: number; highlightKomentarId?: number | null };
@@ -43,6 +45,13 @@ export default function ProspekDetailScreen() {
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
   const [replyTo,     setReplyTo]     = useState<{ id: number; nama: string } | null>(null);
+
+  // Bottom sheet "Tambah catatan pertemuan"
+  const [pertemuanOpen, setPertemuanOpen] = useState(false);
+  const [pertTanggal,    setPertTanggal]    = useState('');
+  const [pertBerikutnya, setPertBerikutnya] = useState('');
+  const [pertKeterangan, setPertKeterangan] = useState('');
+  const toast = useToast();
 
   const handleKomentarChange = (next: string) => {
     if (next.length > komentar.length) {
@@ -92,6 +101,31 @@ export default function ProspekDetailScreen() {
     onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal kirim komentar.'),
   });
 
+  const pertemuanMutation = useMutation({
+    mutationFn: () => prospekApi.addPertemuan(id, {
+      tanggal: pertTanggal,
+      tanggal_berikutnya: pertBerikutnya || undefined,
+      keterangan: pertKeterangan,
+    }),
+    onSuccess: () => {
+      setPertemuanOpen(false);
+      setPertTanggal(''); setPertBerikutnya(''); setPertKeterangan('');
+      queryClient.invalidateQueries({ queryKey: ['prospek', id] });
+      queryClient.invalidateQueries({ queryKey: ['prospek'] });
+      toast.success('Pertemuan dicatat.');
+    },
+    onError: (e: any) => Alert.alert('Error',
+      e.response?.data?.message
+        ?? Object.values(e.response?.data?.errors ?? {}).flat().join('\n')
+        ?? 'Gagal catat pertemuan.'),
+  });
+
+  const submitPertemuan = () => {
+    if (!pertTanggal)        return Alert.alert('Validasi', 'Tanggal pertemuan wajib diisi.');
+    if (!pertKeterangan.trim()) return Alert.alert('Validasi', 'Keterangan wajib diisi.');
+    pertemuanMutation.mutate();
+  };
+
   if (isLoading || !data) {
     return (
       <SafeAreaView style={styles.container}>
@@ -114,7 +148,7 @@ export default function ProspekDetailScreen() {
             <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.topTitle}>Detail Prospek</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('AddPertemuan', { id })} style={styles.addBtn}>
+          <TouchableOpacity onPress={() => setPertemuanOpen(true)} style={styles.addBtn}>
             <Ionicons name="add-circle-outline" size={22} color="#3b82f6" />
           </TouchableOpacity>
         </View>
@@ -174,25 +208,27 @@ export default function ProspekDetailScreen() {
           </View>
 
           {/* Riwayat pertemuan */}
-          {p.pertemuan && p.pertemuan.length > 0 && (
-            <>
-              <Text style={styles.sectionLabel}>RIWAYAT PERTEMUAN ({p.pertemuan.length})</Text>
-              {p.pertemuan.map((pt) => (
-                <View key={pt.id} style={styles.pertemuanItem}>
-                  <View style={styles.pertemuanDate}>
-                    <Ionicons name="calendar" size={14} color="#3b82f6" />
-                    <Text style={styles.pertemuanDateText}>{formatDate(pt.tanggal)}</Text>
-                  </View>
-                  <Text style={styles.pertemuanKet}>{pt.keterangan}</Text>
-                  {pt.tanggal_berikutnya && (
-                    <Text style={styles.pertemuanNext}>
-                      → Lanjut: {formatDate(pt.tanggal_berikutnya)}
-                    </Text>
-                  )}
-                </View>
-              ))}
-            </>
-          )}
+          <Text style={styles.sectionLabel}>
+            RIWAYAT PERTEMUAN ({p.pertemuan?.length ?? 0})
+          </Text>
+          {p.pertemuan && p.pertemuan.length > 0 && p.pertemuan.map((pt) => (
+            <View key={pt.id} style={styles.pertemuanItem}>
+              <View style={styles.pertemuanDate}>
+                <Ionicons name="calendar" size={14} color="#3b82f6" />
+                <Text style={styles.pertemuanDateText}>{formatDate(pt.tanggal)}</Text>
+              </View>
+              <Text style={styles.pertemuanKet}>{pt.keterangan}</Text>
+              {pt.tanggal_berikutnya && (
+                <Text style={styles.pertemuanNext}>
+                  → Lanjut: {formatDate(pt.tanggal_berikutnya)}
+                </Text>
+              )}
+            </View>
+          ))}
+          <TouchableOpacity style={styles.addPertemuanBtn} onPress={() => setPertemuanOpen(true)}>
+            <Ionicons name="add-circle" size={18} color="#3b82f6" />
+            <Text style={styles.addPertemuanText}>Tambah catatan pertemuan</Text>
+          </TouchableOpacity>
 
           {/* Komentar */}
           <Text style={styles.sectionLabel}>KOMENTAR ({komentarList.length})</Text>
@@ -266,6 +302,59 @@ export default function ProspekDetailScreen() {
         onPick={insertMention}
         title="Mention Karyawan"
       />
+
+      {/* Bottom sheet: Tambah catatan pertemuan */}
+      <Modal visible={pertemuanOpen} transparent animationType="slide" onRequestClose={() => setPertemuanOpen(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.sheetBackdrop}
+        >
+          <TouchableOpacity activeOpacity={1} style={{ flex: 1 }} onPress={() => setPertemuanOpen(false)} />
+          <View style={[styles.sheet, { paddingBottom: 24 }]} onStartShouldSetResponder={() => true}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Catatan Pertemuan</Text>
+              <TouchableOpacity onPress={() => setPertemuanOpen(false)} hitSlop={8}>
+                <Ionicons name="close" size={22} color="#8a94a6" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.sheetLabel}>Tanggal Pertemuan <Text style={styles.sheetReq}>*</Text></Text>
+            <DatePickerInput value={pertTanggal} onChange={setPertTanggal} />
+
+            <Text style={styles.sheetLabel}>Tanggal Pertemuan Berikutnya</Text>
+            <DatePickerInput value={pertBerikutnya} onChange={setPertBerikutnya} placeholder="Opsional" />
+
+            <Text style={styles.sheetLabel}>Keterangan <Text style={styles.sheetReq}>*</Text></Text>
+            <TextInput
+              style={[styles.sheetInput, { minHeight: 110 }]}
+              value={pertKeterangan}
+              onChangeText={setPertKeterangan}
+              placeholder="Hasil pertemuan, kesepakatan, follow-up..."
+              placeholderTextColor="#6b7280"
+              multiline
+              textAlignVertical="top"
+              maxLength={2000}
+            />
+
+            <TouchableOpacity
+              style={styles.sheetSubmit}
+              onPress={submitPertemuan}
+              disabled={pertemuanMutation.isPending}
+            >
+              {pertemuanMutation.isPending
+                ? <ActivityIndicator size="small" color="#fff" />
+                : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                    <Text style={styles.sheetSubmitText}>Simpan Pertemuan</Text>
+                  </>
+                )
+              }
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -375,6 +464,47 @@ const styles = StyleSheet.create({
   pertemuanDateText: { color: '#3b82f6', fontSize: 12, fontWeight: '600' },
   pertemuanKet: { color: '#d6dce6', fontSize: 13, lineHeight: 19 },
   pertemuanNext: { color: '#22c55e', fontSize: 11, marginTop: 4 },
+  addPertemuanBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: 'rgba(59,130,246,0.10)',
+    borderWidth: 1, borderColor: 'rgba(59,130,246,0.30)', borderStyle: 'dashed',
+    paddingVertical: 12, borderRadius: 10, marginTop: 4,
+  },
+  addPertemuanText: { color: '#3b82f6', fontSize: 13, fontWeight: '600' },
+
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: '#1c2333',
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingHorizontal: 16, paddingTop: 8,
+  },
+  sheetHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.20)',
+    alignSelf: 'center', marginBottom: 12,
+  },
+  sheetHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  sheetTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  sheetLabel: {
+    color: '#8a94a6', fontSize: 12, fontWeight: '600',
+    marginTop: 12, marginBottom: 6, letterSpacing: 0.5,
+  },
+  sheetReq:   { color: '#ef4444' },
+  sheetInput: {
+    backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff',
+    paddingHorizontal: 14, paddingVertical: 11, borderRadius: 10,
+    fontSize: 14,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  sheetSubmit: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#3b82f6', paddingVertical: 14,
+    borderRadius: 12, marginTop: 18,
+  },
+  sheetSubmitText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   emptyText: { color: '#6b7280', fontSize: 12, fontStyle: 'italic' },
   replyBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
