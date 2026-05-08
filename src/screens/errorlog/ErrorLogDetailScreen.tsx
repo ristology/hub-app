@@ -36,10 +36,11 @@ export default function ErrorLogDetailScreen() {
   const navigation = useNavigation();
   const { id, highlightKomentarId } = route.params;
   const queryClient = useQueryClient();
-  const { scrollRef, registerKomRef, highlightedId } = useKomentarHighlight(highlightKomentarId);
+  const { scrollRef, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
   const [komentar, setKomentar] = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
+  const [replyTo,     setReplyTo]     = useState<{ id: number; nama: string } | null>(null);
 
   const handleKomentarChange = (next: string) => {
     if (next.length > komentar.length) {
@@ -67,6 +68,7 @@ export default function ErrorLogDetailScreen() {
   const { data, isLoading } = useQuery({
     queryKey: ['error-log', id],
     queryFn:  () => errorLogApi.detail(id),
+    refetchInterval: 5000, // Polling utk update komentar realtime
   });
 
   const statusMutation = useMutation({
@@ -80,9 +82,10 @@ export default function ErrorLogDetailScreen() {
   });
 
   const commentMutation = useMutation({
-    mutationFn: (text: string) => errorLogApi.comment(id, text),
+    mutationFn: (text: string) => errorLogApi.comment(id, text, replyTo?.id),
     onSuccess: () => {
       setKomentar('');
+      setReplyTo(null);
       queryClient.invalidateQueries({ queryKey: ['error-log', id] });
     },
     onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal kirim komentar.'),
@@ -112,7 +115,7 @@ export default function ErrorLogDetailScreen() {
           <Text style={styles.topTitle}>Detail Error Log</Text>
         </View>
 
-        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} onContentSizeChange={onContentReady}>
           {/* Klien + kategori */}
           <View style={styles.headerInfo}>
             {log.klien?.nama && (
@@ -212,16 +215,40 @@ export default function ErrorLogDetailScreen() {
           <Text style={styles.sectionLabel}>KOMENTAR ({komentarList.length})</Text>
           {komentarList.length > 0 ? (
             komentarList.map((k) => (
-              <KomentarItem
-                key={k.id} k={k}
-                bindRef={registerKomRef(k.id)}
-                highlighted={highlightedId === k.id}
-              />
+              <View key={k.id}>
+                <KomentarItem
+                  k={k}
+                  bindRef={registerKomRef(k.id)}
+                  highlighted={highlightedId === k.id}
+                  onReply={() => setReplyTo({ id: k.id, nama: k.nama })}
+                />
+                {k.replies && k.replies.length > 0 && k.replies.map((r) => (
+                  <View key={r.id} style={komStyles.replyWrap}>
+                    <KomentarItem
+                      k={r}
+                      bindRef={registerKomRef(r.id)}
+                      highlighted={highlightedId === r.id}
+                      onReply={() => setReplyTo({ id: k.id, nama: r.nama })}
+                    />
+                  </View>
+                ))}
+              </View>
             ))
           ) : (
             <Text style={styles.emptyText}>Belum ada komentar.</Text>
           )}
         </ScrollView>
+
+        {/* Reply banner */}
+        {replyTo && (
+          <View style={styles.replyBanner}>
+            <Ionicons name="arrow-undo" size={14} color="#3b82f6" />
+            <Text style={styles.replyBannerText}>Membalas <Text style={{ fontWeight: '700' }}>{replyTo.nama}</Text></Text>
+            <TouchableOpacity onPress={() => setReplyTo(null)} hitSlop={8}>
+              <Ionicons name="close" size={16} color="#8a94a6" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Input komentar */}
         <View style={styles.inputBar}>
@@ -230,7 +257,7 @@ export default function ErrorLogDetailScreen() {
           </TouchableOpacity>
           <TextInput
             style={styles.input}
-            placeholder="Tulis komentar... ketik @ untuk mention"
+            placeholder={replyTo ? `Balas ${replyTo.nama}...` : 'Tulis komentar... ketik @ untuk mention'}
             placeholderTextColor="#6b7280"
             value={komentar}
             onChangeText={handleKomentarChange}
@@ -288,10 +315,11 @@ function UserRow({ label, nama, foto }: { label: string; nama: string; foto: str
   );
 }
 
-function KomentarItem({ k, bindRef, highlighted }: {
+function KomentarItem({ k, bindRef, highlighted, onReply }: {
   k: ErrorLogKomentar;
   bindRef?: (v: View | null) => void;
   highlighted?: boolean;
+  onReply?: () => void;
 }) {
   return (
     <View ref={bindRef} style={[komStyles.item, highlighted && komStyles.itemHighlight]}>
@@ -305,6 +333,11 @@ function KomentarItem({ k, bindRef, highlighted }: {
       <View style={{ flex: 1, marginLeft: 10 }}>
         <Text style={komStyles.nama}>{k.nama}</Text>
         <MentionText text={k.komentar} style={komStyles.text} />
+        {onReply && (
+          <TouchableOpacity onPress={onReply} hitSlop={6}>
+            <Text style={komStyles.replyBtn}>Balas</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -327,6 +360,11 @@ const komStyles = StyleSheet.create({
     backgroundColor: 'rgba(59,130,246,0.15)',
     borderWidth: 1, borderColor: 'rgba(59,130,246,0.40)',
   },
+  replyWrap: {
+    marginLeft: 30, paddingLeft: 8,
+    borderLeftWidth: 2, borderLeftColor: 'rgba(59,130,246,0.30)',
+  },
+  replyBtn: { color: '#3b82f6', fontSize: 11, fontWeight: '600', marginTop: 4 },
   avatar:  { width: 32, height: 32, borderRadius: 16, backgroundColor: '#1c2333' },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#fff', fontWeight: '700' },
@@ -372,6 +410,13 @@ const styles = StyleSheet.create({
   catatanText: { color: '#d6dce6', fontSize: 13, lineHeight: 19 },
   resolvedText: { color: '#22c55e', fontSize: 12, marginTop: 8, textAlign: 'center' },
   emptyText: { color: '#6b7280', fontSize: 12, fontStyle: 'italic' },
+  replyBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(59,130,246,0.10)',
+    borderTopWidth: 1, borderTopColor: 'rgba(59,130,246,0.25)',
+    paddingHorizontal: 12, paddingVertical: 8,
+  },
+  replyBannerText: { color: '#c5cdd9', fontSize: 12, flex: 1 },
   inputBar: {
     flexDirection: 'row', padding: 8, gap: 8,
     borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)',

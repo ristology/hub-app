@@ -38,6 +38,7 @@ export type RequestKomentar = {
   nama: string;
   foto: string | null;
   created_at: string;
+  replies?: RequestKomentar[];
 };
 
 export type RequestStats = {

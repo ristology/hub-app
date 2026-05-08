@@ -8,10 +8,10 @@ import { findNodeHandle, type ScrollView, type View } from 'react-native';
  * Pakai di detail screen yang punya list komentar:
  *
  * ```tsx
- * const { scrollRef, registerKomRef, highlightedId } =
+ * const { scrollRef, registerKomRef, highlightedId, onContentReady } =
  *   useKomentarHighlight(route.params.highlightKomentarId);
  *
- * <ScrollView ref={scrollRef}>
+ * <ScrollView ref={scrollRef} onContentSizeChange={onContentReady}>
  *   ...
  *   {komentar.map((k) => (
  *     <View
@@ -30,8 +30,11 @@ export function useKomentarHighlight(targetId: number | null | undefined) {
   const scrolled  = useRef(false);
   const [highlightedId, setHighlightedId] = useState<number | null>(null);
 
-  // Reset flag saat targetId berubah (mis. user buka detail komentar lain)
-  useEffect(() => { scrolled.current = false; }, [targetId]);
+  // Reset saat targetId berubah (mis. user buka detail komentar lain)
+  useEffect(() => {
+    scrolled.current = false;
+    setHighlightedId(null);
+  }, [targetId]);
 
   const tryScroll = useCallback(() => {
     if (!targetId || scrolled.current) return;
@@ -45,27 +48,33 @@ export function useKomentarHighlight(targetId: number | null | undefined) {
     view.measureLayout(
       handle,
       (_x: number, y: number) => {
+        // Jangan scroll kalau measurement masih 0 (layout belum selesai)
+        if (y <= 0 || scrolled.current) return;
         scrolled.current = true;
-        // -80 supaya komentar tidak nempel di paling atas screen
         sv.scrollTo({ y: Math.max(0, y - 80), animated: true });
         setHighlightedId(targetId);
-        // Auto-clear highlight setelah 3 detik
         setTimeout(() => setHighlightedId(null), 3000);
       },
       () => {},
     );
   }, [targetId]);
 
+  /**
+   * Panggil ini di `onContentSizeChange` dari ScrollView. Ini fire setelah
+   * layout pass selesai — saat ini barulah measureLayout reliable.
+   * Retry beberapa kali untuk handle async loading komentar.
+   */
+  const onContentReady = useCallback(() => {
+    if (!targetId || scrolled.current) return;
+    [50, 250, 600, 1200].forEach((delay) => setTimeout(tryScroll, delay));
+  }, [targetId, tryScroll]);
+
   const registerKomRef = useCallback(
     (id: number) => (view: View | null) => {
-      komRefs.current[id] = view;
-      if (view && id === targetId && !scrolled.current) {
-        // Delay supaya layout final sudah terhitung (avoid measure 0)
-        setTimeout(tryScroll, 250);
-      }
+      if (view) komRefs.current[id] = view;
     },
-    [targetId, tryScroll],
+    [],
   );
 
-  return { scrollRef, registerKomRef, highlightedId };
+  return { scrollRef, registerKomRef, highlightedId, onContentReady };
 }

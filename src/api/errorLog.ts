@@ -30,6 +30,7 @@ export type ErrorLogKomentar = {
   nama: string;
   foto: string | null;
   created_at: string;
+  replies?: ErrorLogKomentar[];
 };
 
 export type ErrorLogStats = {

@@ -36,6 +36,7 @@ export type ProspekKomentar = {
   nama: string;
   foto: string | null;
   created_at: string;
+  replies?: ProspekKomentar[];
 };
 
 export type ProspekStats = {

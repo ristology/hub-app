@@ -19,11 +19,12 @@ export default function FeedDetailScreen() {
   const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const navigation = useNavigation();
   const { id, highlightKomentarId } = route.params;
-  const { scrollRef, registerKomRef, highlightedId } = useKomentarHighlight(highlightKomentarId);
+  const { scrollRef, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
   const queryClient = useQueryClient();
   const [komentar, setKomentar]       = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
+  const [replyTo,     setReplyTo]     = useState<{ id: number; nama: string } | null>(null);
 
   const handleKomentarChange = (next: string) => {
     if (next.length > komentar.length) {
@@ -52,6 +53,7 @@ export default function FeedDetailScreen() {
   const { data, isLoading } = useQuery({
     queryKey: ['feed', id],
     queryFn:  () => feedApi.detail(id),
+    refetchInterval: 5000, // Polling utk update komentar realtime
   });
 
   const likeMutation = useMutation({
@@ -63,9 +65,10 @@ export default function FeedDetailScreen() {
   });
 
   const commentMutation = useMutation({
-    mutationFn: (text: string) => feedApi.comment(id, text),
+    mutationFn: (text: string) => feedApi.comment(id, text, replyTo?.id),
     onSuccess: () => {
       setKomentar('');
+      setReplyTo(null);
       queryClient.invalidateQueries({ queryKey: ['feed', id] });
       queryClient.invalidateQueries({ queryKey: ['feed'] });
     },
@@ -98,7 +101,7 @@ export default function FeedDetailScreen() {
           <Text style={styles.topTitle}>Detail Feed</Text>
         </View>
 
-        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} onContentSizeChange={onContentReady}>
           {/* Header — pengirim */}
           <View style={styles.header}>
             {feed.karyawan.foto ? (
@@ -158,17 +161,41 @@ export default function FeedDetailScreen() {
             <Text style={styles.commentsTitle}>Komentar</Text>
             {feed.komentar?.length ? (
               feed.komentar.map((k) => (
-                <CommentItem
-                  key={k.id} k={k}
-                  bindRef={registerKomRef(k.id)}
-                  highlighted={highlightedId === k.id}
-                />
+                <View key={k.id}>
+                  <CommentItem
+                    k={k}
+                    bindRef={registerKomRef(k.id)}
+                    highlighted={highlightedId === k.id}
+                    onReply={() => setReplyTo({ id: k.id, nama: k.nama })}
+                  />
+                  {k.replies && k.replies.length > 0 && k.replies.map((r) => (
+                    <View key={r.id} style={styles.replyWrap}>
+                      <CommentItem
+                        k={r}
+                        bindRef={registerKomRef(r.id)}
+                        highlighted={highlightedId === r.id}
+                        onReply={() => setReplyTo({ id: k.id, nama: r.nama })}
+                      />
+                    </View>
+                  ))}
+                </View>
               ))
             ) : (
               <Text style={styles.empty}>Belum ada komentar.</Text>
             )}
           </View>
         </ScrollView>
+
+        {/* Reply banner */}
+        {replyTo && (
+          <View style={styles.replyBanner}>
+            <Ionicons name="arrow-undo" size={14} color="#3b82f6" />
+            <Text style={styles.replyBannerText}>Membalas <Text style={{ fontWeight: '700' }}>{replyTo.nama}</Text></Text>
+            <TouchableOpacity onPress={() => setReplyTo(null)} hitSlop={8}>
+              <Ionicons name="close" size={16} color="#8a94a6" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Input komentar */}
         <View style={styles.inputBar}>
@@ -181,7 +208,7 @@ export default function FeedDetailScreen() {
 
           <TextInput
             style={styles.input}
-            placeholder="Tulis komentar... ketik @ untuk mention"
+            placeholder={replyTo ? `Balas ${replyTo.nama}...` : 'Tulis komentar... ketik @ untuk mention'}
             placeholderTextColor="#6b7280"
             value={komentar}
             onChangeText={handleKomentarChange}
@@ -211,10 +238,11 @@ export default function FeedDetailScreen() {
   );
 }
 
-function CommentItem({ k, bindRef, highlighted }: {
+function CommentItem({ k, bindRef, highlighted, onReply }: {
   k: FeedKomentar;
   bindRef?: (v: View | null) => void;
   highlighted?: boolean;
+  onReply?: () => void;
 }) {
   return (
     <View ref={bindRef} style={[styles.commentItem, highlighted && styles.commentHighlight]}>
@@ -222,6 +250,11 @@ function CommentItem({ k, bindRef, highlighted }: {
       <View style={{ flex: 1, marginLeft: 10 }}>
         <Text style={styles.commentName}>{k.nama}</Text>
         <MentionText text={k.komentar} style={styles.commentText} />
+        {onReply && (
+          <TouchableOpacity onPress={onReply} hitSlop={6}>
+            <Text style={styles.replyBtn}>Balas</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -266,6 +299,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(59,130,246,0.15)',
     borderWidth: 1, borderColor: 'rgba(59,130,246,0.40)',
   },
+  replyBtn:      { color: '#3b82f6', fontSize: 11, fontWeight: '600', marginTop: 4 },
+  replyWrap:     { marginLeft: 30, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: 'rgba(59,130,246,0.30)' },
+  replyBanner:   {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(59,130,246,0.10)',
+    borderTopWidth: 1, borderTopColor: 'rgba(59,130,246,0.25)',
+    paddingHorizontal: 12, paddingVertical: 8,
+  },
+  replyBannerText: { color: '#c5cdd9', fontSize: 12, flex: 1 },
   commentAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#1c2333' },
   commentName:   { color: '#fff', fontWeight: '600', fontSize: 13 },
   commentText:   { color: '#c5cdd9', fontSize: 13, marginTop: 2, lineHeight: 18 },
