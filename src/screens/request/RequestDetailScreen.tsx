@@ -46,7 +46,7 @@ export default function RequestDetailScreen() {
   const navigation = useNavigation<any>();
   const { id, highlightKomentarId } = route.params;
   const queryClient = useQueryClient();
-  const { scrollRef, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
+  const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
 
   const [komentar, setKomentar] = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -145,7 +145,13 @@ export default function RequestDetailScreen() {
           <Text style={styles.topTitle}>Detail Request</Text>
         </View>
 
-        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} onContentSizeChange={onContentReady}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scroll}
+          onContentSizeChange={onContentReady}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+        >
           <Text style={styles.namaKlien}>{r.nama_klien}</Text>
           <View style={[styles.statusPill, { backgroundColor: statusStyle.bg }]}>
             <Text style={[styles.statusText, { color: statusStyle.color }]}>{statusStyle.label}</Text>

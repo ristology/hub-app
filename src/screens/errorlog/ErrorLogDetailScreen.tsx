@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, Image, TextInput, TouchableOpacity, StyleSheet,
   ActivityIndicator, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, type RouteProp } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -36,7 +36,8 @@ export default function ErrorLogDetailScreen() {
   const navigation = useNavigation();
   const { id, highlightKomentarId } = route.params;
   const queryClient = useQueryClient();
-  const { scrollRef, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
+  const insets = useSafeAreaInsets();
+  const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
   const [komentar, setKomentar] = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
@@ -115,7 +116,13 @@ export default function ErrorLogDetailScreen() {
           <Text style={styles.topTitle}>Detail Error Log</Text>
         </View>
 
-        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} onContentSizeChange={onContentReady}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scroll}
+          onContentSizeChange={onContentReady}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+        >
           {/* Klien + kategori */}
           <View style={styles.headerInfo}>
             {log.klien?.nama && (
@@ -251,7 +258,7 @@ export default function ErrorLogDetailScreen() {
         )}
 
         {/* Input komentar */}
-        <View style={styles.inputBar}>
+        <View style={[styles.inputBar, Platform.OS === 'android' && { paddingBottom: 8 + insets.bottom }]}>
           <TouchableOpacity style={styles.mentionBtn} onPress={() => setMentionOpen(true)}>
             <Ionicons name="at" size={18} color="#3b82f6" />
           </TouchableOpacity>

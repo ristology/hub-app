@@ -38,7 +38,7 @@ export default function ProspekDetailScreen() {
   const navigation = useNavigation<any>();
   const { id, highlightKomentarId } = route.params;
   const queryClient = useQueryClient();
-  const { scrollRef, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
+  const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
   const [komentar, setKomentar] = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
@@ -119,7 +119,13 @@ export default function ProspekDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} onContentSizeChange={onContentReady}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scroll}
+          onContentSizeChange={onContentReady}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+        >
           {/* Nama klien */}
           <Text style={styles.namaKlien}>{p.nama_klien}</Text>
           {p.kota && <Text style={styles.subInfo}>📍 {p.kota}</Text>}

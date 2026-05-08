@@ -19,7 +19,7 @@ export default function FeedDetailScreen() {
   const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const navigation = useNavigation();
   const { id, highlightKomentarId } = route.params;
-  const { scrollRef, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
+  const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
   const queryClient = useQueryClient();
   const [komentar, setKomentar]       = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -101,7 +101,13 @@ export default function FeedDetailScreen() {
           <Text style={styles.topTitle}>Detail Feed</Text>
         </View>
 
-        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} onContentSizeChange={onContentReady}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scroll}
+          onContentSizeChange={onContentReady}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+        >
           {/* Header — pengirim */}
           <View style={styles.header}>
             {feed.karyawan.foto ? (
