@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, Modal, TouchableOpacity, TextInput, FlatList, StyleSheet,
-  Platform, Keyboard,
+  Platform, Keyboard, Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -55,11 +55,18 @@ export default function PickerSheet({
     ? kbHeight + (Platform.OS === 'android' ? insets.bottom : 0)
     : 0;
 
+  // Constrain maxHeight supaya tidak overflow ke area atas layar saat
+  // sheet di-push naik oleh keyboard. Available = screen - top inset - kb - margin.
+  const screenH   = Dimensions.get('window').height;
+  const maxHeight = kbHeight > 0
+    ? Math.max(220, screenH - insets.top - sheetMarginBottom - 40)
+    : Math.floor(screenH * 0.8);
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <TouchableOpacity activeOpacity={1} style={{ flex: 1 }} onPress={onClose} />
-        <View style={[styles.sheet, { marginBottom: sheetMarginBottom }]} onStartShouldSetResponder={() => true}>
+        <View style={[styles.sheet, { marginBottom: sheetMarginBottom, maxHeight }]} onStartShouldSetResponder={() => true}>
           <View style={styles.handle} />
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
@@ -129,7 +136,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#1c2333',
     borderTopLeftRadius: 20, borderTopRightRadius: 20,
     paddingHorizontal: 12, paddingTop: 8, paddingBottom: 24,
-    maxHeight: '80%',
   },
   handle: {
     width: 40, height: 4, borderRadius: 2,
