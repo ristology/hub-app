@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
-  TouchableOpacity, ScrollView,
+  TouchableOpacity, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 import { aktivitasApi, type Aktivitas } from '../../api/aktivitas';
+import PickerSheet, { type PickerOption } from '../../components/PickerSheet';
 
 const HARI_INDO = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 const BULAN_INDO_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -63,8 +64,16 @@ export default function AktivitasScreen() {
   const navigation = useNavigation<any>();
   const [refreshing, setRefreshing] = useState(false);
   const [tipe, setTipe] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [tipeOpen, setTipeOpen] = useState(false);
 
-  const { data, isLoading, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteAktivitas(tipe);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data, isLoading, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteAktivitas(tipe, debouncedSearch);
 
   const { data: stats } = useQuery({
     queryKey: ['aktivitas-stats'],
@@ -113,38 +122,44 @@ export default function AktivitasScreen() {
         <Text style={styles.topTitle}>Log Aktivitas</Text>
       </View>
 
-      {/* Filter chips */}
-      <View style={styles.filtersWrap}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersContent}
+      {/* Picker tipe + search bar */}
+      <View style={styles.toolsRow}>
+        <TouchableOpacity
+          style={[styles.tipeBtn, tipe && {
+            borderColor: (stats?.data.find(s => s.tipe === tipe)?.warna ?? '#3b82f6') + '60',
+          }]}
+          onPress={() => setTipeOpen(true)}
         >
-          <TouchableOpacity
-            onPress={() => setTipe(null)}
-            style={[styles.chip, tipe === null && styles.chipActive]}
-          >
-            <Text style={[styles.chipText, tipe === null && styles.chipTextActive]}>
-              Semua ({totalAll})
-            </Text>
-          </TouchableOpacity>
-          {stats?.data.filter(s => s.count > 0).map((s) => (
-            <TouchableOpacity
-              key={s.tipe}
-              onPress={() => setTipe(s.tipe)}
-              style={[
-                styles.chip,
-                tipe === s.tipe && { backgroundColor: s.warna + '30', borderColor: s.warna },
-              ]}
-            >
-              <View style={[styles.chipDot, { backgroundColor: s.warna }]} />
-              <Text style={[
-                styles.chipText,
-                tipe === s.tipe && { color: s.warna, fontWeight: '700' },
-              ]}>{s.label} ({s.count})</Text>
+          <View style={[styles.tipeDot, {
+            backgroundColor: tipe
+              ? (stats?.data.find(s => s.tipe === tipe)?.warna ?? '#3b82f6')
+              : '#3b82f6',
+          }]} />
+          <Text style={styles.tipeText} numberOfLines={1}>
+            {tipe
+              ? (stats?.data.find(s => s.tipe === tipe)?.label ?? 'Kategori')
+              : `Semua (${totalAll})`}
+          </Text>
+          <Ionicons name="chevron-down" size={14} color="#8a94a6" />
+        </TouchableOpacity>
+
+        <View style={styles.searchBox}>
+          <Ionicons name="search" size={16} color="#6b7280" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Cari aktivitas..."
+            placeholderTextColor="#6b7280"
+            value={search}
+            onChangeText={setSearch}
+            autoCapitalize="none"
+            returnKeyType="search"
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} hitSlop={6}>
+              <Ionicons name="close-circle" size={16} color="#6b7280" />
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+          )}
+        </View>
       </View>
 
       <FlatList
@@ -173,9 +188,28 @@ export default function AktivitasScreen() {
         ListEmptyComponent={
           <View style={styles.center}>
             <Ionicons name="pulse-outline" size={48} color="#3b3f4a" />
-            <Text style={styles.empty}>Belum ada aktivitas tercatat.</Text>
+            <Text style={styles.empty}>
+              {search ? `Tidak ada hasil untuk "${search}"` : 'Belum ada aktivitas tercatat.'}
+            </Text>
           </View>
         }
+      />
+
+      <PickerSheet
+        visible={tipeOpen}
+        onClose={() => setTipeOpen(false)}
+        title="Filter Kategori"
+        searchable
+        searchPlaceholder="Cari kategori..."
+        selectedId={tipe}
+        options={[
+          { id: null, label: `Semua (${totalAll})`, sublabel: 'Tampilkan semua kategori' } as PickerOption,
+          ...(stats?.data.filter(s => s.count > 0).map<PickerOption>((s) => ({
+            id: s.tipe,
+            label: `${s.label} (${s.count})`,
+          })) ?? []),
+        ]}
+        onPick={(opt) => setTipe(opt.id as string | null)}
       />
     </SafeAreaView>
   );
@@ -198,11 +232,15 @@ function AktivitasItem({ a }: { a: Aktivitas }) {
   );
 }
 
-function useInfiniteAktivitas(tipe: string | null) {
+function useInfiniteAktivitas(tipe: string | null, search: string) {
   return useInfiniteQuery({
-    queryKey: ['aktivitas', tipe],
+    queryKey: ['aktivitas', tipe, search],
     queryFn: ({ pageParam }) =>
-      aktivitasApi.list({ tipe: tipe ?? undefined, page: pageParam as number }),
+      aktivitasApi.list({
+        tipe:   tipe ?? undefined,
+        search: search.trim() || undefined,
+        page:   pageParam as number,
+      }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) => {
       const cur = lastPage.meta.current_page;
@@ -224,21 +262,27 @@ const styles = StyleSheet.create({
   backBtn:  { padding: 8 },
   topTitle: { color: '#fff', fontSize: 16, fontWeight: '600', flex: 1, marginLeft: 4 },
 
-  filtersWrap: { marginTop: 8, marginBottom: 4 },
-  filtersContent: {
-    flexDirection: 'row', gap: 6,
-    paddingHorizontal: 16, paddingVertical: 4, alignItems: 'center',
+  toolsRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 16, marginTop: 8, marginBottom: 8,
   },
-  chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16,
+  tipeBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 9,
     backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    minWidth: 130,
   },
-  chipActive: { backgroundColor: 'rgba(59,130,246,0.20)', borderColor: '#3b82f6' },
-  chipDot:    { width: 6, height: 6, borderRadius: 3 },
-  chipText:   { color: '#c5cdd9', fontSize: 12 },
-  chipTextActive: { color: '#3b82f6', fontWeight: '600' },
+  tipeDot:  { width: 8, height: 8, borderRadius: 4 },
+  tipeText: { color: '#fff', fontSize: 13, fontWeight: '600', flex: 1 },
+  searchBox: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 10,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  searchInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 0 },
 
   list: { padding: 16, paddingTop: 8 },
   empty: { color: '#8a94a6', fontSize: 14 },

@@ -28,6 +28,7 @@ export const aktivitasApi = {
     tipe?: string;
     dari?: string;
     sampai?: string;
+    search?: string;
     page?: number;
   }): Promise<Paginated<Aktivitas>> => {
     const { data } = await apiClient.get('/aktivitas', { params });
