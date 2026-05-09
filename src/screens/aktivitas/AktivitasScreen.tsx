@@ -4,7 +4,7 @@ import {
   TouchableOpacity, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, keepPreviousData } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
@@ -103,6 +103,46 @@ export default function AktivitasScreen() {
 
   const totalAll = stats?.data.reduce((sum, s) => sum + s.count, 0) ?? 0;
 
+  // Resolver: model_type → navigation target. Kalau tipe tidak dikenal, return null.
+  const getNavTarget = (a: Aktivitas): { tab: string; screen?: string; params?: any } | null => {
+    if (!a.model_type || !a.model_id) return null;
+    const id = a.model_id;
+    const mt = a.model_type;
+
+    if (mt.endsWith('\\Feed') || mt === 'App\\Models\\Feed') {
+      return { tab: 'Feed', screen: 'FeedDetail', params: { id } };
+    }
+    if (mt.endsWith('\\Prospek') || mt === 'App\\Models\\Prospek') {
+      return { tab: 'Prospek', screen: 'ProspekDetail', params: { id } };
+    }
+    if (mt.endsWith('\\ErrorLog') || mt === 'App\\Models\\ErrorLog') {
+      return { tab: 'ErrorLog', screen: 'ErrorLogDetail', params: { id } };
+    }
+    if (mt.endsWith('\\ClientRequest') || mt === 'App\\Models\\ClientRequest') {
+      return { tab: 'Menu', screen: 'Request', params: { screen: 'RequestDetail', params: { id } } };
+    }
+    if (mt.endsWith('\\KalenderKegiatan') || mt === 'App\\Models\\KalenderKegiatan') {
+      return { tab: 'Menu', screen: 'Kalender', params: { screen: 'KegiatanDetail', params: { id } } };
+    }
+    if (mt.endsWith('\\Tugas') || mt === 'App\\Models\\Tugas') {
+      return { tab: 'Task', screen: 'TaskDetail', params: { id } };
+    }
+    if (mt.endsWith('\\Performance') || mt === 'App\\Models\\Performance') {
+      return { tab: 'Menu', screen: 'Performance', params: { screen: 'PerformanceDetail', params: { id } } };
+    }
+    return null;
+  };
+
+  const handleTap = (a: Aktivitas) => {
+    const target = getNavTarget(a);
+    if (!target) return;
+    if (target.screen) {
+      navigation.navigate(target.tab, { screen: target.screen, params: target.params });
+    } else {
+      navigation.navigate(target.tab, target.params);
+    }
+  };
+
   if (isLoading && !data) {
     return (
       <SafeAreaView style={styles.container}>
@@ -170,7 +210,15 @@ export default function AktivitasScreen() {
           return (
             <View style={styles.group}>
               <Text style={styles.groupHeader}>{formatGroupHeader(key)}</Text>
-              {list.map((a) => <AktivitasItem key={a.id} a={a} />)}
+              {list.map((a) => {
+                const navTarget = getNavTarget(a);
+                return (
+                  <AktivitasItem
+                    key={a.id} a={a}
+                    onPress={navTarget ? () => handleTap(a) : undefined}
+                  />
+                );
+              })}
             </View>
           );
         }}
@@ -215,11 +263,11 @@ export default function AktivitasScreen() {
   );
 }
 
-function AktivitasItem({ a }: { a: Aktivitas }) {
+function AktivitasItem({ a, onPress }: { a: Aktivitas; onPress?: () => void }) {
   const iconName = TIPE_ICON[a.tipe] ?? 'pulse';
 
   return (
-    <View style={styles.item}>
+    <TouchableOpacity activeOpacity={0.7} onPress={onPress} disabled={!onPress} style={styles.item}>
       <View style={[styles.iconWrap, { backgroundColor: a.warna + '22' }]}>
         <Ionicons name={iconName} size={16} color={a.warna} />
       </View>
@@ -228,7 +276,8 @@ function AktivitasItem({ a }: { a: Aktivitas }) {
         <Text style={styles.itemJudul} numberOfLines={2}>{a.judul}</Text>
         <Text style={styles.itemTime}>{formatTime(a.created_at)}</Text>
       </View>
-    </View>
+      {onPress && <Ionicons name="chevron-forward" size={16} color="#6b7280" />}
+    </TouchableOpacity>
   );
 }
 
@@ -247,6 +296,9 @@ function useInfiniteAktivitas(tipe: string | null, search: string) {
       const max = lastPage.meta.last_page;
       return cur < max ? cur + 1 : undefined;
     },
+    // Cegah keyboard dismiss saat search query ganti — keep data lama
+    // sambil fetch yg baru, tidak unmount loading screen.
+    placeholderData: keepPreviousData,
   });
 }
 
