@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../store/auth';
 import LoginScreen        from '../screens/auth/LoginScreen';
@@ -30,9 +30,25 @@ export default function RootNavigator() {
     );
   }
 
+  // Custom dark theme — pakai warna container Afresto supaya tidak ada
+  // flash putih saat transisi navigasi atau saat tab bar hide.
+  const theme = {
+    ...DarkTheme,
+    colors: {
+      ...DarkTheme.colors,
+      background: '#0d1421',
+      card:       '#0d1421',
+    },
+  };
+
   return (
-    <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <NavigationContainer ref={navigationRef} theme={theme}>
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: '#0d1421' },
+        }}
+      >
         {token
           ? <Stack.Screen name="Main"  component={BottomTabNavigator} />
           : <Stack.Screen name="Login" component={LoginScreen} />
