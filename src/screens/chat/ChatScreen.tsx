@@ -34,6 +34,8 @@ export default function ChatScreen() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['chat-rooms'],
     queryFn:  chatApi.rooms,
+    // Poll tiap 5 detik supaya chat baru / unread count auto-muncul
+    refetchInterval: 5000,
   });
 
   // Refresh tiap layar di-focus (kalau habis kirim pesan, list update)
