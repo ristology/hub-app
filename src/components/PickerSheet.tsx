@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, Modal, TouchableOpacity, TextInput, FlatList, StyleSheet,
-  KeyboardAvoidingView, Platform,
+  Platform, Keyboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 export type PickerOption = {
@@ -27,7 +28,20 @@ export default function PickerSheet({
   visible, onClose, title, options, selectedId, onPick,
   searchable = false, searchPlaceholder = 'Cari...',
 }: Props) {
+  const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
+  const [kbHeight, setKbHeight] = useState(0);
+
+  // Manual keyboard listener — KeyboardAvoidingView di Modal Android
+  // edge-to-edge tidak push sheet di atas keyboard (tetap di bawah)
+  useEffect(() => {
+    if (!visible) { setKbHeight(0); return; }
+    const showName = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideName = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showName, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideName, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, [visible]);
 
   const filtered = useMemo(() => {
     if (!searchable || !search.trim()) return options;
@@ -36,14 +50,16 @@ export default function PickerSheet({
       || (o.sublabel ?? '').toLowerCase().includes(q));
   }, [options, search, searchable]);
 
+  // Sheet harus naik saat keyboard muncul
+  const sheetMarginBottom = kbHeight > 0
+    ? kbHeight + (Platform.OS === 'android' ? insets.bottom : 0)
+    : 0;
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.backdrop}
-      >
+      <View style={styles.backdrop}>
         <TouchableOpacity activeOpacity={1} style={{ flex: 1 }} onPress={onClose} />
-        <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+        <View style={[styles.sheet, { marginBottom: sheetMarginBottom }]} onStartShouldSetResponder={() => true}>
           <View style={styles.handle} />
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
@@ -102,7 +118,7 @@ export default function PickerSheet({
             contentContainerStyle={{ paddingBottom: 20 }}
           />
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
