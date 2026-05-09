@@ -29,6 +29,13 @@ export type ChatMessage = {
     nama: string;
     foto: string | null;
   };
+  reply_to?: {
+    id: number;
+    pesan: string | null;
+    tipe: 'text' | 'image';
+    dihapus: boolean;
+    user_nama: string;
+  } | null;
 };
 
 export type ChatUser = {
@@ -55,11 +62,19 @@ export const chatApi = {
     return data;
   },
 
-  /** Send message (text atau dengan foto) */
-  send: async (roomId: number, payload: { pesan?: string; foto?: { uri: string; name: string; type: string } }): Promise<{ data: ChatMessage }> => {
+  /** Send message (text atau dengan foto, optional reply_to) */
+  send: async (
+    roomId: number,
+    payload: {
+      pesan?: string;
+      foto?: { uri: string; name: string; type: string };
+      replyToId?: number;
+    },
+  ): Promise<{ data: ChatMessage }> => {
     if (payload.foto) {
       const formData = new FormData();
-      if (payload.pesan) formData.append('pesan', payload.pesan);
+      if (payload.pesan)     formData.append('pesan', payload.pesan);
+      if (payload.replyToId) formData.append('reply_to_id', String(payload.replyToId));
       formData.append('foto', payload.foto as any);
 
       const { data } = await apiClient.post(`/chat/rooms/${roomId}/messages`, formData, {
@@ -69,7 +84,8 @@ export const chatApi = {
     }
 
     const { data } = await apiClient.post(`/chat/rooms/${roomId}/messages`, {
-      pesan: payload.pesan,
+      pesan:       payload.pesan,
+      reply_to_id: payload.replyToId,
     });
     return data;
   },

@@ -42,6 +42,7 @@ export default function ChatRoomScreen() {
   const [pesan, setPesan] = useState('');
   const [pendingImage, setPendingImage] = useState<{ uri: string; name: string; type: string } | null>(null);
   const [caption, setCaption] = useState('');
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   const { data, isLoading, refetch } = useQuery({
@@ -57,11 +58,12 @@ export default function ChatRoomScreen() {
   }, [roomId, data]);
 
   const sendMutation = useMutation({
-    mutationFn: (payload: { pesan?: string; foto?: any }) => chatApi.send(roomId, payload),
+    mutationFn: (payload: { pesan?: string; foto?: any; replyToId?: number }) => chatApi.send(roomId, payload),
     onSuccess: () => {
       setPesan('');
       setPendingImage(null);
       setCaption('');
+      setReplyTo(null);
       queryClient.invalidateQueries({ queryKey: ['chat-room', roomId] });
       queryClient.invalidateQueries({ queryKey: ['chat-rooms'] });
     },
@@ -72,7 +74,7 @@ export default function ChatRoomScreen() {
 
   const handleSend = () => {
     if (!pesan.trim()) return;
-    sendMutation.mutate({ pesan: pesan.trim() });
+    sendMutation.mutate({ pesan: pesan.trim(), replyToId: replyTo?.id });
   };
 
   const pickImage = async () => {
@@ -103,6 +105,7 @@ export default function ChatRoomScreen() {
     sendMutation.mutate({
       pesan: caption.trim() || undefined,
       foto: pendingImage,
+      replyToId: replyTo?.id,
     });
   };
 
@@ -114,10 +117,17 @@ export default function ChatRoomScreen() {
   const messages = (data?.messages.data ?? []) as ChatMessage[];
 
   const handleLongPressMessage = (msg: ChatMessage) => {
-    if (msg.user_id !== user?.id || msg.dihapus_at) return;
-    Alert.alert('Hapus pesan?', 'Pesan akan dihapus untuk semua orang di room ini.', [
+    if (msg.dihapus_at) return; // Pesan deleted — no actions
+
+    const isMine = msg.user_id === user?.id;
+
+    // Build action buttons: Balas (semua), Hapus (hanya milik sendiri)
+    const buttons: any[] = [
       { text: 'Batal', style: 'cancel' },
-      {
+      { text: 'Balas', onPress: () => setReplyTo(msg) },
+    ];
+    if (isMine) {
+      buttons.push({
         text: 'Hapus',
         style: 'destructive',
         onPress: async () => {
@@ -129,8 +139,14 @@ export default function ChatRoomScreen() {
             Alert.alert('Error', e.response?.data?.message ?? 'Gagal hapus pesan.');
           }
         },
-      },
-    ]);
+      });
+    }
+
+    Alert.alert(
+      'Pilih aksi',
+      isMine ? 'Apa yang ingin dilakukan dgn pesan ini?' : `Balas pesan dari ${msg.user.nama}?`,
+      buttons,
+    );
   };
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
@@ -155,6 +171,21 @@ export default function ChatRoomScreen() {
             isHapus && styles.bubbleDeleted]}
         >
           {!isMine && <Text style={styles.bubbleSender}>{item.user.nama}</Text>}
+
+          {/* Quoted reply preview di atas pesan utama */}
+          {item.reply_to && !isHapus && (
+            <View style={[styles.quotedBox, isMine ? styles.quotedBoxMine : styles.quotedBoxOther]}>
+              <Text style={styles.quotedSender} numberOfLines={1}>{item.reply_to.user_nama}</Text>
+              <Text style={styles.quotedText} numberOfLines={2}>
+                {item.reply_to.dihapus
+                  ? '🚫 Pesan dihapus'
+                  : (item.reply_to.tipe === 'image' && !item.reply_to.pesan
+                      ? '🖼️ Foto'
+                      : item.reply_to.pesan)}
+              </Text>
+            </View>
+          )}
+
           {isHapus ? (
             <Text style={styles.bubbleDeletedText}>
               <Ionicons name="ban-outline" size={11} color="#8a94a6" /> Pesan ini dihapus
@@ -216,6 +247,24 @@ export default function ChatRoomScreen() {
           />
         )}
 
+        {/* Reply banner */}
+        {replyTo && (
+          <View style={styles.replyBanner}>
+            <View style={styles.replyBannerBar} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.replyBannerLabel}>Membalas {replyTo.user.nama}</Text>
+              <Text style={styles.replyBannerText} numberOfLines={1}>
+                {replyTo.tipe === 'image' && !replyTo.pesan
+                  ? '🖼️ Foto'
+                  : replyTo.pesan}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => setReplyTo(null)} hitSlop={8}>
+              <Ionicons name="close" size={18} color="#8a94a6" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Input bar */}
         <View style={styles.inputBar}>
           <TouchableOpacity onPress={pickImage} style={styles.iconBtn} disabled={sendMutation.isPending}>
@@ -223,7 +272,7 @@ export default function ChatRoomScreen() {
           </TouchableOpacity>
           <TextInput
             style={styles.input}
-            placeholder="Tulis pesan..."
+            placeholder={replyTo ? `Balas ${replyTo.user.nama}...` : 'Tulis pesan...'}
             placeholderTextColor="#6b7280"
             value={pesan}
             onChangeText={setPesan}
@@ -338,6 +387,25 @@ const styles = StyleSheet.create({
   },
   bubbleSender: { color: '#a8b6ff', fontSize: 11, fontWeight: '600', marginBottom: 2 },
   bubbleText:   { fontSize: 14, lineHeight: 19, color: '#fff' },
+
+  quotedBox: {
+    borderLeftWidth: 3, paddingLeft: 8, paddingVertical: 4,
+    paddingRight: 8, borderRadius: 4, marginBottom: 6,
+  },
+  quotedBoxMine:  { backgroundColor: 'rgba(255,255,255,0.15)', borderLeftColor: '#bfdbfe' },
+  quotedBoxOther: { backgroundColor: 'rgba(255,255,255,0.06)', borderLeftColor: '#3b82f6' },
+  quotedSender:   { color: '#a8b6ff', fontSize: 11, fontWeight: '700', marginBottom: 1 },
+  quotedText:     { color: '#c5cdd9', fontSize: 12, fontStyle: 'italic' },
+
+  replyBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(59,130,246,0.10)',
+    borderTopWidth: 1, borderTopColor: 'rgba(59,130,246,0.25)',
+    paddingHorizontal: 12, paddingVertical: 8,
+  },
+  replyBannerBar:   { width: 3, height: 30, borderRadius: 2, backgroundColor: '#3b82f6' },
+  replyBannerLabel: { color: '#3b82f6', fontSize: 11, fontWeight: '700' },
+  replyBannerText:  { color: '#c5cdd9', fontSize: 12, marginTop: 1 },
   bubbleDeleted:     { opacity: 0.6 },
   bubbleDeletedText: { color: '#8a94a6', fontSize: 13, fontStyle: 'italic' },
   bubbleTime:   { color: 'rgba(255,255,255,0.5)', fontSize: 10, marginTop: 3, alignSelf: 'flex-end' },
