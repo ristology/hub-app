@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRoute, useNavigation, type RouteProp } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect, type RouteProp } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -44,6 +44,8 @@ export default function ChatRoomScreen() {
   const [caption, setCaption] = useState('');
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [highlightedMsgId, setHighlightedMsgId] = useState<number | null>(null);
+  // Pesan yang gagal kirim — disimpan local, tampil sebagai ghost bubble dgn icon error
+  const [failedMessages, setFailedMessages] = useState<{ tempId: string; pesan: string; replyToId?: number }[]>([]);
   const flatListRef = useRef<FlatList>(null);
 
   const { data, isLoading, refetch } = useQuery({
@@ -58,9 +60,21 @@ export default function ChatRoomScreen() {
     queryClient.invalidateQueries({ queryKey: ['chat-rooms'] });
   }, [roomId, data]);
 
+  // Refetch saat layar fokus (mis. user kembali dari background) — pastikan
+  // reads array selalu up-to-date untuk render status read
+  useFocusEffect(useCallback(() => {
+    refetch();
+    chatApi.markRead(roomId).catch(() => {});
+  }, [roomId, refetch]));
+
   const sendMutation = useMutation({
-    mutationFn: (payload: { pesan?: string; foto?: any; replyToId?: number }) => chatApi.send(roomId, payload),
-    onSuccess: () => {
+    mutationFn: (payload: { pesan?: string; foto?: any; replyToId?: number; tempId?: string }) =>
+      chatApi.send(roomId, payload).then((r) => ({ ...r, tempId: payload.tempId })),
+    onSuccess: (res) => {
+      // Hapus dari failed kalau ini retry
+      if (res.tempId) {
+        setFailedMessages((prev) => prev.filter((f) => f.tempId !== res.tempId));
+      }
       setPesan('');
       setPendingImage(null);
       setCaption('');
@@ -68,14 +82,34 @@ export default function ChatRoomScreen() {
       queryClient.invalidateQueries({ queryKey: ['chat-room', roomId] });
       queryClient.invalidateQueries({ queryKey: ['chat-rooms'] });
     },
-    onError: (e: any) => {
-      Alert.alert('Error', e.response?.data?.message ?? 'Gagal kirim pesan.');
+    onError: (e: any, vars) => {
+      // Tambah ke failed messages — hanya untuk pesan teks (foto skip dulu)
+      if (vars && vars.pesan && !vars.foto) {
+        setFailedMessages((prev) => {
+          // Kalau retry & masih gagal, tetap ada
+          if (vars.tempId && prev.some((f) => f.tempId === vars.tempId)) return prev;
+          return [...prev, {
+            tempId: vars.tempId ?? `f-${Date.now()}`,
+            pesan: vars.pesan ?? '',
+            replyToId: vars.replyToId,
+          }];
+        });
+      }
+      Alert.alert('Gagal kirim', e.response?.data?.message ?? 'Periksa koneksi & coba lagi.');
     },
   });
 
   const handleSend = () => {
     if (!pesan.trim()) return;
     sendMutation.mutate({ pesan: pesan.trim(), replyToId: replyTo?.id });
+  };
+
+  const retryFailed = (f: { tempId: string; pesan: string; replyToId?: number }) => {
+    sendMutation.mutate({ pesan: f.pesan, replyToId: f.replyToId, tempId: f.tempId });
+  };
+
+  const removeFailed = (tempId: string) => {
+    setFailedMessages((prev) => prev.filter((f) => f.tempId !== tempId));
   };
 
   const pickImage = async () => {
@@ -116,6 +150,15 @@ export default function ChatRoomScreen() {
   };
 
   const messages = (data?.messages.data ?? []) as ChatMessage[];
+
+  // Read status: max last_read dari user lain (bukan diri sendiri)
+  const otherMaxRead = (data?.reads ?? [])
+    .filter((r) => r.user_id !== user?.id)
+    .reduce((max, r) => Math.max(max, r.last_read_message_id), 0);
+
+  const getMessageStatus = (msg: ChatMessage): 'sent' | 'read' => {
+    return otherMaxRead >= msg.id ? 'read' : 'sent';
+  };
 
   // Scroll FlatList ke pesan yg di-reply + highlight sebentar
   const scrollToMessage = (messageId: number) => {
@@ -218,7 +261,16 @@ export default function ChatRoomScreen() {
               )}
             </>
           )}
-          <Text style={styles.bubbleTime}>{formatTime(item.created_at)}</Text>
+          <View style={styles.bubbleMeta}>
+            <Text style={styles.bubbleTime}>{formatTime(item.created_at)}</Text>
+            {isMine && !isHapus && (
+              getMessageStatus(item) === 'read' ? (
+                <Ionicons name="checkmark-done" size={16} color="#22d3ee" />
+              ) : (
+                <Ionicons name="checkmark" size={16} color="rgba(255,255,255,0.55)" />
+              )
+            )}
+          </View>
         </TouchableOpacity>
       </View>
     );
@@ -271,6 +323,24 @@ export default function ChatRoomScreen() {
               }, 300);
             }}
           />
+        )}
+
+        {/* Pesan gagal kirim — ghost bubble dgn icon error + retry/remove */}
+        {failedMessages.length > 0 && (
+          <View style={styles.failedWrap}>
+            {failedMessages.map((f) => (
+              <View key={f.tempId} style={styles.failedRow}>
+                <Ionicons name="alert-circle" size={16} color="#ef4444" />
+                <Text style={styles.failedText} numberOfLines={1}>{f.pesan}</Text>
+                <TouchableOpacity onPress={() => retryFailed(f)} hitSlop={6}>
+                  <Text style={styles.failedAction}>Coba lagi</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => removeFailed(f.tempId)} hitSlop={6}>
+                  <Ionicons name="close" size={16} color="#8a94a6" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
         )}
 
         {/* Reply banner */}
@@ -439,7 +509,21 @@ const styles = StyleSheet.create({
   replyBannerText:  { color: '#c5cdd9', fontSize: 12, marginTop: 1 },
   bubbleDeleted:     { opacity: 0.6 },
   bubbleDeletedText: { color: '#8a94a6', fontSize: 13, fontStyle: 'italic' },
-  bubbleTime:   { color: 'rgba(255,255,255,0.5)', fontSize: 10, marginTop: 3, alignSelf: 'flex-end' },
+  bubbleTime:   { color: 'rgba(255,255,255,0.5)', fontSize: 10 },
+  bubbleMeta:   {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    marginTop: 3, alignSelf: 'flex-end',
+  },
+
+  failedWrap: { paddingHorizontal: 12, paddingTop: 6, gap: 6 },
+  failedRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderWidth: 1, borderColor: 'rgba(239,68,68,0.30)',
+    borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8,
+  },
+  failedText:   { color: '#fff', fontSize: 13, flex: 1 },
+  failedAction: { color: '#3b82f6', fontSize: 12, fontWeight: '700' },
   bubbleImage:  { width: 200, height: 200, borderRadius: 8, marginBottom: 4 },
 
   inputBar: {
