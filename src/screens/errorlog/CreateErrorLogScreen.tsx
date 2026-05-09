@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { errorLogApi } from '../../api/errorLog';
 import { useToast } from '../../components/Toast';
+import PickerSheet, { type PickerOption } from '../../components/PickerSheet';
 
 const MAX_PHOTOS = 6;
 type Foto = { uri: string; name: string; type: string };
@@ -27,6 +28,8 @@ export default function CreateErrorLogScreen() {
   const [username, setUsername]   = useState('');
   const [password, setPassword]   = useState('');
   const [fotos, setFotos]         = useState<Foto[]>([]);
+  const [klienOpen, setKlienOpen]       = useState(false);
+  const [kategoriOpen, setKategoriOpen] = useState(false);
 
   const { data: klienData }    = useQuery({ queryKey: ['error-log-klien'],    queryFn: errorLogApi.klien });
   const { data: kategoriData } = useQuery({ queryKey: ['error-log-kategori'], queryFn: errorLogApi.kategori });
@@ -122,45 +125,31 @@ export default function CreateErrorLogScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll}>
-          {/* Klien (optional) */}
-          <Field label="Klien (opsional)">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.chipRow}>
-                <TouchableOpacity
-                  onPress={() => setKlienId(null)}
-                  style={[styles.chip, klienId === null && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, klienId === null && styles.chipTextActive]}>Tanpa Klien</Text>
-                </TouchableOpacity>
-                {klienData?.data.map((k) => (
-                  <TouchableOpacity
-                    key={k.id}
-                    onPress={() => setKlienId(k.id)}
-                    style={[styles.chip, klienId === k.id && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, klienId === k.id && styles.chipTextActive]}>{k.nama}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-          </Field>
-
-          {/* Kategori (required) */}
-          <Field label="Kategori Error *">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.chipRow}>
-                {kategoriData?.data.map((k) => (
-                  <TouchableOpacity
-                    key={k.id}
-                    onPress={() => setKategoriId(k.id)}
-                    style={[styles.chip, kategoriId === k.id && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, kategoriId === k.id && styles.chipTextActive]}>{k.nama}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-          </Field>
+          {/* Klien + Kategori — 2 picker side-by-side */}
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Klien</Text>
+              <TouchableOpacity style={styles.pickerBtn} onPress={() => setKlienOpen(true)}>
+                <Text style={[styles.pickerText, klienId === null && styles.pickerPlaceholder]} numberOfLines={1}>
+                  {klienId === null
+                    ? 'Tanpa Klien'
+                    : (klienData?.data.find(k => k.id === klienId)?.nama ?? 'Pilih...')}
+                </Text>
+                <Ionicons name="chevron-down" size={14} color="#8a94a6" />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Kategori <Text style={{ color: '#ef4444' }}>*</Text></Text>
+              <TouchableOpacity style={styles.pickerBtn} onPress={() => setKategoriOpen(true)}>
+                <Text style={[styles.pickerText, !kategoriId && styles.pickerPlaceholder]} numberOfLines={1}>
+                  {kategoriId
+                    ? (kategoriData?.data.find(k => k.id === kategoriId)?.nama ?? 'Pilih...')
+                    : 'Pilih kategori...'}
+                </Text>
+                <Ionicons name="chevron-down" size={14} color="#8a94a6" />
+              </TouchableOpacity>
+            </View>
+          </View>
 
           {/* Keterangan */}
           <Field label="Keterangan Error *">
@@ -242,6 +231,32 @@ export default function CreateErrorLogScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Picker sheets */}
+      <PickerSheet
+        visible={klienOpen}
+        onClose={() => setKlienOpen(false)}
+        title="Pilih Klien"
+        searchable
+        searchPlaceholder="Cari nama klien..."
+        selectedId={klienId}
+        options={[
+          { id: null, label: 'Tanpa Klien' } as PickerOption,
+          ...(klienData?.data ?? []).map<PickerOption>((k) => ({ id: k.id, label: k.nama })),
+        ]}
+        onPick={(opt) => setKlienId(opt.id as number | null)}
+      />
+
+      <PickerSheet
+        visible={kategoriOpen}
+        onClose={() => setKategoriOpen(false)}
+        title="Pilih Kategori Error"
+        searchable
+        searchPlaceholder="Cari kategori..."
+        selectedId={kategoriId}
+        options={(kategoriData?.data ?? []).map<PickerOption>((k) => ({ id: k.id, label: k.nama }))}
+        onPick={(opt) => setKategoriId(opt.id as number)}
+      />
     </SafeAreaView>
   );
 }
@@ -275,6 +290,14 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
   chipRow:    { flexDirection: 'row', gap: 8 },
+  pickerBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 11,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  pickerText:        { color: '#fff', fontSize: 13, flex: 1 },
+  pickerPlaceholder: { color: '#6b7280' },
   chip:       {
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.05)',
