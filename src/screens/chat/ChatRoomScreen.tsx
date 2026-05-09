@@ -43,6 +43,7 @@ export default function ChatRoomScreen() {
   const [pendingImage, setPendingImage] = useState<{ uri: string; name: string; type: string } | null>(null);
   const [caption, setCaption] = useState('');
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [highlightedMsgId, setHighlightedMsgId] = useState<number | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   const { data, isLoading, refetch } = useQuery({
@@ -116,6 +117,18 @@ export default function ChatRoomScreen() {
 
   const messages = (data?.messages.data ?? []) as ChatMessage[];
 
+  // Scroll FlatList ke pesan yg di-reply + highlight sebentar
+  const scrollToMessage = (messageId: number) => {
+    const idx = messages.findIndex((m) => m.id === messageId);
+    if (idx < 0) {
+      // Pesan tidak ada di list yg sudah di-load (mungkin di history lebih lama)
+      return;
+    }
+    flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+    setHighlightedMsgId(messageId);
+    setTimeout(() => setHighlightedMsgId(null), 2500);
+  };
+
   const handleLongPressMessage = (msg: ChatMessage) => {
     if (msg.dihapus_at) return; // Pesan deleted — no actions
 
@@ -168,13 +181,18 @@ export default function ChatRoomScreen() {
           onLongPress={() => handleLongPressMessage(item)}
           delayLongPress={350}
           style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleOther,
-            isHapus && styles.bubbleDeleted]}
+            isHapus && styles.bubbleDeleted,
+            highlightedMsgId === item.id && styles.bubbleHighlight]}
         >
           {!isMine && <Text style={styles.bubbleSender}>{item.user.nama}</Text>}
 
-          {/* Quoted reply preview di atas pesan utama */}
+          {/* Quoted reply preview di atas pesan utama — tap untuk scroll ke pesan asli */}
           {item.reply_to && !isHapus && (
-            <View style={[styles.quotedBox, isMine ? styles.quotedBoxMine : styles.quotedBoxOther]}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => item.reply_to && scrollToMessage(item.reply_to.id)}
+              style={[styles.quotedBox, isMine ? styles.quotedBoxMine : styles.quotedBoxOther]}
+            >
               <Text style={styles.quotedSender} numberOfLines={1}>{item.reply_to.user_nama}</Text>
               <Text style={styles.quotedText} numberOfLines={2}>
                 {item.reply_to.dihapus
@@ -183,7 +201,7 @@ export default function ChatRoomScreen() {
                       ? '🖼️ Foto'
                       : item.reply_to.pesan)}
               </Text>
-            </View>
+            </TouchableOpacity>
           )}
 
           {isHapus ? (
@@ -244,6 +262,14 @@ export default function ChatRoomScreen() {
             renderItem={renderMessage}
             inverted // pesan terbaru di bawah, scroll ke atas untuk lihat history
             contentContainerStyle={styles.list}
+            onScrollToIndexFailed={(info) => {
+              // Pesan target belum rendered (FlatList virtualization). Retry dgn delay.
+              setTimeout(() => {
+                flatListRef.current?.scrollToIndex({
+                  index: info.index, animated: true, viewPosition: 0.5,
+                });
+              }, 300);
+            }}
           />
         )}
 
@@ -396,6 +422,11 @@ const styles = StyleSheet.create({
   quotedBoxOther: { backgroundColor: 'rgba(255,255,255,0.06)', borderLeftColor: '#3b82f6' },
   quotedSender:   { color: '#a8b6ff', fontSize: 11, fontWeight: '700', marginBottom: 1 },
   quotedText:     { color: '#c5cdd9', fontSize: 12, fontStyle: 'italic' },
+  bubbleHighlight: {
+    borderWidth: 2, borderColor: '#fbbf24',
+    shadowColor: '#fbbf24', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6, shadowRadius: 8, elevation: 6,
+  },
 
   replyBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
