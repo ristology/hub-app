@@ -12,6 +12,7 @@ import { tugasApi, type TugasPrioritas, type TugasStatus } from '../../api/tugas
 import { type KaryawanRingkas } from '../../api/feed';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import DatePickerInput from '../../components/DatePickerInput';
+import SaveButton from '../../components/SaveButton';
 import { useToast } from '../../components/Toast';
 
 const PRIORITAS_OPTIONS: { key: TugasPrioritas; label: string; color: string }[] = [
@@ -100,16 +101,11 @@ export default function CreateTaskScreen() {
             <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.topTitle}>Task Baru</Text>
-          <TouchableOpacity
+          <SaveButton
             onPress={handleSubmit}
-            disabled={createMutation.isPending || !judul.trim()}
-            style={[styles.postBtn, (!judul.trim() || createMutation.isPending) && styles.postBtnDisabled]}
-          >
-            {createMutation.isPending
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <Text style={styles.postBtnText}>Simpan</Text>
-            }
-          </TouchableOpacity>
+            loading={createMutation.isPending}
+            disabled={!judul.trim()}
+          />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll}>

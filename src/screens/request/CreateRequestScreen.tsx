@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { requestApi, type CreateRequestPayload, type KlienRingkas } from '../../api/clientRequest';
 import DatePickerInput from '../../components/DatePickerInput';
+import SaveButton from '../../components/SaveButton';
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -58,12 +59,7 @@ export default function CreateRequestScreen() {
             <Ionicons name="close" size={22} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.topTitle}>Request Baru</Text>
-          <TouchableOpacity onPress={submit} disabled={createMutation.isPending} style={styles.saveBtn}>
-            {createMutation.isPending
-              ? <ActivityIndicator size="small" color="#3b82f6" />
-              : <Text style={styles.saveText}>Simpan</Text>
-            }
-          </TouchableOpacity>
+          <SaveButton onPress={submit} loading={createMutation.isPending} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll}>

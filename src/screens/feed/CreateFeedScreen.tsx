@@ -12,6 +12,7 @@ import * as Location    from 'expo-location';
 import { feedApi, type Kategori, type KaryawanRingkas } from '../../api/feed';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import { useToast } from '../../components/Toast';
+import SaveButton from '../../components/SaveButton';
 
 const MAX_PHOTOS = 6;
 
@@ -233,16 +234,12 @@ export default function CreateFeedScreen() {
             <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.topTitle}>Posting Baru</Text>
-          <TouchableOpacity
+          <SaveButton
             onPress={handleSubmit}
-            disabled={createMutation.isPending || !konten.trim()}
-            style={[styles.postBtn, (!konten.trim() || createMutation.isPending) && styles.postBtnDisabled]}
-          >
-            {createMutation.isPending
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <Text style={styles.postBtnText}>Posting</Text>
-            }
-          </TouchableOpacity>
+            loading={createMutation.isPending}
+            disabled={!konten.trim()}
+            label="Posting"
+          />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll}>

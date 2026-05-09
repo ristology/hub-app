@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { prospekApi, type ProspekStatus } from '../../api/prospek';
 import DatePickerInput from '../../components/DatePickerInput';
+import SaveButton from '../../components/SaveButton';
 import { useToast } from '../../components/Toast';
 
 const STATUS_OPTIONS: { key: ProspekStatus; label: string; color: string }[] = [
@@ -78,16 +79,11 @@ export default function CreateProspekScreen() {
             <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.topTitle}>Prospek Baru</Text>
-          <TouchableOpacity
+          <SaveButton
             onPress={handleSubmit}
-            disabled={createMutation.isPending || !namaKlien.trim()}
-            style={[styles.postBtn, (!namaKlien.trim() || createMutation.isPending) && styles.postBtnDisabled]}
-          >
-            {createMutation.isPending
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <Text style={styles.postBtnText}>Simpan</Text>
-            }
-          </TouchableOpacity>
+            loading={createMutation.isPending}
+            disabled={!namaKlien.trim()}
+          />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll}>

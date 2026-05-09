@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { prospekApi } from '../../api/prospek';
 import DatePickerInput from '../../components/DatePickerInput';
+import SaveButton from '../../components/SaveButton';
 import { useToast } from '../../components/Toast';
 
 type RouteParams = { id: number };
@@ -61,16 +62,7 @@ export default function AddPertemuanScreen() {
             <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.topTitle}>Tambah Pertemuan</Text>
-          <TouchableOpacity
-            onPress={handleSubmit}
-            disabled={mutation.isPending}
-            style={[styles.postBtn, mutation.isPending && styles.postBtnDisabled]}
-          >
-            {mutation.isPending
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <Text style={styles.postBtnText}>Simpan</Text>
-            }
-          </TouchableOpacity>
+          <SaveButton onPress={handleSubmit} loading={mutation.isPending} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll}>

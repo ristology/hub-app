@@ -14,6 +14,7 @@ import {
 } from '../../api/kalender';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import DatePickerInput from '../../components/DatePickerInput';
+import SaveButton from '../../components/SaveButton';
 import type { KaryawanRingkas } from '../../api/feed';
 
 type RouteParams = { id?: number };
@@ -147,12 +148,7 @@ export default function CreateKegiatanScreen() {
             <Ionicons name="close" size={22} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.topTitle}>{editId ? 'Edit Jadwal' : 'Jadwal Baru'}</Text>
-          <TouchableOpacity onPress={submit} disabled={saveMut.isPending} style={styles.saveBtn}>
-            {saveMut.isPending
-              ? <ActivityIndicator size="small" color="#3b82f6" />
-              : <Text style={styles.saveText}>Simpan</Text>
-            }
-          </TouchableOpacity>
+          <SaveButton onPress={submit} loading={saveMut.isPending} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll}>

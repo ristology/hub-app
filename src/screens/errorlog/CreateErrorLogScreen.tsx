@@ -12,6 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { errorLogApi } from '../../api/errorLog';
 import { useToast } from '../../components/Toast';
 import PickerSheet, { type PickerOption } from '../../components/PickerSheet';
+import SaveButton from '../../components/SaveButton';
 
 const MAX_PHOTOS = 6;
 type Foto = { uri: string; name: string; type: string };
@@ -112,16 +113,12 @@ export default function CreateErrorLogScreen() {
             <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.topTitle}>Laporan Error</Text>
-          <TouchableOpacity
+          <SaveButton
             onPress={handleSubmit}
-            disabled={createMutation.isPending || !keterangan.trim() || !kategoriId}
-            style={[styles.postBtn, (!keterangan.trim() || !kategoriId || createMutation.isPending) && styles.postBtnDisabled]}
-          >
-            {createMutation.isPending
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <Text style={styles.postBtnText}>Kirim</Text>
-            }
-          </TouchableOpacity>
+            loading={createMutation.isPending}
+            disabled={!keterangan.trim() || !kategoriId}
+            label="Kirim"
+          />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll}>
