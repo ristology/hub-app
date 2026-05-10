@@ -8,7 +8,13 @@ import ChatStack       from './ChatStack';
 import TaskStack       from './TaskStack';
 import ErrorLogStack   from './ErrorLogStack';
 import ProspekStack    from './ProspekStack';
+import KalenderStack   from './KalenderStack';
+import RequestStack    from './RequestStack';
+import PerformanceStack from './PerformanceStack';
+import DokumenStack    from './DokumenStack';
+import InvoiceStack    from './InvoiceStack';
 import HomeScreen      from '../screens/home/HomeScreen';
+import AktivitasScreen from '../screens/aktivitas/AktivitasScreen';
 import { useTabBarStyle } from './useTabBarStyle';
 
 type TabIconName = keyof typeof Ionicons.glyphMap;
@@ -24,6 +30,11 @@ const tabConfig: Record<string, { icon: TabIconName; iconFocused: TabIconName }>
   ErrorLog: { icon: 'bug-outline',          iconFocused: 'bug' },
 };
 
+// Tabs yang tidak ditampilkan di tab bar — diakses lewat side drawer.
+// Tetap dijadikan tab supaya bottom navigation tetap terlihat saat user
+// berada di salah satu screen ini.
+const hiddenTabRoute = { tabBarButton: () => null, tabBarItemStyle: { display: 'none' as const } };
+
 export default function BottomTabNavigator() {
   const tabBarStyle = useTabBarStyle();
 
@@ -33,6 +44,7 @@ export default function BottomTabNavigator() {
         headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
           const cfg = tabConfig[route.name];
+          if (!cfg) return null;
           const name = focused ? cfg.iconFocused : cfg.icon;
           return <Ionicons name={name} size={size} color={color} />;
         },
@@ -42,13 +54,13 @@ export default function BottomTabNavigator() {
         tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
       })}
     >
+      {/* Tab terlihat */}
       <Tab.Screen name="Beranda"  component={HomeScreen} />
       <Tab.Screen name="Feed"     component={FeedStack} />
       <Tab.Screen
         name="Prospek"
         component={ProspekStack}
         options={({ route }) => ({
-          // Sembunyikan tab bar di ProspekDetail (full-screen UX dgn komentar input)
           tabBarStyle: getFocusedRouteNameFromRoute(route) === 'ProspekDetail'
             ? { display: 'none' }
             : tabBarStyle,
@@ -58,7 +70,6 @@ export default function BottomTabNavigator() {
         name="Pesan"
         component={ChatStack}
         options={({ route }) => ({
-          // Sembunyikan tab bar saat user di ChatRoom (full-screen messaging UX)
           tabBarStyle: getFocusedRouteNameFromRoute(route) === 'ChatRoom'
             ? { display: 'none' }
             : tabBarStyle,
@@ -71,6 +82,58 @@ export default function BottomTabNavigator() {
         options={({ route }) => ({
           tabBarLabel: 'Error Log',
           tabBarStyle: getFocusedRouteNameFromRoute(route) === 'ErrorLogDetail'
+            ? { display: 'none' }
+            : tabBarStyle,
+        })}
+      />
+
+      {/* Hidden tabs — diakses dari side drawer */}
+      <Tab.Screen
+        name="Kalender"
+        component={KalenderStack}
+        options={({ route }) => ({
+          ...hiddenTabRoute,
+          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'KegiatanDetail'
+            ? { display: 'none' }
+            : tabBarStyle,
+        })}
+      />
+      <Tab.Screen
+        name="Request"
+        component={RequestStack}
+        options={({ route }) => ({
+          ...hiddenTabRoute,
+          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'RequestDetail'
+            ? { display: 'none' }
+            : tabBarStyle,
+        })}
+      />
+      <Tab.Screen
+        name="Performance"
+        component={PerformanceStack}
+        options={({ route }) => ({
+          ...hiddenTabRoute,
+          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'PerformanceDetail'
+            ? { display: 'none' }
+            : tabBarStyle,
+        })}
+      />
+      <Tab.Screen
+        name="Dokumen"
+        component={DokumenStack}
+        options={hiddenTabRoute}
+      />
+      <Tab.Screen
+        name="Aktivitas"
+        component={AktivitasScreen}
+        options={hiddenTabRoute}
+      />
+      <Tab.Screen
+        name="Invoice"
+        component={InvoiceStack}
+        options={({ route }) => ({
+          ...hiddenTabRoute,
+          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'InvoiceDetail'
             ? { display: 'none' }
             : tabBarStyle,
         })}

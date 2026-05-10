@@ -38,17 +38,18 @@ function resolveTarget(data: NotifData): { tab: string; screen?: string; params?
       return { tab: 'ErrorLog', screen: 'ErrorLogDetail', params: { id: modelId, highlightKomentarId: komId } };
     }
     if (tipe === 'komentar_request' || tipe.startsWith('request_')) {
+      // Request adalah hidden tab di MainTabs — navigate via MainTabs > Request > RequestDetail
       return {
-        tab: 'Request',
-        screen: 'RequestDetail',
-        params: { id: modelId, highlightKomentarId: komId },
+        tab: 'MainTabs',
+        screen: 'Request',
+        params: { screen: 'RequestDetail', params: { id: modelId, highlightKomentarId: komId } },
       };
     }
     if (tipe === 'kalender' || tipe.startsWith('kalender_')) {
       return {
-        tab: 'Kalender',
-        screen: 'KegiatanDetail',
-        params: { id: modelId },
+        tab: 'MainTabs',
+        screen: 'Kalender',
+        params: { screen: 'KegiatanDetail', params: { id: modelId } },
       };
     }
     if (tipe.startsWith('task_')) {
@@ -78,10 +79,12 @@ function resolveTarget(data: NotifData): { tab: string; screen?: string; params?
     if (segment === 'prospek')   return { tab: 'Prospek', screen: 'ProspekDetail', params: { id } };
     if (segment === 'error-log') return { tab: 'ErrorLog', screen: 'ErrorLogDetail', params: { id } };
     if (segment === 'request')   return {
-      tab: 'Request', screen: 'RequestDetail', params: { id },
+      tab: 'MainTabs', screen: 'Request',
+      params: { screen: 'RequestDetail', params: { id } },
     };
     if (segment === 'kalender')  return {
-      tab: 'Kalender', screen: 'KegiatanDetail', params: { id },
+      tab: 'MainTabs', screen: 'Kalender',
+      params: { screen: 'KegiatanDetail', params: { id } },
     };
   }
 

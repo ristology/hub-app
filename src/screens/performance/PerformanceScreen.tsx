@@ -69,9 +69,6 @@ export default function PerformanceScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color="#fff" />
-        </TouchableOpacity>
         <Text style={styles.topTitle}>Performance</Text>
       </View>
 

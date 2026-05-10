@@ -144,13 +144,11 @@ export default function AppDrawer() {
   const goTo = (route: string) => {
     animateClose();
     setTimeout(() => {
-      if (navigationRef.isReady()) {
-        if (route === 'MainTabs') {
-          navigationRef.navigate('MainTabs', { screen: 'Beranda' });
-        } else {
-          navigationRef.navigate(route as any);
-        }
-      }
+      if (!navigationRef.isReady()) return;
+      // Semua route drawer adalah child dari MainTabs (sebagai tab tersembunyi)
+      // supaya bottom navigation bar tetap terlihat.
+      const target = route === 'MainTabs' ? 'Beranda' : route;
+      navigationRef.navigate('MainTabs', { screen: target });
     }, 220);
   };
 
