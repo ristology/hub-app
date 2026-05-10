@@ -19,6 +19,7 @@ export type ClientRequest = {
   pencatat?: { id: number; nama_lengkap: string; foto: string | null } | null;
   pic?: { id: number; nama_lengkap: string; foto: string | null } | null;
   gambar_urls?: string[];
+  gambar_ids?: number[];
   dokumen?: { id: number; nama: string; url: string; ukuran: number }[];
   respon?: {
     id: number;
@@ -56,12 +57,22 @@ export type RequestStats = {
 export type KlienRingkas = { id: number; nama: string };
 export type PicRingkas   = { user_id: number; nama: string; foto: string | null };
 
+export type FileAsset = { uri: string; name: string; type: string };
+
 export type CreateRequestPayload = {
   nama_klien: string;
   klien_id?: number | null;
   tanggal_request: string;
   deadline?: string;
   keterangan: string;
+  gambar?:  FileAsset[];
+  dokumen?: FileAsset[];
+};
+
+export type UpdateRequestPayload = Partial<Omit<CreateRequestPayload, 'gambar' | 'dokumen'>> & {
+  gambar?:  FileAsset[];
+  dokumen?: FileAsset[];
+  remove_lampiran_ids?: number[];
 };
 
 type Paginated<T> = { data: T[]; meta?: { current_page: number; last_page: number; total: number } };
@@ -97,12 +108,40 @@ export const requestApi = {
   },
 
   create: async (payload: CreateRequestPayload): Promise<{ data: ClientRequest }> => {
-    const { data } = await apiClient.post('/request', payload);
+    const formData = new FormData();
+    formData.append('nama_klien',      payload.nama_klien);
+    formData.append('tanggal_request', payload.tanggal_request);
+    formData.append('keterangan',      payload.keterangan);
+    if (payload.klien_id != null)        formData.append('klien_id', String(payload.klien_id));
+    if (payload.deadline)                formData.append('deadline', payload.deadline);
+
+    payload.gambar?.forEach((f, i)  => formData.append(`gambar[${i}]`,  f as any));
+    payload.dokumen?.forEach((f, i) => formData.append(`dokumen[${i}]`, f as any));
+
+    const { data } = await apiClient.post('/request', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return data;
   },
 
-  update: async (id: number, payload: Partial<CreateRequestPayload>): Promise<{ data: ClientRequest }> => {
-    const { data } = await apiClient.patch(`/request/${id}`, payload);
+  update: async (id: number, payload: UpdateRequestPayload): Promise<{ data: ClientRequest }> => {
+    const formData = new FormData();
+    // Laravel multipart spoofing — POST + _method=PATCH supaya body multipart diparsing.
+    formData.append('_method', 'PATCH');
+
+    if (payload.nama_klien      !== undefined) formData.append('nama_klien',      payload.nama_klien);
+    if (payload.tanggal_request !== undefined) formData.append('tanggal_request', payload.tanggal_request);
+    if (payload.keterangan      !== undefined) formData.append('keterangan',      payload.keterangan);
+    if (payload.klien_id        !== undefined) formData.append('klien_id', payload.klien_id != null ? String(payload.klien_id) : '');
+    if (payload.deadline        !== undefined) formData.append('deadline', payload.deadline ?? '');
+
+    payload.gambar?.forEach((f, i)              => formData.append(`gambar[${i}]`,  f as any));
+    payload.dokumen?.forEach((f, i)             => formData.append(`dokumen[${i}]`, f as any));
+    payload.remove_lampiran_ids?.forEach((id, i) => formData.append(`remove_lampiran_ids[${i}]`, String(id)));
+
+    const { data } = await apiClient.post(`/request/${id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return data;
   },
 
