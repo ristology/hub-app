@@ -285,8 +285,14 @@ const styles = StyleSheet.create({
   handleBar: {
     width: HANDLE_BAR_W,
     height: HANDLE_BAR_H,
-    backgroundColor: 'rgba(255,255,255,0.30)',
+    backgroundColor: '#ef4444',
     borderTopRightRadius: 4,
     borderBottomRightRadius: 4,
+    // Glow merah menyala
+    shadowColor:   '#ef4444',
+    shadowOffset:  { width: 2, height: 0 },
+    shadowOpacity: 0.85,
+    shadowRadius:  6,
+    elevation:     8,
   },
 });
