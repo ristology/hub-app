@@ -12,7 +12,8 @@ import { navigationRef } from '../utils/deepLink';
 const { height: SCREEN_H } = Dimensions.get('window');
 
 const PANEL_WIDTH      = 88;
-const HANDLE_TOUCH_W   = 28;   // tap area lebar (invisible)
+const HANDLE_TOUCH_W   = 14;   // tap area — sengaja dibatasi 14px supaya tidak overlap
+                               //  dengan FlatList paddingHorizontal:16 (cek SwipeableCard di Request).
 const HANDLE_BAR_W     = 5;    // bar visual
 const HANDLE_BAR_H     = 90;
 const HANDLE_TOP       = SCREEN_H * 0.40;
@@ -174,7 +175,9 @@ export default function AppDrawer() {
         />
       )}
 
-      {/* Panel — selalu mounted, hanya digeser */}
+      {/* Panel — selalu mounted, hanya digeser. pointerEvents=none saat tertutup
+          supaya tidak intercept tap/swipe pada child di belakangnya (di Android
+          translateX tidak otomatis pindahkan hitbox). */}
       <Animated.View
         style={[
           styles.panel,
@@ -184,7 +187,8 @@ export default function AppDrawer() {
             transform: [{ translateX: slideX }],
           },
         ]}
-        {...panelPan.panHandlers}
+        pointerEvents={isOpen ? 'auto' : 'none'}
+        {...(isOpen ? panelPan.panHandlers : {})}
       >
         <ScrollView
           contentContainerStyle={styles.panelContent}
