@@ -67,8 +67,19 @@ export type CreateProspekPayload = {
 type Paginated<T> = { data: T[]; meta?: { current_page: number; last_page: number; total: number } };
 
 export const prospekApi = {
-  list: async (params?: { status?: ProspekStatus; search?: string; page?: number }): Promise<Paginated<Prospek>> => {
+  list: async (params?: {
+    status?: ProspekStatus;
+    kota?: string;
+    bulan?: string; // YYYY-MM
+    search?: string;
+    page?: number;
+  }): Promise<Paginated<Prospek>> => {
     const { data } = await apiClient.get('/prospek', { params });
+    return data;
+  },
+
+  kotaList: async (): Promise<{ data: string[] }> => {
+    const { data } = await apiClient.get('/prospek/kota');
     return data;
   },
 

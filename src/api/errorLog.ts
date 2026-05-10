@@ -75,6 +75,8 @@ export const errorLogApi = {
     status?: ErrorLogStatus;
     kategori?: number;
     klien?: number;
+    handler_id?: number;
+    bulan?: string; // YYYY-MM
     search?: string;
     page?: number;
   }): Promise<Paginated<ErrorLog>> => {

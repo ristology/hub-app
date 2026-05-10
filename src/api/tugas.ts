@@ -47,7 +47,13 @@ export type CreateTugasPayload = {
 };
 
 export const tugasApi = {
-  list: async (params?: { search?: string; status?: TugasStatus; prioritas?: TugasPrioritas; page?: number }): Promise<Paginated<Tugas>> => {
+  list: async (params?: {
+    search?: string;
+    status?: TugasStatus;
+    prioritas?: TugasPrioritas;
+    karyawan_id?: number;
+    page?: number;
+  }): Promise<Paginated<Tugas>> => {
     const { data } = await apiClient.get('/tugas', { params });
     return data;
   },

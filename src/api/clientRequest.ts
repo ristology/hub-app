@@ -78,7 +78,14 @@ export type UpdateRequestPayload = Partial<Omit<CreateRequestPayload, 'gambar' |
 type Paginated<T> = { data: T[]; meta?: { current_page: number; last_page: number; total: number } };
 
 export const requestApi = {
-  list: async (params?: { status?: RequestStatus; search?: string; page?: number }): Promise<Paginated<ClientRequest>> => {
+  list: async (params?: {
+    status?: RequestStatus;
+    klien?: number;
+    dari?: string;   // YYYY-MM-DD
+    sampai?: string; // YYYY-MM-DD
+    search?: string;
+    page?: number;
+  }): Promise<Paginated<ClientRequest>> => {
     const { data } = await apiClient.get('/request', { params });
     return data;
   },

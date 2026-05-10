@@ -1,17 +1,23 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
-  View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
-  TouchableOpacity, TextInput, Modal, Alert, Image,
+  View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet, Alert, Image,
+  TouchableOpacity, TouchableWithoutFeedback, TextInput, Keyboard, Platform,
+  Dimensions, ScrollView, Animated, BackHandler, Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { requestApi, type ClientRequest, type RequestStatus, type PicRingkas } from '../../api/clientRequest';
+import {
+  requestApi,
+  type ClientRequest, type RequestStatus, type PicRingkas, type KlienRingkas,
+} from '../../api/clientRequest';
 import RequestCard from './components/RequestCard';
 import SwipeableCard, { type SwipeAction } from '../../components/SwipeableCard';
+import PickerSheet, { type PickerOption } from '../../components/PickerSheet';
+import DatePickerInput from '../../components/DatePickerInput';
 
 type RequestStackParamList = {
   RequestList: undefined;
@@ -19,45 +25,73 @@ type RequestStackParamList = {
   CreateRequest: undefined;
 };
 
-type Filter = 'semua' | RequestStatus;
-
-const FILTER_OPTIONS: { key: Filter; label: string; color: string }[] = [
-  { key: 'semua',    label: 'Semua',    color: '#3b82f6' },
-  { key: 'menunggu', label: 'Menunggu', color: '#8a94a6' },
-  { key: 'diterima', label: 'Diterima', color: '#3b82f6' },
-  { key: 'proses',   label: 'Proses',   color: '#f59e0b' },
-  { key: 'selesai',  label: 'Selesai',  color: '#22c55e' },
-  { key: 'ditolak',  label: 'Ditolak',  color: '#ef4444' },
+const STATUS_OPTIONS: PickerOption[] = [
+  { id: null,       label: 'Semua status' },
+  { id: 'menunggu', label: 'Menunggu' },
+  { id: 'diterima', label: 'Diterima' },
+  { id: 'proses',   label: 'Proses' },
+  { id: 'selesai',  label: 'Selesai' },
+  { id: 'ditolak',  label: 'Ditolak' },
 ];
+
+type Filters = {
+  search?: string;
+  status?: RequestStatus | null;
+  klien?:  number | null;
+  dari?:   string;
+  sampai?: string;
+};
+
+function countActive(f: Filters): number {
+  let n = 0;
+  if (f.search?.trim()) n++;
+  if (f.status)         n++;
+  if (f.klien)          n++;
+  if (f.dari)           n++;
+  if (f.sampai)         n++;
+  return n;
+}
+
+function formatTanggal(s?: string): string {
+  if (!s) return '';
+  const d = new Date(s + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
 export default function RequestScreen() {
   const navigation  = useNavigation<NativeStackNavigationProp<RequestStackParamList>>();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<Filter>('semua');
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [statusOpen, setStatusOpen] = useState(false);
-  const [assignTarget, setAssignTarget] = useState<ClientRequest | null>(null);
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
+  const [filters, setFilters]       = useState<Filters>({});
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [draft, setDraft]           = useState<Filters>({});
+  const [klienNama, setKlienNama]   = useState('');
+  const [klienPickerOpen, setKlienPickerOpen] = useState(false);
+  const [pickerOpen, setPickerOpen]           = useState<'status' | null>(null);
+  const [assignTarget, setAssignTarget]       = useState<ClientRequest | null>(null);
+
+  const openFilterSheet = () => { setDraft(filters); setFilterOpen(true); };
+
+  const handlePickStatus = (opt: PickerOption) => { setDraft((d) => ({ ...d, status: opt.id as RequestStatus | null })); setPickerOpen(null); };
+  const handlePickKlien  = (k: KlienRingkas)   => { setDraft((d) => ({ ...d, klien: k.id })); setKlienNama(k.nama); setKlienPickerOpen(false); };
+
+  const apiParams = useMemo(() => ({
+    ...(filters.status && { status: filters.status }),
+    ...(filters.klien  && { klien:  filters.klien }),
+    ...(filters.dari   && { dari:   filters.dari }),
+    ...(filters.sampai && { sampai: filters.sampai }),
+    ...(filters.search?.trim() && { search: filters.search.trim() }),
+  }), [filters]);
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['request', filter, debouncedSearch],
-    queryFn:  () => requestApi.list({
-      ...(filter === 'semua' ? {} : { status: filter }),
-      ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
-    }),
+    queryKey: ['request', apiParams],
+    queryFn:  () => requestApi.list(apiParams),
     placeholderData: keepPreviousData,
   });
 
-  const { data: stats } = useQuery({
-    queryKey: ['request-stats'],
-    queryFn:  requestApi.stats,
-  });
+  const { data: stats } = useQuery({ queryKey: ['request-stats'], queryFn: requestApi.stats });
 
   const terimaMut = useMutation({
     mutationFn: ({ id, picUserId }: { id: number; picUserId: number }) => requestApi.terima(id, picUserId),
@@ -80,32 +114,22 @@ export default function RequestScreen() {
   const renderItem = ({ item }: { item: ClientRequest }) => {
     const canAssign = item.is_it_or_admin && item.status === 'menunggu';
     const action: SwipeAction | undefined = canAssign
-      ? {
-          icon: 'person-add',
-          label: 'Assign',
-          color: '#3b82f6',
-          onPress: () => setAssignTarget(item),
-        }
+      ? { icon: 'person-add', label: 'Assign', color: '#3b82f6', onPress: () => setAssignTarget(item) }
       : undefined;
-
     return (
       <SwipeableCard rightAction={action}>
-        <RequestCard
-          request={item}
-          onPress={() => navigation.navigate('RequestDetail', { id: item.id })}
-        />
+        <RequestCard request={item} onPress={() => navigation.navigate('RequestDetail', { id: item.id })} />
       </SwipeableCard>
     );
   };
 
-  const currentFilter = FILTER_OPTIONS.find((f) => f.key === filter) ?? FILTER_OPTIONS[0];
+  const activeCount = countActive(filters);
+  const statusLabel = STATUS_OPTIONS.find((o) => o.id === filters.status)?.label;
 
   if (isLoading && !data) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#3b82f6" />
-        </View>
+        <View style={styles.center}><ActivityIndicator size="large" color="#3b82f6" /></View>
       </SafeAreaView>
     );
   }
@@ -114,9 +138,32 @@ export default function RequestScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Request</Text>
+        <TouchableOpacity
+          onPress={openFilterSheet}
+          style={[styles.searchBtn, activeCount > 0 && styles.searchBtnActive]}
+          hitSlop={8}
+        >
+          <Ionicons name="search" size={20} color={activeCount > 0 ? '#3b82f6' : '#fff'} />
+          {activeCount > 0 && (
+            <View style={styles.searchBadge}><Text style={styles.searchBadgeText}>{activeCount}</Text></View>
+          )}
+        </TouchableOpacity>
       </View>
 
-      {stats && (
+      {activeCount > 0 && (
+        <View style={styles.chipsRow}>
+          {filters.search?.trim() && <Chip label={`"${filters.search.trim()}"`} onClear={() => setFilters({ ...filters, search: '' })} />}
+          {filters.status && <Chip label={statusLabel ?? filters.status} onClear={() => setFilters({ ...filters, status: null })} />}
+          {filters.klien  && <Chip label={klienNama ? `Klien: ${klienNama}` : 'Klien ✓'} onClear={() => { setFilters({ ...filters, klien: null }); setKlienNama(''); }} />}
+          {filters.dari   && <Chip label={`Dari ${formatTanggal(filters.dari)}`} onClear={() => setFilters({ ...filters, dari: undefined })} />}
+          {filters.sampai && <Chip label={`Sampai ${formatTanggal(filters.sampai)}`} onClear={() => setFilters({ ...filters, sampai: undefined })} />}
+          <TouchableOpacity onPress={() => { setFilters({}); setKlienNama(''); }} style={styles.clearAll}>
+            <Text style={styles.clearAllText}>Reset</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {stats && activeCount === 0 && (
         <View style={styles.statsRow}>
           <StatBox label="Menunggu" value={stats.menunggu} color="#8a94a6" />
           <StatBox label="Proses"   value={(stats.diterima ?? 0) + (stats.proses ?? 0)} color="#f59e0b" />
@@ -125,84 +172,52 @@ export default function RequestScreen() {
         </View>
       )}
 
-      <View style={styles.toolsRow}>
-        <TouchableOpacity
-          style={[styles.statusBtn, { borderColor: currentFilter.color + '60' }]}
-          onPress={() => setStatusOpen(true)}
-        >
-          <View style={[styles.statusDot, { backgroundColor: currentFilter.color }]} />
-          <Text style={styles.statusText} numberOfLines={1}>{currentFilter.label}</Text>
-          <Ionicons name="chevron-down" size={14} color="#8a94a6" />
-        </TouchableOpacity>
-
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={16} color="#6b7280" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Cari request..."
-            placeholderTextColor="#6b7280"
-            value={search}
-            onChangeText={setSearch}
-            autoCapitalize="none"
-            returnKeyType="search"
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')} hitSlop={6}>
-              <Ionicons name="close-circle" size={16} color="#6b7280" />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
       <FlatList
         data={data?.data ?? []}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />}
         ListEmptyComponent={
           <View style={styles.center}>
             <Ionicons name="mail-outline" size={48} color="#3b3f4a" />
-            <Text style={styles.empty}>
-              {search ? `Tidak ada hasil untuk "${search}"` : 'Belum ada request.'}
-            </Text>
+            <Text style={styles.empty}>{activeCount > 0 ? 'Tidak ada hasil dengan filter ini.' : 'Belum ada request.'}</Text>
           </View>
         }
       />
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => navigation.navigate('CreateRequest')}
-        activeOpacity={0.85}
-      >
+      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('CreateRequest')} activeOpacity={0.85}>
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
 
-      <Modal visible={statusOpen} transparent animationType="slide" onRequestClose={() => setStatusOpen(false)}>
-        <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={() => setStatusOpen(false)}>
-          <View style={styles.sheet} onStartShouldSetResponder={() => true}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Filter Status</Text>
-            {FILTER_OPTIONS.map((opt) => (
-              <TouchableOpacity
-                key={opt.key}
-                style={[styles.sheetItem, filter === opt.key && { backgroundColor: opt.color + '15' }]}
-                onPress={() => { setFilter(opt.key); setStatusOpen(false); }}
-              >
-                <View style={[styles.sheetDot, { backgroundColor: opt.color }]} />
-                <Text style={[styles.sheetItemText, filter === opt.key && { color: opt.color, fontWeight: '700' }]}>
-                  {opt.label}
-                </Text>
-                {filter === opt.key && (
-                  <Ionicons name="checkmark" size={18} color={opt.color} />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      <FilterSheet
+        visible={filterOpen}
+        draft={draft}
+        klienNama={klienNama}
+        statusLabel={STATUS_OPTIONS.find((o) => o.id === draft.status)?.label}
+        onDraftChange={setDraft}
+        onClearKlien={() => { setDraft((d) => ({ ...d, klien: null })); setKlienNama(''); }}
+        onOpenStatus={() => setPickerOpen('status')}
+        onOpenKlien={() => setKlienPickerOpen(true)}
+        onClose={() => setFilterOpen(false)}
+        onApply={(f) => { setFilters(f); setFilterOpen(false); }}
+        onReset={() => { setDraft({}); setKlienNama(''); }}
+      />
+
+      <PickerSheet
+        visible={pickerOpen === 'status'}
+        title="Pilih Status"
+        options={STATUS_OPTIONS}
+        selectedId={draft.status ?? null}
+        onPick={handlePickStatus}
+        onClose={() => setPickerOpen(null)}
+      />
+
+      <KlienPicker
+        visible={klienPickerOpen}
+        onClose={() => setKlienPickerOpen(false)}
+        onPick={handlePickKlien}
+      />
 
       <AssignPicModal
         visible={!!assignTarget}
@@ -212,6 +227,277 @@ export default function RequestScreen() {
         onSubmit={(picUserId) => assignTarget && terimaMut.mutate({ id: assignTarget.id, picUserId })}
       />
     </SafeAreaView>
+  );
+}
+
+function Chip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <View style={styles.chip}>
+      <Text style={styles.chipText} numberOfLines={1}>{label}</Text>
+      <TouchableOpacity onPress={onClear} hitSlop={6}>
+        <Ionicons name="close-circle" size={14} color="#3b82f6" />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function StatBox({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <View style={styles.statBox}>
+      <Text style={[styles.statValue, { color }]}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+type FilterSheetProps = {
+  visible: boolean;
+  draft: Filters;
+  klienNama: string;
+  statusLabel?: string;
+  onDraftChange: (d: Filters) => void;
+  onClearKlien: () => void;
+  onOpenStatus: () => void;
+  onOpenKlien: () => void;
+  onClose: () => void;
+  onApply: (f: Filters) => void;
+  onReset: () => void;
+};
+
+function FilterSheet({
+  visible, draft, klienNama, statusLabel,
+  onDraftChange, onClearKlien, onOpenStatus, onOpenKlien,
+  onClose, onApply, onReset,
+}: FilterSheetProps) {
+  const insets   = useSafeAreaInsets();
+  const screenH  = Dimensions.get('window').height;
+  const [kbHeight, setKbHeight] = useState(0);
+  const [mounted, setMounted]   = useState(visible);
+  const slideY    = useRef(new Animated.Value(screenH)).current;
+  const backdropO = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvt, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      Animated.parallel([
+        Animated.timing(slideY,    { toValue: 0, duration: 260, useNativeDriver: true }),
+        Animated.timing(backdropO, { toValue: 1, duration: 220, useNativeDriver: true }),
+      ]).start();
+    } else if (mounted) {
+      Animated.parallel([
+        Animated.timing(slideY,    { toValue: screenH, duration: 220, useNativeDriver: true }),
+        Animated.timing(backdropO, { toValue: 0,       duration: 200, useNativeDriver: true }),
+      ]).start(({ finished }) => { if (finished) setMounted(false); });
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { onClose(); return true; });
+    return () => sub.remove();
+  }, [mounted, onClose]);
+
+  const ANDROID_IME_SAFETY = 60;
+  const effectiveKb = kbHeight > 0
+    ? kbHeight + (Platform.OS === 'android' ? ANDROID_IME_SAFETY : 0) : 0;
+  const availableH  = screenH - insets.top - 40;
+  const sheetH      = effectiveKb > 0
+    ? Math.max(320, availableH - effectiveKb)
+    : Math.min(620, availableH);
+
+  if (!mounted) return null;
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      <TouchableWithoutFeedback onPress={onClose}>
+        <Animated.View style={[StyleSheet.absoluteFill, fsStyles.backdrop, { opacity: backdropO }]} />
+      </TouchableWithoutFeedback>
+      <Animated.View
+        style={[
+          fsStyles.sheet,
+          { height: sheetH, paddingBottom: kbHeight > 0 ? 12 : insets.bottom + 12,
+            transform: [{ translateY: slideY }] },
+        ]}
+      >
+        <View style={fsStyles.handle} />
+        <View style={fsStyles.titleRow}>
+          <Text style={fsStyles.title}>Filter Request</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={8}><Ionicons name="close" size={24} color="#fff" /></TouchableOpacity>
+        </View>
+
+        <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+          <Text style={fsStyles.label}>Cari teks</Text>
+          <View style={fsStyles.searchBox}>
+            <Ionicons name="search" size={16} color="#6b7280" />
+            <TextInput
+              style={fsStyles.searchInput}
+              placeholder="Nama klien / keterangan..."
+              placeholderTextColor="#6b7280"
+              value={draft.search ?? ''}
+              onChangeText={(t) => onDraftChange({ ...draft, search: t })}
+              autoCapitalize="none"
+            />
+            {draft.search ? (
+              <TouchableOpacity onPress={() => onDraftChange({ ...draft, search: '' })} hitSlop={6}>
+                <Ionicons name="close-circle" size={16} color="#6b7280" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          <Text style={fsStyles.label}>Status</Text>
+          <Field value={statusLabel ?? 'Semua status'} empty={!draft.status}
+            onPress={onOpenStatus}
+            onClear={draft.status ? () => onDraftChange({ ...draft, status: null }) : undefined} />
+
+          <Text style={fsStyles.label}>Klien</Text>
+          <Field value={draft.klien ? (klienNama || 'Klien terpilih') : 'Semua klien'}
+            empty={!draft.klien}
+            onPress={onOpenKlien}
+            onClear={draft.klien ? onClearKlien : undefined} />
+
+          <Text style={fsStyles.label}>Tanggal request — Dari</Text>
+          <View style={fsStyles.row}>
+            <View style={{ flex: 1 }}>
+              <DatePickerInput
+                value={draft.dari ?? null}
+                onChange={(v) => onDraftChange({ ...draft, dari: v })}
+                placeholder="Pilih tanggal awal..."
+              />
+            </View>
+            {draft.dari && (
+              <TouchableOpacity onPress={() => onDraftChange({ ...draft, dari: undefined })} style={fsStyles.clearBtn} hitSlop={6}>
+                <Ionicons name="close-circle" size={20} color="#8a94a6" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <Text style={fsStyles.label}>Tanggal request — Sampai</Text>
+          <View style={fsStyles.row}>
+            <View style={{ flex: 1 }}>
+              <DatePickerInput
+                value={draft.sampai ?? null}
+                onChange={(v) => onDraftChange({ ...draft, sampai: v })}
+                placeholder="Pilih tanggal akhir..."
+              />
+            </View>
+            {draft.sampai && (
+              <TouchableOpacity onPress={() => onDraftChange({ ...draft, sampai: undefined })} style={fsStyles.clearBtn} hitSlop={6}>
+                <Ionicons name="close-circle" size={20} color="#8a94a6" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={{ height: 12 }} />
+        </ScrollView>
+
+        <View style={fsStyles.actions}>
+          <TouchableOpacity onPress={onReset} style={fsStyles.resetBtn}>
+            <Text style={fsStyles.resetText}>Reset</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => onApply(draft)} style={fsStyles.applyBtn}>
+            <Text style={fsStyles.applyText}>Terapkan</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
+function Field({ value, empty, onPress, onClear }: { value: string; empty?: boolean; onPress: () => void; onClear?: () => void }) {
+  return (
+    <View style={fsStyles.row}>
+      <TouchableOpacity onPress={onPress} style={fsStyles.field}>
+        <Text style={[fsStyles.fieldText, empty && { color: '#6b7280' }]} numberOfLines={1}>{value}</Text>
+        <Ionicons name="chevron-down" size={16} color="#8a94a6" />
+      </TouchableOpacity>
+      {onClear && (
+        <TouchableOpacity onPress={onClear} style={fsStyles.clearBtn} hitSlop={6}>
+          <Ionicons name="close-circle" size={20} color="#8a94a6" />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+/** Klien picker dengan search autocomplete via API. Pakai Modal biasa karena
+ *  filter sheet sudah Animated overlay (bukan Modal), jadi Modal di sini stack OK. */
+function KlienPicker({ visible, onClose, onPick }: {
+  visible: boolean;
+  onClose: () => void;
+  onPick: (k: KlienRingkas) => void;
+}) {
+  const [search, setSearch]   = useState('');
+  const [results, setResults] = useState<KlienRingkas[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    setLoading(true);
+    const handle = setTimeout(async () => {
+      try {
+        const { data } = await requestApi.searchKlien(search);
+        setResults(data);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [search, visible]);
+
+  useEffect(() => { if (visible) setSearch(''); }, [visible]);
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={picStyles.backdrop}>
+        <View style={picStyles.sheet}>
+          <View style={picStyles.handle} />
+          <View style={picStyles.header}>
+            <Text style={picStyles.title}>Pilih Klien</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          <View style={picStyles.searchBox}>
+            <Ionicons name="search" size={18} color="#6b7280" />
+            <TextInput
+              style={picStyles.searchInput}
+              placeholder="Cari nama klien..."
+              placeholderTextColor="#6b7280"
+              value={search}
+              onChangeText={setSearch}
+              autoCapitalize="words"
+            />
+          </View>
+          {loading ? (
+            <ActivityIndicator size="large" color="#3b82f6" style={{ marginTop: 30 }} />
+          ) : (
+            <FlatList
+              data={results}
+              keyExtractor={(item) => String(item.id)}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <TouchableOpacity onPress={() => onPick(item)} style={picStyles.item}>
+                  <Ionicons name="business-outline" size={18} color="#3b82f6" />
+                  <Text style={picStyles.itemText}>{item.nama}</Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={picStyles.empty}>{search ? 'Tidak ada klien ditemukan.' : 'Mulai ketik untuk mencari.'}</Text>
+              }
+              contentContainerStyle={{ paddingBottom: 24 }}
+            />
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -241,17 +527,13 @@ function AssignPicModal({ visible, target, loading, onClose, onSubmit }: {
           <View style={picStyles.header}>
             <View style={{ flex: 1 }}>
               <Text style={picStyles.title}>Assign Request</Text>
-              {target && (
-                <Text style={picStyles.subtitle} numberOfLines={1}>{target.nama_klien}</Text>
-              )}
+              {target && <Text style={picStyles.subtitle} numberOfLines={1}>{target.nama_klien}</Text>}
             </View>
             <TouchableOpacity onPress={onClose} hitSlop={8}>
               <Ionicons name="close" size={24} color="#fff" />
             </TouchableOpacity>
           </View>
-
           <Text style={picStyles.label}>Pilih PIC untuk handle request ini</Text>
-
           {loadingPic ? (
             <ActivityIndicator size="large" color="#3b82f6" style={{ marginTop: 30 }} />
           ) : picList.length === 0 ? (
@@ -271,9 +553,7 @@ function AssignPicModal({ visible, target, loading, onClose, onSubmit }: {
                     <Image source={{ uri: item.foto }} style={picStyles.picAvatar} />
                   ) : (
                     <View style={[picStyles.picAvatar, picStyles.picAvatarFb]}>
-                      <Text style={{ color: '#fff', fontWeight: '700' }}>
-                        {item.nama.charAt(0).toUpperCase()}
-                      </Text>
+                      <Text style={{ color: '#fff', fontWeight: '700' }}>{item.nama.charAt(0).toUpperCase()}</Text>
                     </View>
                   )}
                   <Text style={picStyles.picName} numberOfLines={1}>{item.nama}</Text>
@@ -291,24 +571,40 @@ function AssignPicModal({ visible, target, loading, onClose, onSubmit }: {
   );
 }
 
-function StatBox({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <View style={styles.statBox}>
-      <Text style={[styles.statValue, { color }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0d1421' },
   center:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
-  header: {
+  header:    {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 8, paddingTop: 8, paddingBottom: 12, gap: 4,
+    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12, gap: 8,
   },
-  backBtn: { padding: 8 },
-  title:   { color: '#fff', fontSize: 22, fontWeight: '700', flex: 1 },
+  title:     { color: '#fff', fontSize: 24, fontWeight: '700', flex: 1 },
+  searchBtn: {
+    width: 38, height: 38, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    position: 'relative',
+  },
+  searchBtnActive: { backgroundColor: 'rgba(59,130,246,0.15)', borderColor: '#3b82f6' },
+  searchBadge: {
+    position: 'absolute', top: -4, right: -4,
+    backgroundColor: '#ef4444', borderRadius: 8, minWidth: 16, height: 16,
+    paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center',
+  },
+  searchBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 16, paddingBottom: 8 },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(59,130,246,0.15)',
+    borderColor: 'rgba(59,130,246,0.30)', borderWidth: 1,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12,
+    maxWidth: 220,
+  },
+  chipText:    { color: '#3b82f6', fontSize: 11, fontWeight: '600', flexShrink: 1 },
+  clearAll:    { paddingHorizontal: 8, paddingVertical: 4 },
+  clearAllText:{ color: '#ef4444', fontSize: 11, fontWeight: '700' },
 
   statsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 12 },
   statBox: {
@@ -319,29 +615,7 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 22, fontWeight: '700' },
   statLabel: { color: '#8a94a6', fontSize: 11, marginTop: 4 },
 
-  toolsRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 16, marginBottom: 8,
-  },
-  statusBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 9,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 10, borderWidth: 1,
-    minWidth: 130,
-  },
-  statusDot:  { width: 8, height: 8, borderRadius: 4 },
-  statusText: { color: '#fff', fontSize: 13, fontWeight: '600', flex: 1 },
-  searchBox: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 12, paddingVertical: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 10,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-  },
-  searchInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 0 },
-
-  list:  { padding: 16, paddingTop: 8 },
+  list:  { padding: 16, paddingTop: 4 },
   empty: { color: '#8a94a6', fontSize: 14, textAlign: 'center' },
   fab: {
     position: 'absolute', right: 20, bottom: 20,
@@ -351,30 +625,49 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3, shadowRadius: 6, elevation: 6,
   },
+});
 
-  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+const fsStyles = StyleSheet.create({
+  backdrop: { backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: {
-    backgroundColor: '#1c2333',
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    backgroundColor: '#0d1421',
     borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    paddingBottom: 30, paddingHorizontal: 12, paddingTop: 8,
+    paddingHorizontal: 16,
   },
-  sheetHandle: {
+  handle: {
     width: 40, height: 4, borderRadius: 2,
     backgroundColor: 'rgba(255,255,255,0.20)',
-    alignSelf: 'center', marginBottom: 12,
+    alignSelf: 'center', marginTop: 8, marginBottom: 12,
   },
-  sheetTitle: {
-    color: '#8a94a6', fontSize: 12, fontWeight: '700',
-    letterSpacing: 0.8, marginBottom: 8, paddingHorizontal: 8,
-    textTransform: 'uppercase',
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  title: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  label: { color: '#8a94a6', fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginTop: 12, marginBottom: 6 },
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
-  sheetItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 12, paddingHorizontal: 12,
-    borderRadius: 10,
+  searchInput: { flex: 1, color: '#fff', paddingVertical: 6, fontSize: 14 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  field: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 12, paddingVertical: 11, borderRadius: 10,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
-  sheetDot: { width: 10, height: 10, borderRadius: 5 },
-  sheetItemText: { color: '#fff', fontSize: 14, flex: 1 },
+  fieldText: { flex: 1, color: '#fff', fontSize: 14 },
+  clearBtn: { padding: 4 },
+  actions: { flexDirection: 'row', gap: 10, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' },
+  resetBtn: {
+    flex: 1, paddingVertical: 13, borderRadius: 10,
+    alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+  },
+  resetText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  applyBtn: { flex: 2, paddingVertical: 13, borderRadius: 10, alignItems: 'center', backgroundColor: '#3b82f6' },
+  applyText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });
 
 const picStyles = StyleSheet.create({
@@ -389,17 +682,19 @@ const picStyles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.20)',
     alignSelf: 'center', marginTop: 8, marginBottom: 12,
   },
-  header: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
-    marginBottom: 12,
-  },
+  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 12 },
   title:    { color: '#fff', fontSize: 16, fontWeight: '700' },
   subtitle: { color: '#8a94a6', fontSize: 12, marginTop: 2 },
   label:    { color: '#8a94a6', fontSize: 12, fontWeight: '600', marginBottom: 8 },
-  picItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 12, paddingHorizontal: 8, borderRadius: 8,
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10,
+    paddingHorizontal: 12, marginBottom: 8,
   },
+  searchInput: { flex: 1, color: '#fff', paddingVertical: 10, fontSize: 14 },
+  item: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 8, borderRadius: 8 },
+  itemText: { color: '#fff', fontSize: 14, flex: 1 },
+  picItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 8, borderRadius: 8 },
   picAvatar:   { width: 38, height: 38, borderRadius: 19, backgroundColor: '#1c2333' },
   picAvatarFb: { alignItems: 'center', justifyContent: 'center' },
   picName:     { color: '#fff', fontSize: 14, flex: 1 },
