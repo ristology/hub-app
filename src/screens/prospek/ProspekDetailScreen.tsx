@@ -9,6 +9,7 @@ import { useRoute, useNavigation, type RouteProp } from '@react-navigation/nativ
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { prospekApi, type ProspekStatus, type ProspekKomentar } from '../../api/prospek';
+import { notifApi, NotifModel } from '../../api/notif';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
 import { useKomentarHighlight } from '../../hooks/useKomentarHighlight';
@@ -40,6 +41,14 @@ export default function ProspekDetailScreen() {
   const navigation = useNavigation<any>();
   const { id, highlightKomentarId } = route.params;
   const queryClient = useQueryClient();
+
+  // Tandai notif Prospek ini sebagai dibaca → badge bottom tab berkurang
+  useEffect(() => {
+    notifApi.markRead(NotifModel.Prospek, id)
+      .then(() => queryClient.invalidateQueries({ queryKey: ['notif-count'] }))
+      .catch(() => {});
+  }, [id]);
+
   const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady, scrollToKomentar } = useKomentarHighlight(highlightKomentarId);
   const [komentar, setKomentar] = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);

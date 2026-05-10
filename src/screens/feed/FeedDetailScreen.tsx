@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, Image, TextInput, TouchableOpacity,
   ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Alert,
@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, type RouteProp } from '@react-navigation/native';
 import { feedApi, type FeedKomentar, type KaryawanRingkas } from '../../api/feed';
+import { notifApi, NotifModel } from '../../api/notif';
 import { useAuth } from '../../store/auth';
 import PhotoCarousel  from '../../components/PhotoCarousel';
 import KaryawanPicker from '../../components/KaryawanPicker';
@@ -23,6 +24,14 @@ export default function FeedDetailScreen() {
   const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady, scrollToKomentar } = useKomentarHighlight(highlightKomentarId);
   const queryClient = useQueryClient();
   const { user } = useAuth();
+
+  // Tandai notifikasi terkait feed ini sebagai dibaca → badge berkurang
+  useEffect(() => {
+    notifApi.markRead(NotifModel.Feed, id)
+      .then(() => queryClient.invalidateQueries({ queryKey: ['notif-count'] }))
+      .catch(() => {});
+  }, [id]);
+
   const [komentar, setKomentar]       = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);

@@ -10,6 +10,7 @@ import { useRoute, useNavigation, type RouteProp } from '@react-navigation/nativ
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { errorLogApi, type ErrorLogStatus, type ErrorLogKomentar } from '../../api/errorLog';
+import { notifApi, NotifModel } from '../../api/notif';
 import PhotoCarousel  from '../../components/PhotoCarousel';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
@@ -39,6 +40,13 @@ export default function ErrorLogDetailScreen() {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const toast = useToast();
+
+  // Tandai notif Error Log ini sebagai dibaca → badge bottom tab berkurang
+  useEffect(() => {
+    notifApi.markRead(NotifModel.ErrorLog, id)
+      .then(() => queryClient.invalidateQueries({ queryKey: ['notif-count'] }))
+      .catch(() => {});
+  }, [id]);
   const [kbHeight, setKbHeight] = useState(0);
   useEffect(() => {
     const showName = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';

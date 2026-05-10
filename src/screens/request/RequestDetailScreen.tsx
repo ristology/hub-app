@@ -13,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   requestApi, type RequestKomentar, type PicRingkas,
 } from '../../api/clientRequest';
+import { notifApi, NotifModel } from '../../api/notif';
 import PhotoCarousel  from '../../components/PhotoCarousel';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
@@ -51,6 +52,13 @@ export default function RequestDetailScreen() {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const tabBarStyle = useTabBarStyle();
+
+  // Tandai notif Request ini sebagai dibaca → badge bottom tab berkurang
+  useEffect(() => {
+    notifApi.markRead(NotifModel.Request, id)
+      .then(() => queryClient.invalidateQueries({ queryKey: ['notif-count'] }))
+      .catch(() => {});
+  }, [id]);
 
   // Sembunyikan bottom tab bar saat di Request detail (full-screen UX dgn komentar input).
   // Pakai useFocusEffect karena RequestDetail ada di nested stack 2 level

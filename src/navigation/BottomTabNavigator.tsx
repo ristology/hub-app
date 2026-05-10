@@ -2,6 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
 
 import FeedStack       from './FeedStack';
 import ChatStack       from './ChatStack';
@@ -15,6 +16,7 @@ import DokumenStack    from './DokumenStack';
 import InvoiceStack    from './InvoiceStack';
 import HomeScreen      from '../screens/home/HomeScreen';
 import AktivitasScreen from '../screens/aktivitas/AktivitasScreen';
+import { notifApi } from '../api/notif';
 import { useTabBarStyle } from './useTabBarStyle';
 
 type TabIconName = keyof typeof Ionicons.glyphMap;
@@ -31,12 +33,36 @@ const tabConfig: Record<string, { icon: TabIconName; iconFocused: TabIconName }>
 };
 
 // Tabs yang tidak ditampilkan di tab bar — diakses lewat side drawer.
-// Tetap dijadikan tab supaya bottom navigation tetap terlihat saat user
-// berada di salah satu screen ini.
 const hiddenTabRoute = { tabBarButton: () => null, tabBarItemStyle: { display: 'none' as const } };
+
+// Style badge merah menyala — sama untuk semua tab.
+const RED_BADGE_STYLE = {
+  backgroundColor: '#ef4444',
+  color: '#fff',
+  fontSize: 10,
+  fontWeight: '700' as const,
+  minWidth: 18,
+  height: 18,
+  borderRadius: 9,
+};
+
+/** Format badge — number, atau "99+" kalau lebih besar. Undefined = tidak ada badge. */
+function badge(n?: number): number | string | undefined {
+  if (!n || n <= 0) return undefined;
+  return n > 99 ? '99+' : n;
+}
 
 export default function BottomTabNavigator() {
   const tabBarStyle = useTabBarStyle();
+
+  // Polling notif count tiap 20 detik. Akan di-invalidate manual saat user
+  // buka detail screen (mark-read) supaya badge update real-time.
+  const { data: notif } = useQuery({
+    queryKey: ['notif-count'],
+    queryFn:  notifApi.count,
+    refetchInterval: 20000,
+    refetchOnWindowFocus: true,
+  });
 
   return (
     <Tab.Navigator
@@ -52,15 +78,21 @@ export default function BottomTabNavigator() {
         tabBarInactiveTintColor: '#6b7280',
         tabBarStyle,
         tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
+        tabBarBadgeStyle: RED_BADGE_STYLE,
       })}
     >
       {/* Tab terlihat */}
       <Tab.Screen name="Beranda"  component={HomeScreen} />
-      <Tab.Screen name="Feed"     component={FeedStack} />
+      <Tab.Screen
+        name="Feed"
+        component={FeedStack}
+        options={{ tabBarBadge: badge(notif?.feed) }}
+      />
       <Tab.Screen
         name="Prospek"
         component={ProspekStack}
         options={({ route }) => ({
+          tabBarBadge: badge(notif?.prospek),
           tabBarStyle: getFocusedRouteNameFromRoute(route) === 'ProspekDetail'
             ? { display: 'none' }
             : tabBarStyle,
@@ -70,6 +102,7 @@ export default function BottomTabNavigator() {
         name="Pesan"
         component={ChatStack}
         options={({ route }) => ({
+          tabBarBadge: badge(notif?.pesan),
           tabBarStyle: getFocusedRouteNameFromRoute(route) === 'ChatRoom'
             ? { display: 'none' }
             : tabBarStyle,
@@ -81,6 +114,7 @@ export default function BottomTabNavigator() {
         component={ErrorLogStack}
         options={({ route }) => ({
           tabBarLabel: 'Error Log',
+          tabBarBadge: badge(notif?.error_log),
           tabBarStyle: getFocusedRouteNameFromRoute(route) === 'ErrorLogDetail'
             ? { display: 'none' }
             : tabBarStyle,

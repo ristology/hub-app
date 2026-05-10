@@ -5,9 +5,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
 import { useAppDrawer } from '../context/AppDrawerContext';
 import { useAuth } from '../store/auth';
 import { navigationRef } from '../utils/deepLink';
+import { notifApi } from '../api/notif';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -33,6 +35,15 @@ export default function AppDrawer() {
   const { isOpen, open, close } = useAppDrawer();
   const { user, logout } = useAuth();
   const insets = useSafeAreaInsets();
+
+  // Notif count untuk badge — share queryKey dengan BottomTabNavigator supaya
+  // tidak duplikat fetch.
+  const { data: notif } = useQuery({
+    queryKey: ['notif-count'],
+    queryFn:  notifApi.count,
+    refetchInterval: 20000,
+  });
+  const requestUnread = notif?.request ?? 0;
 
   // Animasi: panel selalu di-mount, hanya digeser via translateX
   const slideX    = useRef(new Animated.Value(-PANEL_WIDTH)).current;
@@ -192,17 +203,27 @@ export default function AppDrawer() {
           contentContainerStyle={styles.panelContent}
           showsVerticalScrollIndicator={false}
         >
-          {items.map((item) => (
-            <TouchableOpacity
-              key={item.key}
-              onPress={() => goTo(item.route)}
-              style={styles.item}
-              activeOpacity={0.6}
-            >
-              <Ionicons name={item.icon} size={24} color="#fff" />
-              <Text style={styles.itemLabel} numberOfLines={1}>{item.label}</Text>
-            </TouchableOpacity>
-          ))}
+          {items.map((item) => {
+            const count = item.key === 'request' ? requestUnread : 0;
+            return (
+              <TouchableOpacity
+                key={item.key}
+                onPress={() => goTo(item.route)}
+                style={styles.item}
+                activeOpacity={0.6}
+              >
+                <View style={styles.iconWrap}>
+                  <Ionicons name={item.icon} size={24} color="#fff" />
+                  {count > 0 && (
+                    <View style={styles.itemBadge}>
+                      <Text style={styles.itemBadgeText}>{count > 99 ? '99+' : count}</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.itemLabel} numberOfLines={1}>{item.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
 
           <View style={styles.divider} />
 
@@ -213,14 +234,17 @@ export default function AppDrawer() {
         </ScrollView>
       </Animated.View>
 
-      {/* Fin/handle — selalu visible di edge kiri, tap atau swipe untuk buka */}
+      {/* Fin/handle — selalu visible di edge kiri, tap atau swipe untuk buka.
+          Saat ada notif Request unread, tampilkan dot putih di ujung fin. */}
       <View
         style={[styles.handleArea, { top: HANDLE_TOP }]}
         {...handlePan.panHandlers}
         pointerEvents={isOpen ? 'none' : 'auto'}
       >
         <TouchableOpacity onPress={animateOpen} activeOpacity={0.5} style={styles.handleTouch}>
-          <View style={styles.handleBar} />
+          <View style={styles.handleBar}>
+            {requestUnread > 0 && <View style={styles.handleDot} />}
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -264,6 +288,21 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
+  // Wrapper icon supaya badge bisa absolute positioned
+  iconWrap: { position: 'relative' },
+  itemBadge: {
+    position: 'absolute',
+    top: -6, right: -10,
+    minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 4,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: '#0d1421',
+  },
+  itemBadgeText: {
+    color: '#fff', fontSize: 9, fontWeight: '700',
+  },
+
   divider: {
     width: '70%', height: 1,
     backgroundColor: 'rgba(255,255,255,0.10)',
@@ -296,5 +335,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.85,
     shadowRadius:  6,
     elevation:     8,
+  },
+  /** Dot putih kecil di tengah fin saat ada notif Request unread */
+  handleDot: {
+    position: 'absolute',
+    top: HANDLE_BAR_H / 2 - 4,
+    left: -3,
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: '#fff',
+    shadowColor:   '#fff',
+    shadowOffset:  { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius:  4,
+    elevation:     6,
   },
 });
