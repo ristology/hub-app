@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, ScrollView, TouchableOpacity, Image,
   StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -15,25 +15,57 @@ import PickerSheet, { type PickerOption } from '../../components/PickerSheet';
 import SaveButton from '../../components/SaveButton';
 
 const MAX_PHOTOS = 6;
-type Foto = { uri: string; name: string; type: string };
+type NewFoto      = { uri: string; name: string; type: string };
+type ExistingFoto = { id: number; url: string; markedForRemoval: boolean };
+type RouteParams  = { id?: number };
 
 export default function CreateErrorLogScreen() {
-  const navigation = useNavigation();
+  const navigation  = useNavigation();
+  const route       = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const queryClient = useQueryClient();
-  const toast = useToast();
+  const toast       = useToast();
+  const editId      = route.params?.id;
+  const isEdit      = !!editId;
 
-  const [klienId, setKlienId]     = useState<number | null>(null);
+  const [klienId, setKlienId]       = useState<number | null>(null);
   const [kategoriId, setKategoriId] = useState<number | null>(null);
   const [keterangan, setKeterangan] = useState('');
-  const [url, setUrl]             = useState('');
-  const [username, setUsername]   = useState('');
-  const [password, setPassword]   = useState('');
-  const [fotos, setFotos]         = useState<Foto[]>([]);
-  const [klienOpen, setKlienOpen]       = useState(false);
-  const [kategoriOpen, setKategoriOpen] = useState(false);
+  const [url, setUrl]               = useState('');
+  const [username, setUsername]     = useState('');
+  const [password, setPassword]     = useState('');
+  const [newFotos, setNewFotos]     = useState<NewFoto[]>([]);
+  const [existingFotos, setExistingFotos] = useState<ExistingFoto[]>([]);
+  const [klienOpen, setKlienOpen]         = useState(false);
+  const [kategoriOpen, setKategoriOpen]   = useState(false);
+  const [initialized, setInitialized]     = useState(false);
 
   const { data: klienData }    = useQuery({ queryKey: ['error-log-klien'],    queryFn: errorLogApi.klien });
   const { data: kategoriData } = useQuery({ queryKey: ['error-log-kategori'], queryFn: errorLogApi.kategori });
+
+  // Load existing data untuk edit mode
+  const { data: existingData } = useQuery({
+    queryKey: ['error-log', editId],
+    queryFn:  () => errorLogApi.detail(editId!),
+    enabled:  isEdit,
+  });
+
+  useEffect(() => {
+    if (!isEdit || !existingData || initialized) return;
+    const log = existingData.data;
+    setKlienId(log.klien?.id ?? null);
+    setKategoriId(log.kategori?.id ?? null);
+    setKeterangan(log.keterangan ?? '');
+    setUrl(log.url ?? '');
+    setUsername(log.username ?? '');
+    setPassword(log.password ?? '');
+    const urls = log.foto_urls ?? [];
+    const ids  = log.foto_ids  ?? [];
+    setExistingFotos(urls.map((u, i) => ({ id: ids[i] ?? 0, url: u, markedForRemoval: false })));
+    setInitialized(true);
+  }, [existingData, initialized, isEdit]);
+
+  const activeExisting = existingFotos.filter((p) => !p.markedForRemoval).length;
+  const totalPhotos    = activeExisting + newFotos.length;
 
   const createMutation = useMutation({
     mutationFn: () => errorLogApi.create({
@@ -43,7 +75,7 @@ export default function CreateErrorLogScreen() {
       url:      url      || undefined,
       username: username || undefined,
       password: password || undefined,
-      fotos,
+      fotos:    newFotos,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['error-log'] });
@@ -51,58 +83,74 @@ export default function CreateErrorLogScreen() {
       toast.success('Laporan error berhasil dibuat.');
       navigation.goBack();
     },
-    onError: (e: any) => {
-      Alert.alert('Error', e.response?.data?.message ?? 'Gagal buat laporan.');
-    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal buat laporan.'),
   });
 
+  const updateMutation = useMutation({
+    mutationFn: () => errorLogApi.update(editId!, {
+      klien_id:          klienId ?? null,
+      kategori_error_id: kategoriId ?? undefined,
+      keterangan,
+      url:               url      || null,
+      username:          username || null,
+      password:          password || null,
+      fotos:             newFotos.length > 0 ? newFotos : undefined,
+      remove_photo_ids:  existingFotos.filter((p) => p.markedForRemoval).map((p) => p.id),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['error-log'] });
+      queryClient.invalidateQueries({ queryKey: ['error-log', editId] });
+      queryClient.invalidateQueries({ queryKey: ['error-log-stats'] });
+      toast.success('Laporan error berhasil diperbarui.');
+      navigation.goBack();
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal update laporan.'),
+  });
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
   const pickImages = async () => {
-    if (fotos.length >= MAX_PHOTOS) {
-      Alert.alert('Maksimal', `Maksimal ${MAX_PHOTOS} foto.`);
-      return;
-    }
-
+    if (totalPhotos >= MAX_PHOTOS) { Alert.alert('Maksimal', `Maksimal ${MAX_PHOTOS} foto.`); return; }
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Izin ditolak', 'Beri izin akses galeri.');
-      return;
-    }
-
+    if (!perm.granted) { Alert.alert('Izin ditolak', 'Beri izin akses galeri.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
-      selectionLimit: MAX_PHOTOS - fotos.length,
+      selectionLimit: MAX_PHOTOS - totalPhotos,
       quality: 0.8,
     });
-
     if (!result.canceled) {
-      const newFotos: Foto[] = result.assets.map((a) => ({
+      const added: NewFoto[] = result.assets.map((a) => ({
         uri:  a.uri,
         name: a.fileName ?? `error-${Date.now()}.jpg`,
         type: a.mimeType ?? 'image/jpeg',
       }));
-      setFotos((prev) => [...prev, ...newFotos].slice(0, MAX_PHOTOS));
+      setNewFotos((prev) => [...prev, ...added].slice(0, MAX_PHOTOS - activeExisting));
     }
   };
 
   const takePhoto = async () => {
-    if (fotos.length >= MAX_PHOTOS) return;
+    if (totalPhotos >= MAX_PHOTOS) return;
     const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Izin ditolak', 'Beri izin akses kamera.');
-      return;
-    }
+    if (!perm.granted) { Alert.alert('Izin ditolak', 'Beri izin akses kamera.'); return; }
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
     if (!result.canceled && result.assets[0]) {
       const a = result.assets[0];
-      setFotos((p) => [...p, { uri: a.uri, name: a.fileName ?? `cam-${Date.now()}.jpg`, type: a.mimeType ?? 'image/jpeg' }].slice(0, MAX_PHOTOS));
+      setNewFotos((p) => [...p, { uri: a.uri, name: a.fileName ?? `cam-${Date.now()}.jpg`, type: a.mimeType ?? 'image/jpeg' }]);
     }
   };
+
+  const toggleExistingRemoval = (id: number) => {
+    setExistingFotos((prev) => prev.map((p) => p.id === id ? { ...p, markedForRemoval: !p.markedForRemoval } : p));
+  };
+
+  const removeNewFoto = (index: number) => setNewFotos((prev) => prev.filter((_, i) => i !== index));
 
   const handleSubmit = () => {
     if (!keterangan.trim()) { Alert.alert('Error', 'Keterangan wajib diisi.'); return; }
     if (!kategoriId)        { Alert.alert('Error', 'Pilih kategori error.'); return; }
-    createMutation.mutate();
+    if (isEdit) updateMutation.mutate();
+    else        createMutation.mutate();
   };
 
   return (
@@ -112,17 +160,17 @@ export default function CreateErrorLogScreen() {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.topTitle}>Laporan Error</Text>
+          <Text style={styles.topTitle}>{isEdit ? 'Edit Laporan Error' : 'Laporan Error'}</Text>
           <SaveButton
             onPress={handleSubmit}
-            loading={createMutation.isPending}
+            loading={isPending}
             disabled={!keterangan.trim() || !kategoriId}
-            label="Kirim"
+            label={isEdit ? 'Simpan' : 'Kirim'}
           />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll}>
-          {/* Klien + Kategori — 2 picker side-by-side */}
+          {/* Klien + Kategori */}
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1 }}>
               <Text style={styles.label}>Klien</Text>
@@ -148,7 +196,6 @@ export default function CreateErrorLogScreen() {
             </View>
           </View>
 
-          {/* Keterangan */}
           <Field label="Keterangan Error *">
             <TextInput
               style={[styles.input, { height: 120, textAlignVertical: 'top' }]}
@@ -161,19 +208,34 @@ export default function CreateErrorLogScreen() {
             />
           </Field>
 
-          {/* Foto */}
-          <Field label={`Foto Error (opsional, ${fotos.length}/${MAX_PHOTOS})`}>
-            {fotos.length > 0 && (
+          {/* Foto — existing (tandai hapus) + new */}
+          <Field label={`Foto Error (opsional, ${totalPhotos}/${MAX_PHOTOS})`}>
+            {(existingFotos.length > 0 || newFotos.length > 0) && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
-                {fotos.map((foto, idx) => (
-                  <View key={idx} style={styles.fotoItem}>
+                {existingFotos.map((foto) => (
+                  <TouchableOpacity key={`ex-${foto.id}`} onPress={() => toggleExistingRemoval(foto.id)} style={styles.fotoItem}>
+                    <Image source={{ uri: foto.url }} style={[styles.fotoImage, foto.markedForRemoval && styles.fotoMarked]} />
+                    <View style={styles.fotoRemove}>
+                      <Ionicons
+                        name={foto.markedForRemoval ? 'add-circle' : 'close-circle'}
+                        size={22}
+                        color={foto.markedForRemoval ? '#22c55e' : '#ef4444'}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                ))}
+                {newFotos.map((foto, idx) => (
+                  <View key={`new-${idx}`} style={styles.fotoItem}>
                     <Image source={{ uri: foto.uri }} style={styles.fotoImage} />
-                    <TouchableOpacity onPress={() => setFotos((p) => p.filter((_, i) => i !== idx))} style={styles.fotoRemove}>
+                    <TouchableOpacity onPress={() => removeNewFoto(idx)} style={styles.fotoRemove}>
                       <Ionicons name="close-circle" size={22} color="#ef4444" />
                     </TouchableOpacity>
                   </View>
                 ))}
               </ScrollView>
+            )}
+            {existingFotos.some((p) => p.markedForRemoval) && (
+              <Text style={styles.removeHint}>Tap foto merah untuk batalkan penghapusan</Text>
             )}
             <View style={styles.mediaRow}>
               <TouchableOpacity onPress={pickImages} style={styles.mediaBtn}>
@@ -187,7 +249,6 @@ export default function CreateErrorLogScreen() {
             </View>
           </Field>
 
-          {/* Akses (URL/Username/Password) */}
           <Field label="URL (opsional)">
             <TextInput
               style={styles.input}
@@ -229,7 +290,6 @@ export default function CreateErrorLogScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Picker sheets */}
       <PickerSheet
         visible={klienOpen}
         onClose={() => setKlienOpen(false)}
@@ -273,20 +333,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 12, gap: 12,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backBtn:   { padding: 4 },
-  topTitle:  { color: '#fff', fontSize: 16, fontWeight: '600', flex: 1 },
-  postBtn:   { backgroundColor: '#3b82f6', paddingHorizontal: 18, paddingVertical: 8, borderRadius: 8 },
-  postBtnDisabled: { opacity: 0.5 },
-  postBtnText: { color: '#fff', fontWeight: '600' },
-  scroll:    { padding: 16 },
-  field:     { marginBottom: 16 },
-  label:     { color: '#8a94a6', fontSize: 12, marginBottom: 6, fontWeight: '600' },
+  backBtn:  { padding: 4 },
+  topTitle: { color: '#fff', fontSize: 16, fontWeight: '600', flex: 1 },
+  scroll:   { padding: 16 },
+  field:    { marginBottom: 16 },
+  label:    { color: '#8a94a6', fontSize: 12, marginBottom: 6, fontWeight: '600' },
   input: {
     backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff',
     borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
-  chipRow:    { flexDirection: 'row', gap: 8 },
   pickerBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10,
@@ -295,17 +351,11 @@ const styles = StyleSheet.create({
   },
   pickerText:        { color: '#fff', fontSize: 13, flex: 1 },
   pickerPlaceholder: { color: '#6b7280' },
-  chip:       {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
-  },
-  chipActive: { backgroundColor: 'rgba(59,130,246,0.20)', borderColor: '#3b82f6' },
-  chipText:   { color: '#8a94a6', fontSize: 13 },
-  chipTextActive: { color: '#3b82f6', fontWeight: '600' },
   fotoItem:   { marginRight: 8, position: 'relative' },
   fotoImage:  { width: 90, height: 90, borderRadius: 8, backgroundColor: '#1c2333' },
+  fotoMarked: { opacity: 0.35 },
   fotoRemove: { position: 'absolute', top: -6, right: -6, backgroundColor: '#0d1421', borderRadius: 11 },
+  removeHint: { color: '#8a94a6', fontSize: 11, fontStyle: 'italic', marginBottom: 8 },
   mediaRow:   { flexDirection: 'row', gap: 16, paddingTop: 4 },
   mediaBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
   mediaText:  { color: '#3b82f6', fontWeight: '500', fontSize: 13 },

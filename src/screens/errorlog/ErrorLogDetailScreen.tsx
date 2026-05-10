@@ -34,7 +34,7 @@ function formatDate(s: string | null): string {
 
 export default function ErrorLogDetailScreen() {
   const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { id, highlightKomentarId } = route.params;
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
@@ -149,9 +149,14 @@ export default function ErrorLogDetailScreen() {
           </TouchableOpacity>
           <Text style={styles.topTitle}>Detail Error Log</Text>
           {log.can_edit && (
-            <TouchableOpacity onPress={confirmDelete} style={styles.backBtn}>
-              <Ionicons name="trash-outline" size={20} color="#ef4444" />
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity onPress={() => navigation.navigate('CreateErrorLog', { id })} style={styles.backBtn}>
+                <Ionicons name="create-outline" size={20} color="#3b82f6" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={confirmDelete} style={styles.backBtn}>
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              </TouchableOpacity>
+            </>
           )}
         </View>
 

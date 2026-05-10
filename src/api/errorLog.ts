@@ -21,6 +21,7 @@ export type ErrorLog = {
   pelapor?: { id: number; nama_lengkap: string; foto: string | null } | null;
   handler?: { id: number; nama_lengkap: string; foto: string | null } | null;
   foto_urls?: string[];
+  foto_ids?: number[];
   jumlah_komentar?: number;
   created_at: string;
   updated_at: string;
@@ -54,6 +55,17 @@ export type CreateErrorLogPayload = {
   keterangan: string;
   kategori_error_id: number;
   fotos?: { uri: string; name: string; type: string }[];
+};
+
+export type UpdateErrorLogPayload = {
+  klien_id?: number | null;
+  url?: string | null;
+  username?: string | null;
+  password?: string | null;
+  keterangan?: string;
+  kategori_error_id?: number;
+  fotos?: { uri: string; name: string; type: string }[];
+  remove_photo_ids?: number[];
 };
 
 type Paginated<T> = { data: T[]; meta?: { current_page: number; last_page: number; total: number } };
@@ -108,6 +120,31 @@ export const errorLogApi = {
     });
 
     const { data } = await apiClient.post('/error-log', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+
+  update: async (id: number, payload: UpdateErrorLogPayload): Promise<{ data: ErrorLog }> => {
+    const formData = new FormData();
+    // Laravel multipart spoofing — POST + _method=PATCH supaya body multipart diparsing.
+    formData.append('_method', 'PATCH');
+
+    if (payload.klien_id          !== undefined) formData.append('klien_id',          payload.klien_id ? String(payload.klien_id) : '');
+    if (payload.kategori_error_id !== undefined) formData.append('kategori_error_id', String(payload.kategori_error_id));
+    if (payload.keterangan        !== undefined) formData.append('keterangan',        payload.keterangan);
+    if (payload.url               !== undefined) formData.append('url',               payload.url      ?? '');
+    if (payload.username          !== undefined) formData.append('username',          payload.username ?? '');
+    if (payload.password          !== undefined) formData.append('password',          payload.password ?? '');
+
+    payload.fotos?.forEach((foto, i) => {
+      formData.append(`fotos[${i}]`, foto as any);
+    });
+    payload.remove_photo_ids?.forEach((pid, i) => {
+      formData.append(`remove_photo_ids[${i}]`, String(pid));
+    });
+
+    const { data } = await apiClient.post(`/error-log/${id}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return data;
