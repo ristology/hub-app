@@ -36,7 +36,8 @@ export default function RequestCard({ request, onPress }: Props) {
   const tglDeadline = formatDate(request.deadline);
 
   return (
-    <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={styles.card}>
+    <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={[styles.card, request.has_unread_notif && styles.cardUnread]}>
+      {request.has_unread_notif && <View style={styles.unreadDot} />}
       <View style={styles.topRow}>
         <View style={[styles.statusPill, { backgroundColor: statusStyle.bg }]}>
           <Text style={[styles.statusText, { color: statusStyle.color }]}>{statusStyle.label}</Text>
@@ -94,6 +95,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 12, marginBottom: 10, padding: 14,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    position: 'relative',
+  },
+  cardUnread: {
+    borderColor: 'rgba(239,68,68,0.45)',
+    backgroundColor: 'rgba(239,68,68,0.05)',
+  },
+  unreadDot: {
+    position: 'absolute',
+    top: -4, right: -4,
+    width: 12, height: 12, borderRadius: 6,
+    backgroundColor: '#ef4444',
+    borderWidth: 2, borderColor: '#0d1421',
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 4,
+    elevation: 6,
+    zIndex: 10,
   },
   topRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   statusPill:{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },

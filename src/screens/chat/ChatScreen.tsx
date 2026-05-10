@@ -154,8 +154,10 @@ const styles = StyleSheet.create({
   timeText:  { color: '#6b7280', fontSize: 11 },
   lastMessage: { color: '#8a94a6', fontSize: 13, flex: 1 },
   unreadBadge: {
-    backgroundColor: '#3b82f6', borderRadius: 10, minWidth: 20, height: 20,
+    backgroundColor: '#ef4444', borderRadius: 10, minWidth: 20, height: 20,
     paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#ef4444', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7, shadowRadius: 4, elevation: 4,
   },
   unreadText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   empty:     { color: '#8a94a6', fontSize: 14, textAlign: 'center' },

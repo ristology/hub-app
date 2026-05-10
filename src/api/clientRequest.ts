@@ -7,6 +7,7 @@ export type ClientRequest = {
   milikku: boolean;
   can_edit: boolean;
   is_it_or_admin: boolean;
+  has_unread_notif: boolean;
   nama_klien: string;
   klien_id: number | null;
   tanggal_request: string | null;

@@ -20,6 +20,7 @@ export type Feed = {
   jumlah_komentar: number;
   sudah_like: boolean;
   can_edit: boolean;
+  has_unread_notif: boolean;
   komentar?: FeedKomentar[];
   created_at: string;
 };

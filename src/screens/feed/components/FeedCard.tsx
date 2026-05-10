@@ -29,7 +29,8 @@ function ringkasLokasi(lokasi: string): string {
 
 export default function FeedCard({ feed, onPress, onLike }: Props) {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, feed.has_unread_notif && styles.cardUnread]}>
+      {feed.has_unread_notif && <View style={styles.unreadDot} />}
       {/* Header — tap masuk detail */}
       <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={styles.header}>
         {feed.karyawan.foto ? (
@@ -100,6 +101,26 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 14, marginBottom: 12, padding: 14,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    position: 'relative',
+  },
+  /** Border merah tipis + bg sedikit kemerahan saat ada notif unread. */
+  cardUnread: {
+    borderColor: 'rgba(239,68,68,0.45)',
+    backgroundColor: 'rgba(239,68,68,0.05)',
+  },
+  /** Dot merah menyala di pojok kanan atas saat ada notif. */
+  unreadDot: {
+    position: 'absolute',
+    top: -4, right: -4,
+    width: 12, height: 12, borderRadius: 6,
+    backgroundColor: '#ef4444',
+    borderWidth: 2, borderColor: '#0d1421',
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 4,
+    elevation: 6,
+    zIndex: 10,
   },
   header:    { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   avatar:    { width: 40, height: 40, borderRadius: 20, backgroundColor: '#1c2333' },

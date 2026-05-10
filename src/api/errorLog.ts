@@ -7,6 +7,7 @@ export type ErrorLog = {
   milikku: boolean;
   can_edit: boolean;
   can_update_status: boolean;
+  has_unread_notif: boolean;
   url: string | null;
   username: string | null;
   password: string | null;

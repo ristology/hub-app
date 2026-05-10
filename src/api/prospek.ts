@@ -6,6 +6,7 @@ export type Prospek = {
   id: number;
   milikku: boolean;
   can_edit: boolean;
+  has_unread_notif: boolean;
   nama_klien: string;
   alamat: string | null;
   kota: string | null;
