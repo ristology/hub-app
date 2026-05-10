@@ -428,15 +428,30 @@ function Field({ value, empty, onPress, onClear }: { value: string; empty?: bool
 }
 
 /** Klien picker dengan search autocomplete via API. Pakai Modal biasa karena
- *  filter sheet sudah Animated overlay (bukan Modal), jadi Modal di sini stack OK. */
+ *  filter sheet sudah Animated overlay (bukan Modal), jadi Modal di sini stack OK.
+ *  Keyboard handling pakai manual listener — KeyboardAvoidingView TIDAK reliable
+ *  untuk Modal di Android edge-to-edge (lihat memori keyboard pattern). */
 function KlienPicker({ visible, onClose, onPick }: {
   visible: boolean;
   onClose: () => void;
   onPick: (k: KlienRingkas) => void;
 }) {
+  const insets   = useSafeAreaInsets();
+  const screenH  = Dimensions.get('window').height;
   const [search, setSearch]   = useState('');
   const [results, setResults] = useState<KlienRingkas[]>([]);
   const [loading, setLoading] = useState(false);
+  const [kbHeight, setKbHeight] = useState(0);
+
+  // Manual keyboard listener — supaya sheet naik saat keyboard muncul
+  useEffect(() => {
+    if (!visible) { setKbHeight(0); return; }
+    const showName = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideName = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showName, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideName, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -454,10 +469,22 @@ function KlienPicker({ visible, onClose, onPick }: {
 
   useEffect(() => { if (visible) setSearch(''); }, [visible]);
 
+  // Push sheet ke atas keyboard. Plus constrain height supaya tidak overflow ke
+  // area atas saat di-push naik. ANDROID_IME_SAFETY = ekstra 60px untuk
+  // toolbar IME Samsung Honeyboard yg tidak ikut kbHeight.
+  const ANDROID_IME_SAFETY = 60;
+  const effectiveKb = kbHeight > 0
+    ? kbHeight + (Platform.OS === 'android' ? ANDROID_IME_SAFETY : 0)
+    : 0;
+  const availableH = screenH - insets.top - 40;
+  const sheetH = effectiveKb > 0
+    ? Math.max(280, availableH - effectiveKb)
+    : Math.min(600, availableH);
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={picStyles.backdrop}>
-        <View style={picStyles.sheet}>
+      <View style={[picStyles.backdrop, { paddingBottom: effectiveKb }]}>
+        <View style={[picStyles.sheet, { height: sheetH, paddingBottom: kbHeight > 0 ? 12 : insets.bottom + 12 }]}>
           <View style={picStyles.handle} />
           <View style={picStyles.header}>
             <Text style={picStyles.title}>Pilih Klien</Text>
@@ -675,7 +702,7 @@ const picStyles = StyleSheet.create({
   sheet: {
     backgroundColor: '#0d1421',
     borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    paddingHorizontal: 16, paddingBottom: 24, maxHeight: '80%', minHeight: '40%',
+    paddingHorizontal: 16,
   },
   handle: {
     width: 40, height: 4, borderRadius: 2,
