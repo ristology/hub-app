@@ -12,7 +12,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { tugasApi, type Tugas, type TugasStatus } from '../../api/tugas';
 import TaskCard from './components/TaskCard';
 import SwipeableCard, { type SwipeAction } from '../../components/SwipeableCard';
-import HamburgerButton from '../../components/HamburgerButton';
 
 type TaskStackParamList = {
   TaskList: undefined;
@@ -84,7 +83,6 @@ export default function TaskScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <HamburgerButton style={{ marginLeft: -4 }} />
         <Text style={styles.title}>Task</Text>
       </View>
 

@@ -12,7 +12,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { errorLogApi, type ErrorLog, type ErrorLogStatus } from '../../api/errorLog';
 import ErrorLogCard from './components/ErrorLogCard';
 import SwipeableCard, { type SwipeAction } from '../../components/SwipeableCard';
-import HamburgerButton from '../../components/HamburgerButton';
 
 type ErrorLogStackParamList = {
   ErrorLogList: undefined;
@@ -122,7 +121,6 @@ export default function ErrorLogScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <HamburgerButton style={{ marginLeft: -4 }} />
         <Text style={styles.title}>Error Log</Text>
       </View>
 

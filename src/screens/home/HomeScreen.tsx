@@ -14,7 +14,6 @@ import { errorLogApi }    from '../../api/errorLog';
 import { requestApi }     from '../../api/clientRequest';
 import { kalenderApi }    from '../../api/kalender';
 import { performanceApi } from '../../api/performance';
-import HamburgerButton    from '../../components/HamburgerButton';
 
 function greetingByHour(): string {
   const h = new Date().getHours();
@@ -67,7 +66,6 @@ export default function HomeScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <HamburgerButton style={{ marginLeft: -6, marginRight: 4 }} />
           <View style={{ flex: 1 }}>
             <Text style={styles.greeting}>{greetingByHour()},</Text>
             <Text style={styles.name}>{user?.name}</Text>

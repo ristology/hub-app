@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, Image, Animated, StyleSheet, Dimensions,
-  TouchableWithoutFeedback, BackHandler, Alert, ScrollView,
+  View, Text, TouchableOpacity, Animated, StyleSheet, Dimensions,
+  PanResponder, BackHandler, Alert, ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,55 +9,127 @@ import { useAppDrawer } from '../context/AppDrawerContext';
 import { useAuth } from '../store/auth';
 import { navigationRef } from '../utils/deepLink';
 
-const { width: SCREEN_W } = Dimensions.get('window');
-const DRAWER_WIDTH = Math.min(320, SCREEN_W * 0.78);
+const { height: SCREEN_H } = Dimensions.get('window');
+
+const PANEL_WIDTH      = 88;
+const HANDLE_TOUCH_W   = 28;   // tap area lebar (invisible)
+const HANDLE_BAR_W     = 5;    // bar visual
+const HANDLE_BAR_H     = 90;
+const HANDLE_TOP       = SCREEN_H * 0.40;
+
+// Threshold untuk swipe gesture
+const SWIPE_OPEN_DX    = PANEL_WIDTH * 0.35;
+const SWIPE_VX         = 0.4;
 
 type DrawerItem = {
   key:   string;
   label: string;
   icon:  keyof typeof Ionicons.glyphMap;
   route: string;
-  color?: string;
 };
 
 export default function AppDrawer() {
-  const { isOpen, close } = useAppDrawer();
-  const { user, logout }  = useAuth();
+  const { isOpen, open, close } = useAppDrawer();
+  const { user, logout } = useAuth();
   const insets = useSafeAreaInsets();
-  const [mounted, setMounted] = useState(isOpen);
-  const slideX    = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
-  const backdropO = useRef(new Animated.Value(0)).current;
 
+  // Animasi: panel selalu di-mount, hanya digeser via translateX
+  const slideX    = useRef(new Animated.Value(-PANEL_WIDTH)).current;
+  const backdropO = useRef(new Animated.Value(0)).current;
+  const [showOverlay, setShowOverlay] = useState(false);
+
+  const animateOpen = () => {
+    setShowOverlay(true);
+    Animated.parallel([
+      Animated.spring(slideX,    { toValue: 0, useNativeDriver: true, friction: 8, tension: 65 }),
+      Animated.timing(backdropO, { toValue: 1, duration: 200, useNativeDriver: true }),
+    ]).start();
+    open();
+  };
+
+  const animateClose = () => {
+    Animated.parallel([
+      Animated.spring(slideX,    { toValue: -PANEL_WIDTH, useNativeDriver: true, friction: 8, tension: 65 }),
+      Animated.timing(backdropO, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(({ finished }) => { if (finished) setShowOverlay(false); });
+    close();
+  };
+
+  // Sinkronkan eksternal isOpen dgn animasi (mis. saat goTo close drawer)
   useEffect(() => {
     if (isOpen) {
-      setMounted(true);
+      setShowOverlay(true);
       Animated.parallel([
-        Animated.timing(slideX,    { toValue: 0, duration: 240, useNativeDriver: true }),
+        Animated.spring(slideX,    { toValue: 0, useNativeDriver: true, friction: 8, tension: 65 }),
         Animated.timing(backdropO, { toValue: 1, duration: 200, useNativeDriver: true }),
       ]).start();
-    } else if (mounted) {
+    } else {
       Animated.parallel([
-        Animated.timing(slideX,    { toValue: -DRAWER_WIDTH, duration: 220, useNativeDriver: true }),
-        Animated.timing(backdropO, { toValue: 0,             duration: 180, useNativeDriver: true }),
-      ]).start(({ finished }) => { if (finished) setMounted(false); });
+        Animated.spring(slideX,    { toValue: -PANEL_WIDTH, useNativeDriver: true, friction: 8, tension: 65 }),
+        Animated.timing(backdropO, { toValue: 0, duration: 180, useNativeDriver: true }),
+      ]).start(({ finished }) => { if (finished) setShowOverlay(false); });
     }
   }, [isOpen]);
 
-  // Android back button → close drawer instead of navigating back
+  // Android back → close drawer
   useEffect(() => {
-    if (!mounted) return;
+    if (!showOverlay) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      close();
+      animateClose();
       return true;
     });
     return () => sub.remove();
-  }, [mounted, close]);
+  }, [showOverlay]);
+
+  // PanResponder pada handle — swipe kanan untuk buka
+  const handlePan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderGrant: () => setShowOverlay(true),
+      onPanResponderMove: (_, g) => {
+        if (g.dx >= 0 && g.dx <= PANEL_WIDTH) {
+          slideX.setValue(-PANEL_WIDTH + g.dx);
+          backdropO.setValue(g.dx / PANEL_WIDTH);
+        }
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dx > SWIPE_OPEN_DX || g.vx > SWIPE_VX) {
+          animateOpen();
+        } else {
+          animateClose();
+        }
+      },
+      onPanResponderTerminate: () => animateClose(),
+    }),
+  ).current;
+
+  // PanResponder pada panel — swipe kiri untuk tutup
+  const panelPan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) =>
+        g.dx < -6 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderMove: (_, g) => {
+        if (g.dx <= 0 && g.dx >= -PANEL_WIDTH) {
+          slideX.setValue(g.dx);
+          backdropO.setValue(1 + g.dx / PANEL_WIDTH);
+        }
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dx < -SWIPE_OPEN_DX || g.vx < -SWIPE_VX) {
+          animateClose();
+        } else {
+          animateOpen();
+        }
+      },
+    }),
+  ).current;
 
   const items: DrawerItem[] = [
     { key: 'beranda',     label: 'Beranda',     icon: 'home-outline',         route: 'MainTabs' },
     { key: 'kalender',    label: 'Kalender',    icon: 'calendar-outline',     route: 'Kalender' },
     { key: 'request',     label: 'Request',     icon: 'mail-outline',         route: 'Request' },
-    { key: 'performance', label: 'Performance', icon: 'trending-up-outline',  route: 'Performance' },
+    { key: 'performance', label: 'Perform.',    icon: 'trending-up-outline',  route: 'Performance' },
     { key: 'dokumen',     label: 'Dokumen',     icon: 'folder-outline',       route: 'Dokumen' },
     { key: 'aktivitas',   label: 'Aktivitas',   icon: 'pulse-outline',        route: 'Aktivitas' },
   ];
@@ -69,8 +141,7 @@ export default function AppDrawer() {
   }
 
   const goTo = (route: string) => {
-    close();
-    // Tunggu animasi tutup selesai biar transisi mulus
+    animateClose();
     setTimeout(() => {
       if (navigationRef.isReady()) {
         if (route === 'MainTabs') {
@@ -83,7 +154,7 @@ export default function AppDrawer() {
   };
 
   const confirmLogout = () => {
-    close();
+    animateClose();
     setTimeout(() => {
       Alert.alert('Logout', 'Yakin ingin logout?', [
         { text: 'Batal', style: 'cancel' },
@@ -92,90 +163,130 @@ export default function AppDrawer() {
     }, 220);
   };
 
-  if (!mounted) return null;
-
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      <TouchableWithoutFeedback onPress={close}>
-        <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: backdropO }]} />
-      </TouchableWithoutFeedback>
+      {/* Backdrop — render saat overlay aktif, tap untuk tutup */}
+      {showOverlay && (
+        <Animated.View
+          style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: backdropO }]}
+          pointerEvents={isOpen ? 'auto' : 'box-only'}
+          onTouchEnd={animateClose}
+        />
+      )}
 
+      {/* Panel — selalu mounted, hanya digeser */}
       <Animated.View
         style={[
-          styles.drawer,
+          styles.panel,
           {
-            paddingTop:    insets.top + 16,
-            paddingBottom: insets.bottom,
+            paddingTop:    insets.top + 12,
+            paddingBottom: insets.bottom + 12,
             transform: [{ translateX: slideX }],
           },
         ]}
+        {...panelPan.panHandlers}
       >
-        {/* Profile header */}
-        <View style={styles.profileBox}>
-          {user?.foto ? (
-            <Image source={{ uri: user.foto }} style={styles.profileAvatar} />
-          ) : (
-            <View style={[styles.profileAvatar, styles.avatarFallback]}>
-              <Text style={styles.avatarText}>
-                {user?.name?.charAt(0).toUpperCase() ?? '?'}
-              </Text>
-            </View>
-          )}
-          <Text style={styles.profileName} numberOfLines={1}>{user?.name ?? '-'}</Text>
-          <Text style={styles.profileRole} numberOfLines={1}>
-            {user?.departemen ?? user?.role ?? '-'}
-          </Text>
-        </View>
-
-        <View style={styles.divider} />
-
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 4 }}>
+        <ScrollView
+          contentContainerStyle={styles.panelContent}
+          showsVerticalScrollIndicator={false}
+        >
           {items.map((item) => (
             <TouchableOpacity
               key={item.key}
               onPress={() => goTo(item.route)}
-              style={styles.menuItem}
-              activeOpacity={0.7}
+              style={styles.item}
+              activeOpacity={0.6}
             >
-              <Ionicons name={item.icon} size={20} color="#3b82f6" />
-              <Text style={styles.menuLabel}>{item.label}</Text>
+              <Ionicons name={item.icon} size={24} color="#fff" />
+              <Text style={styles.itemLabel} numberOfLines={1}>{item.label}</Text>
             </TouchableOpacity>
           ))}
+
+          <View style={styles.divider} />
+
+          <TouchableOpacity onPress={confirmLogout} style={styles.item} activeOpacity={0.6}>
+            <Ionicons name="log-out-outline" size={24} color="#ef4444" />
+            <Text style={[styles.itemLabel, { color: '#ef4444' }]}>Logout</Text>
+          </TouchableOpacity>
         </ScrollView>
-
-        <View style={styles.divider} />
-
-        <TouchableOpacity
-          onPress={confirmLogout}
-          style={styles.menuItem}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-          <Text style={[styles.menuLabel, { color: '#ef4444' }]}>Logout</Text>
-        </TouchableOpacity>
       </Animated.View>
+
+      {/* Fin/handle — selalu visible di edge kiri, tap atau swipe untuk buka */}
+      <View
+        style={[styles.handleArea, { top: HANDLE_TOP }]}
+        {...handlePan.panHandlers}
+        pointerEvents={isOpen ? 'none' : 'auto'}
+      >
+        <TouchableOpacity onPress={animateOpen} activeOpacity={0.5} style={styles.handleTouch}>
+          <View style={styles.handleBar} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { backgroundColor: 'rgba(0,0,0,0.5)' },
-  drawer: {
+  backdrop: { backgroundColor: 'rgba(0,0,0,0.45)' },
+
+  // Glass panel — rgba dengan border tipis untuk efek transparan
+  panel: {
     position: 'absolute', left: 0, top: 0, bottom: 0,
-    width: DRAWER_WIDTH,
-    backgroundColor: '#0d1421',
-    borderRightWidth: 1, borderRightColor: 'rgba(255,255,255,0.06)',
+    width: PANEL_WIDTH,
+    backgroundColor: 'rgba(20, 30, 50, 0.78)',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255,255,255,0.10)',
+    // subtle shadow ke kanan
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  profileBox: { paddingHorizontal: 20, paddingVertical: 12, alignItems: 'center' },
-  profileAvatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#1c2333' },
-  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontSize: 24, fontWeight: '700' },
-  profileName: { color: '#fff', fontSize: 14, fontWeight: '700', marginTop: 8 },
-  profileRole: { color: '#8a94a6', fontSize: 11, marginTop: 2, textTransform: 'capitalize' },
-  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)' },
-  menuItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    paddingHorizontal: 20, paddingVertical: 14,
+  panelContent: {
+    alignItems: 'center',
+    paddingVertical: 6,
   },
-  menuLabel: { color: '#fff', fontSize: 14, fontWeight: '500' },
+
+  item: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    gap: 5,
+  },
+  itemLabel: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+
+  divider: {
+    width: '70%', height: 1,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    marginVertical: 6,
+  },
+
+  // Fin/handle pada edge kiri
+  handleArea: {
+    position: 'absolute', left: 0,
+    width: HANDLE_TOUCH_W,
+    height: HANDLE_BAR_H + 20,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  handleTouch: {
+    width: HANDLE_TOUCH_W,
+    height: HANDLE_BAR_H,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  handleBar: {
+    width: HANDLE_BAR_W,
+    height: HANDLE_BAR_H,
+    backgroundColor: 'rgba(255,255,255,0.30)',
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+  },
 });

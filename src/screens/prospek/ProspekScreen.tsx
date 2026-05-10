@@ -11,7 +11,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { prospekApi, type Prospek, type ProspekStatus } from '../../api/prospek';
 import ProspekCard from './components/ProspekCard';
-import HamburgerButton from '../../components/HamburgerButton';
 
 type ProspekStackParamList = {
   ProspekList: undefined;
@@ -91,7 +90,6 @@ export default function ProspekScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <HamburgerButton style={{ marginLeft: -4 }} />
         <Text style={styles.title}>Prospek</Text>
       </View>
 
