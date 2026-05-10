@@ -12,6 +12,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { tugasApi, type Tugas, type TugasStatus } from '../../api/tugas';
 import TaskCard from './components/TaskCard';
 import SwipeableCard, { type SwipeAction } from '../../components/SwipeableCard';
+import HamburgerButton from '../../components/HamburgerButton';
 
 type TaskStackParamList = {
   TaskList: undefined;
@@ -83,6 +84,7 @@ export default function TaskScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
+        <HamburgerButton style={{ marginLeft: -4 }} />
         <Text style={styles.title}>Task</Text>
       </View>
 
@@ -161,7 +163,7 @@ function StatBox({ label, value, color }: { label: string; value: number; color:
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0d1421' },
   center:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
-  header:    { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
+  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12, gap: 4 },
   title:     { color: '#fff', fontSize: 24, fontWeight: '700' },
   statsRow:  {
     flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 12,

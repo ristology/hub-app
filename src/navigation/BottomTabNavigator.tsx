@@ -6,9 +6,9 @@ import { Ionicons } from '@expo/vector-icons';
 import FeedStack       from './FeedStack';
 import ChatStack       from './ChatStack';
 import TaskStack       from './TaskStack';
-import MenuStack       from './MenuStack';
 import ErrorLogStack   from './ErrorLogStack';
 import ProspekStack    from './ProspekStack';
+import HomeScreen      from '../screens/home/HomeScreen';
 import { useTabBarStyle } from './useTabBarStyle';
 
 type TabIconName = keyof typeof Ionicons.glyphMap;
@@ -16,12 +16,12 @@ type TabIconName = keyof typeof Ionicons.glyphMap;
 const Tab = createBottomTabNavigator();
 
 const tabConfig: Record<string, { icon: TabIconName; iconFocused: TabIconName }> = {
+  Beranda:  { icon: 'home-outline',         iconFocused: 'home' },
   Feed:     { icon: 'newspaper-outline',    iconFocused: 'newspaper' },
   Prospek:  { icon: 'people-outline',       iconFocused: 'people' },
   Pesan:    { icon: 'chatbubbles-outline',  iconFocused: 'chatbubbles' },
   Task:     { icon: 'checkbox-outline',     iconFocused: 'checkbox' },
   ErrorLog: { icon: 'bug-outline',          iconFocused: 'bug' },
-  Menu:     { icon: 'grid-outline',         iconFocused: 'grid' },
 };
 
 export default function BottomTabNavigator() {
@@ -42,6 +42,7 @@ export default function BottomTabNavigator() {
         tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
       })}
     >
+      <Tab.Screen name="Beranda"  component={HomeScreen} />
       <Tab.Screen name="Feed"     component={FeedStack} />
       <Tab.Screen
         name="Prospek"
@@ -74,7 +75,6 @@ export default function BottomTabNavigator() {
             : tabBarStyle,
         })}
       />
-      <Tab.Screen name="Menu" component={MenuStack} />
     </Tab.Navigator>
   );
 }

@@ -15,6 +15,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import PickerSheet, { type PickerOption } from '../../components/PickerSheet';
 import DatePickerInput from '../../components/DatePickerInput';
+import HamburgerButton from '../../components/HamburgerButton';
 
 type FeedStackParamList = {
   FeedList: undefined;
@@ -174,6 +175,7 @@ export default function FeedScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
+        <HamburgerButton style={{ marginLeft: -4 }} />
         <Text style={styles.title}>Feed</Text>
         <TouchableOpacity
           onPress={openFilterSheet}

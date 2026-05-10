@@ -12,6 +12,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { errorLogApi, type ErrorLog, type ErrorLogStatus } from '../../api/errorLog';
 import ErrorLogCard from './components/ErrorLogCard';
 import SwipeableCard, { type SwipeAction } from '../../components/SwipeableCard';
+import HamburgerButton from '../../components/HamburgerButton';
 
 type ErrorLogStackParamList = {
   ErrorLogList: undefined;
@@ -121,6 +122,7 @@ export default function ErrorLogScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
+        <HamburgerButton style={{ marginLeft: -4 }} />
         <Text style={styles.title}>Error Log</Text>
       </View>
 
@@ -228,7 +230,7 @@ function StatBox({ label, value, color }: { label: string; value: number; color:
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0d1421' },
   center:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
-  header:    { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
+  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12, gap: 4 },
   title:     { color: '#fff', fontSize: 24, fontWeight: '700' },
 
   statsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 12 },

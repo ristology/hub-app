@@ -39,16 +39,16 @@ function resolveTarget(data: NotifData): { tab: string; screen?: string; params?
     }
     if (tipe === 'komentar_request' || tipe.startsWith('request_')) {
       return {
-        tab: 'Menu',
-        screen: 'Request',
-        params: { screen: 'RequestDetail', params: { id: modelId, highlightKomentarId: komId } },
+        tab: 'Request',
+        screen: 'RequestDetail',
+        params: { id: modelId, highlightKomentarId: komId },
       };
     }
     if (tipe === 'kalender' || tipe.startsWith('kalender_')) {
       return {
-        tab: 'Menu',
-        screen: 'Kalender',
-        params: { screen: 'KegiatanDetail', params: { id: modelId } },
+        tab: 'Kalender',
+        screen: 'KegiatanDetail',
+        params: { id: modelId },
       };
     }
     if (tipe.startsWith('task_')) {
@@ -78,12 +78,10 @@ function resolveTarget(data: NotifData): { tab: string; screen?: string; params?
     if (segment === 'prospek')   return { tab: 'Prospek', screen: 'ProspekDetail', params: { id } };
     if (segment === 'error-log') return { tab: 'ErrorLog', screen: 'ErrorLogDetail', params: { id } };
     if (segment === 'request')   return {
-      tab: 'Menu', screen: 'Request',
-      params: { screen: 'RequestDetail', params: { id } },
+      tab: 'Request', screen: 'RequestDetail', params: { id },
     };
     if (segment === 'kalender')  return {
-      tab: 'Menu', screen: 'Kalender',
-      params: { screen: 'KegiatanDetail', params: { id } },
+      tab: 'Kalender', screen: 'KegiatanDetail', params: { id },
     };
   }
 

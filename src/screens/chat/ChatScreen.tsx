@@ -10,6 +10,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { chatApi, type ChatRoom } from '../../api/chat';
+import HamburgerButton from '../../components/HamburgerButton';
 
 type ChatStackParamList = {
   ChatList: undefined;
@@ -106,6 +107,7 @@ export default function ChatScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
+        <HamburgerButton style={{ marginLeft: -4 }} />
         <Text style={styles.title}>Chat</Text>
       </View>
 
@@ -140,7 +142,7 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0d1421' },
   center:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
-  header:    { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
+  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12, gap: 4 },
   title:     { color: '#fff', fontSize: 24, fontWeight: '700' },
   list:      { paddingHorizontal: 16 },
   separator: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginLeft: 60 },

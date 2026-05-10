@@ -14,6 +14,7 @@ import { errorLogApi }    from '../../api/errorLog';
 import { requestApi }     from '../../api/clientRequest';
 import { kalenderApi }    from '../../api/kalender';
 import { performanceApi } from '../../api/performance';
+import HamburgerButton    from '../../components/HamburgerButton';
 
 function greetingByHour(): string {
   const h = new Date().getHours();
@@ -24,7 +25,7 @@ function greetingByHour(): string {
 }
 
 export default function HomeScreen() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigation = useNavigation<any>();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -66,6 +67,7 @@ export default function HomeScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
+          <HamburgerButton style={{ marginLeft: -6, marginRight: 4 }} />
           <View style={{ flex: 1 }}>
             <Text style={styles.greeting}>{greetingByHour()},</Text>
             <Text style={styles.name}>{user?.name}</Text>
@@ -90,7 +92,7 @@ export default function HomeScreen() {
             label="Jadwal"
             value={kalender.data?.hari_ini ?? 0}
             color="#3b82f6"
-            onPress={() => navigation.navigate('Menu', { screen: 'Kalender' })}
+            onPress={() => navigation.navigate('Kalender')}
           />
           <TodayCard
             icon="checkmark-done"
@@ -104,7 +106,7 @@ export default function HomeScreen() {
             label="Mendatang"
             value={kalender.data?.mendatang ?? 0}
             color="#22c55e"
-            onPress={() => navigation.navigate('Menu', { screen: 'Kalender' })}
+            onPress={() => navigation.navigate('Kalender')}
           />
         </View>
 
@@ -136,7 +138,7 @@ export default function HomeScreen() {
             extra={request.data?.menunggu ? `${request.data.menunggu} menunggu` : null}
             extraColor="#f59e0b"
             color="#0ea5e9"
-            onPress={() => navigation.navigate('Menu', { screen: 'Request' })}
+            onPress={() => navigation.navigate('Request')}
           />
           <StatTile
             icon="trending-up"
@@ -147,7 +149,7 @@ export default function HomeScreen() {
               : null}
             extraColor="#22c55e"
             color="#22c55e"
-            onPress={() => navigation.navigate('Menu', { screen: 'Performance' })}
+            onPress={() => navigation.navigate('Performance')}
           />
         </View>
 
@@ -180,10 +182,6 @@ export default function HomeScreen() {
           />
         </View>
 
-        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-          <Ionicons name="log-out-outline" size={16} color="#ef4444" />
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );

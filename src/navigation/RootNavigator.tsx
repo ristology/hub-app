@@ -5,6 +5,14 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../store/auth';
 import LoginScreen        from '../screens/auth/LoginScreen';
 import BottomTabNavigator from './BottomTabNavigator';
+import KalenderStack      from './KalenderStack';
+import RequestStack       from './RequestStack';
+import PerformanceStack   from './PerformanceStack';
+import DokumenStack       from './DokumenStack';
+import InvoiceStack       from './InvoiceStack';
+import AktivitasScreen    from '../screens/aktivitas/AktivitasScreen';
+import AppDrawer          from './AppDrawer';
+import { AppDrawerProvider } from '../context/AppDrawerContext';
 import { navigationRef, setupDeepLinkHandler } from '../utils/deepLink';
 
 const Stack = createNativeStackNavigator();
@@ -42,18 +50,34 @@ export default function RootNavigator() {
   };
 
   return (
-    <NavigationContainer ref={navigationRef} theme={theme}>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: '#0d1421' },
-        }}
-      >
-        {token
-          ? <Stack.Screen name="Main"  component={BottomTabNavigator} />
-          : <Stack.Screen name="Login" component={LoginScreen} />
-        }
-      </Stack.Navigator>
-    </NavigationContainer>
+    <AppDrawerProvider>
+      <NavigationContainer ref={navigationRef} theme={theme}>
+        <View style={{ flex: 1, backgroundColor: '#0d1421' }}>
+          <Stack.Navigator
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: '#0d1421' },
+            }}
+          >
+            {token ? (
+              <>
+                <Stack.Screen name="MainTabs"    component={BottomTabNavigator} />
+                <Stack.Screen name="Kalender"    component={KalenderStack} />
+                <Stack.Screen name="Request"     component={RequestStack} />
+                <Stack.Screen name="Performance" component={PerformanceStack} />
+                <Stack.Screen name="Dokumen"     component={DokumenStack} />
+                <Stack.Screen name="Aktivitas"   component={AktivitasScreen} />
+                <Stack.Screen name="Invoice"     component={InvoiceStack} />
+              </>
+            ) : (
+              <Stack.Screen name="Login" component={LoginScreen} />
+            )}
+          </Stack.Navigator>
+
+          {/* Side drawer — hanya aktif saat sudah login */}
+          {token && <AppDrawer />}
+        </View>
+      </NavigationContainer>
+    </AppDrawerProvider>
   );
 }
