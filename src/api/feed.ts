@@ -8,8 +8,10 @@ export type Feed = {
   longitude: number | null;
   kategori: string | null;
   foto_urls: string[];
+  foto_ids: number[];
   karyawan: {
     id: number;
+    user_id: number | null;
     nama_lengkap: string;
     foto: string | null;
     jabatan: string | null;
@@ -17,8 +19,20 @@ export type Feed = {
   jumlah_like: number;
   jumlah_komentar: number;
   sudah_like: boolean;
+  can_edit: boolean;
   komentar?: FeedKomentar[];
   created_at: string;
+};
+
+export type UpdateFeedPayload = {
+  konten?: string;
+  lokasi?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  kategori_kegiatan_id?: number | null;
+  fotos?: { uri: string; name: string; type: string }[];
+  remove_photo_ids?: number[];
+  tags?: number[];
 };
 
 export type FeedKomentar = {
@@ -55,9 +69,23 @@ export type KaryawanRingkas = {
   foto: string | null;
 };
 
+export type FeedFilters = {
+  search?:      string;
+  tanggal?:     string;   // YYYY-MM-DD
+  bulan?:       string;   // YYYY-MM
+  kategori_id?: number | null;
+  karyawan_id?: number | null;
+};
+
 export const feedApi = {
-  list: async (page = 1): Promise<Paginated<Feed>> => {
-    const { data } = await apiClient.get('/feed', { params: { page } });
+  list: async (page = 1, filters: FeedFilters = {}): Promise<Paginated<Feed>> => {
+    const params: Record<string, any> = { page };
+    if (filters.search?.trim())   params.search      = filters.search.trim();
+    if (filters.tanggal)          params.tanggal     = filters.tanggal;
+    if (filters.bulan)            params.bulan       = filters.bulan;
+    if (filters.kategori_id)      params.kategori_id = filters.kategori_id;
+    if (filters.karyawan_id)      params.karyawan_id = filters.karyawan_id;
+    const { data } = await apiClient.get('/feed', { params });
     return data;
   },
 
@@ -92,6 +120,38 @@ export const feedApi = {
   detail: async (id: number): Promise<{ data: Feed }> => {
     const { data } = await apiClient.get(`/feed/${id}`);
     return data;
+  },
+
+  update: async (id: number, payload: UpdateFeedPayload): Promise<{ data: Feed }> => {
+    const formData = new FormData();
+    // Laravel method spoofing — PATCH dengan multipart/form-data tidak diparsing,
+    // jadi pakai POST + _method=PATCH supaya Laravel route ke handler PATCH.
+    formData.append('_method', 'PATCH');
+
+    if (payload.konten !== undefined)               formData.append('konten', payload.konten);
+    if (payload.lokasi  !== undefined)              formData.append('lokasi',  payload.lokasi  ?? '');
+    if (payload.latitude  !== undefined)            formData.append('latitude',  payload.latitude  !== null ? String(payload.latitude)  : '');
+    if (payload.longitude !== undefined)            formData.append('longitude', payload.longitude !== null ? String(payload.longitude) : '');
+    if (payload.kategori_kegiatan_id !== undefined) formData.append('kategori_kegiatan_id', payload.kategori_kegiatan_id ? String(payload.kategori_kegiatan_id) : '');
+
+    payload.fotos?.forEach((foto, i) => {
+      formData.append(`fotos[${i}]`, foto as any);
+    });
+    payload.remove_photo_ids?.forEach((pid, i) => {
+      formData.append(`remove_photo_ids[${i}]`, String(pid));
+    });
+    payload.tags?.forEach((tid, i) => {
+      formData.append(`tags[${i}]`, String(tid));
+    });
+
+    const { data } = await apiClient.post(`/feed/${id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+
+  destroy: async (id: number): Promise<void> => {
+    await apiClient.delete(`/feed/${id}`);
   },
 
   toggleLike: async (id: number): Promise<{ sudah_like: boolean; jumlah_like: number }> => {

@@ -14,6 +14,7 @@ type ChatStackParamList = {
   ChatList: undefined;
   ChatRoom: { roomId: number; nama: string; foto: string | null };
   NewChat: undefined;
+  CreateGroup: undefined;
 };
 
 export default function NewChatScreen() {
@@ -81,6 +82,14 @@ export default function NewChatScreen() {
           <Ionicons name="close" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.topTitle}>Chat Baru</Text>
+        <TouchableOpacity
+          onPress={() => navigation.replace('CreateGroup')}
+          style={styles.groupBtn}
+          hitSlop={8}
+        >
+          <Ionicons name="people" size={16} color="#3b82f6" />
+          <Text style={styles.groupBtnText}>Grup</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.searchBox}>
@@ -124,7 +133,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   backBtn: { padding: 4 },
-  topTitle: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  topTitle: { color: '#fff', fontSize: 16, fontWeight: '600', flex: 1 },
+  groupBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16,
+    backgroundColor: 'rgba(59,130,246,0.15)',
+    borderWidth: 1, borderColor: 'rgba(59,130,246,0.30)',
+  },
+  groupBtnText: { color: '#3b82f6', fontSize: 12, fontWeight: '600' },
 
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

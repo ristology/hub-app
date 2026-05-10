@@ -56,6 +56,7 @@ export const chatApi = {
   show: async (roomId: number): Promise<{
     room: { data: ChatRoom };
     messages: { data: ChatMessage[] };
+    reads: { user_id: number; last_read_message_id: number }[];
     meta: { current_page: number; last_page: number; has_more: boolean };
   }> => {
     const { data } = await apiClient.get(`/chat/rooms/${roomId}`);
@@ -109,6 +110,27 @@ export const chatApi = {
   /** Buka atau buat chat private dengan user lain */
   openPrivate: async (userId: number): Promise<{ data: ChatRoom }> => {
     const { data } = await apiClient.post('/chat/private', { user_id: userId });
+    return data;
+  },
+
+  /** Buat grup chat baru — pembuat otomatis jadi admin */
+  createGroup: async (payload: {
+    nama:        string;
+    deskripsi?:  string;
+    member_ids:  number[];
+    foto?:       { uri: string; name: string; type: string };
+  }): Promise<{ data: ChatRoom }> => {
+    const formData = new FormData();
+    formData.append('nama', payload.nama);
+    if (payload.deskripsi) formData.append('deskripsi', payload.deskripsi);
+    payload.member_ids.forEach((id, i) => {
+      formData.append(`member_ids[${i}]`, String(id));
+    });
+    if (payload.foto) formData.append('foto', payload.foto as any);
+
+    const { data } = await apiClient.post('/chat/group', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return data;
   },
 

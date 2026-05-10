@@ -5,6 +5,7 @@ export type User = {
   name: string;
   email: string;
   role: 'admin' | 'hr' | 'karyawan';
+  karyawan_id: number | null;
   foto: string | null;
   departemen?: string | null;
 };

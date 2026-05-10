@@ -1,16 +1,17 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
-  TouchableOpacity, TextInput, Modal,
+  TouchableOpacity, TextInput, Modal, Alert, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { requestApi, type ClientRequest, type RequestStatus } from '../../api/clientRequest';
+import { requestApi, type ClientRequest, type RequestStatus, type PicRingkas } from '../../api/clientRequest';
 import RequestCard from './components/RequestCard';
+import SwipeableCard, { type SwipeAction } from '../../components/SwipeableCard';
 
 type RequestStackParamList = {
   RequestList: undefined;
@@ -30,12 +31,14 @@ const FILTER_OPTIONS: { key: Filter; label: string; color: string }[] = [
 ];
 
 export default function RequestScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RequestStackParamList>>();
+  const navigation  = useNavigation<NativeStackNavigationProp<RequestStackParamList>>();
+  const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('semua');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusOpen, setStatusOpen] = useState(false);
+  const [assignTarget, setAssignTarget] = useState<ClientRequest | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -56,6 +59,16 @@ export default function RequestScreen() {
     queryFn:  requestApi.stats,
   });
 
+  const terimaMut = useMutation({
+    mutationFn: ({ id, picUserId }: { id: number; picUserId: number }) => requestApi.terima(id, picUserId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['request'] });
+      queryClient.invalidateQueries({ queryKey: ['request-stats'] });
+      setAssignTarget(null);
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal assign PIC.'),
+  });
+
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
   const onRefresh = useCallback(async () => {
@@ -64,12 +77,26 @@ export default function RequestScreen() {
     setRefreshing(false);
   }, [refetch]);
 
-  const renderItem = ({ item }: { item: ClientRequest }) => (
-    <RequestCard
-      request={item}
-      onPress={() => navigation.navigate('RequestDetail', { id: item.id })}
-    />
-  );
+  const renderItem = ({ item }: { item: ClientRequest }) => {
+    const canAssign = item.is_it_or_admin && item.status === 'menunggu';
+    const action: SwipeAction | undefined = canAssign
+      ? {
+          icon: 'person-add',
+          label: 'Assign',
+          color: '#3b82f6',
+          onPress: () => setAssignTarget(item),
+        }
+      : undefined;
+
+    return (
+      <SwipeableCard rightAction={action}>
+        <RequestCard
+          request={item}
+          onPress={() => navigation.navigate('RequestDetail', { id: item.id })}
+        />
+      </SwipeableCard>
+    );
+  };
 
   const currentFilter = FILTER_OPTIONS.find((f) => f.key === filter) ?? FILTER_OPTIONS[0];
 
@@ -179,7 +206,91 @@ export default function RequestScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <AssignPicModal
+        visible={!!assignTarget}
+        target={assignTarget}
+        loading={terimaMut.isPending}
+        onClose={() => setAssignTarget(null)}
+        onSubmit={(picUserId) => assignTarget && terimaMut.mutate({ id: assignTarget.id, picUserId })}
+      />
     </SafeAreaView>
+  );
+}
+
+function AssignPicModal({ visible, target, loading, onClose, onSubmit }: {
+  visible: boolean;
+  target: ClientRequest | null;
+  loading: boolean;
+  onClose: () => void;
+  onSubmit: (picUserId: number) => void;
+}) {
+  const [picList, setPicList]       = useState<PicRingkas[]>([]);
+  const [loadingPic, setLoadingPic] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    setLoadingPic(true);
+    requestApi.listPic()
+      .then(({ data }) => setPicList(data))
+      .finally(() => setLoadingPic(false));
+  }, [visible]);
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={picStyles.backdrop}>
+        <View style={picStyles.sheet}>
+          <View style={picStyles.handle} />
+          <View style={picStyles.header}>
+            <View style={{ flex: 1 }}>
+              <Text style={picStyles.title}>Assign Request</Text>
+              {target && (
+                <Text style={picStyles.subtitle} numberOfLines={1}>{target.nama_klien}</Text>
+              )}
+            </View>
+            <TouchableOpacity onPress={onClose} hitSlop={8}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={picStyles.label}>Pilih PIC untuk handle request ini</Text>
+
+          {loadingPic ? (
+            <ActivityIndicator size="large" color="#3b82f6" style={{ marginTop: 30 }} />
+          ) : picList.length === 0 ? (
+            <Text style={picStyles.empty}>Tidak ada karyawan IT tersedia.</Text>
+          ) : (
+            <FlatList
+              data={picList}
+              keyExtractor={(item) => String(item.user_id)}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  onPress={() => onSubmit(item.user_id)}
+                  disabled={loading}
+                  style={picStyles.picItem}
+                  activeOpacity={0.7}
+                >
+                  {item.foto ? (
+                    <Image source={{ uri: item.foto }} style={picStyles.picAvatar} />
+                  ) : (
+                    <View style={[picStyles.picAvatar, picStyles.picAvatarFb]}>
+                      <Text style={{ color: '#fff', fontWeight: '700' }}>
+                        {item.nama.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={picStyles.picName} numberOfLines={1}>{item.nama}</Text>
+                  {loading
+                    ? <ActivityIndicator size="small" color="#3b82f6" />
+                    : <Ionicons name="chevron-forward" size={18} color="#6b7280" />}
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <View style={picStyles.sep} />}
+            />
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -267,4 +378,34 @@ const styles = StyleSheet.create({
   },
   sheetDot: { width: 10, height: 10, borderRadius: 5 },
   sheetItemText: { color: '#fff', fontSize: 14, flex: 1 },
+});
+
+const picStyles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: '#0d1421',
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingHorizontal: 16, paddingBottom: 24, maxHeight: '80%', minHeight: '40%',
+  },
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.20)',
+    alignSelf: 'center', marginTop: 8, marginBottom: 12,
+  },
+  header: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    marginBottom: 12,
+  },
+  title:    { color: '#fff', fontSize: 16, fontWeight: '700' },
+  subtitle: { color: '#8a94a6', fontSize: 12, marginTop: 2 },
+  label:    { color: '#8a94a6', fontSize: 12, fontWeight: '600', marginBottom: 8 },
+  picItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 12, paddingHorizontal: 8, borderRadius: 8,
+  },
+  picAvatar:   { width: 38, height: 38, borderRadius: 19, backgroundColor: '#1c2333' },
+  picAvatarFb: { alignItems: 'center', justifyContent: 'center' },
+  picName:     { color: '#fff', fontSize: 14, flex: 1 },
+  sep:         { height: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginLeft: 60 },
+  empty:       { color: '#6b7280', fontSize: 13, textAlign: 'center', marginTop: 30 },
 });

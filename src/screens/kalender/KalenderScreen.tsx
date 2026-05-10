@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
-  TouchableOpacity, ScrollView,
+  TouchableOpacity, LayoutAnimation, Platform, UIManager,
+  type NativeSyntheticEvent, type NativeScrollEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
@@ -11,6 +12,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { kalenderApi, type Kegiatan } from '../../api/kalender';
 import KegiatanCard from './components/KegiatanCard';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type KalenderStackParamList = {
   KalenderList: undefined;
@@ -51,6 +56,14 @@ export default function KalenderScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<KalenderStackParamList>>();
   const [refreshing, setRefreshing] = useState(false);
   const [cursor, setCursor] = useState(() => new Date());
+  const [showCalendar, setShowCalendar]   = useState(false);
+  const [selectedDate, setSelectedDate]   = useState<string | null>(null);
+  const lastScrollY = useRef(0);
+
+  const toggleCalendar = (next: boolean) => {
+    LayoutAnimation.configureNext(LayoutAnimation.create(220, 'easeInEaseOut', 'opacity'));
+    setShowCalendar(next);
+  };
 
   const start = startOfMonth(cursor);
   const end   = endOfMonth(cursor);
@@ -78,7 +91,7 @@ export default function KalenderScreen() {
     setRefreshing(false);
   }, [refetch]);
 
-  const groups = useMemo(() => {
+  const eventsByDate = useMemo(() => {
     const list = data?.data ?? [];
     const map = new Map<string, Kegiatan[]>();
     for (const k of list) {
@@ -87,8 +100,27 @@ export default function KalenderScreen() {
       arr.push(k);
       map.set(key, arr);
     }
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+    return map;
   }, [data]);
+
+  const groups = useMemo(() => {
+    const all = Array.from(eventsByDate.entries()).sort(([a], [b]) => a.localeCompare(b));
+    return selectedDate ? all.filter(([k]) => k === selectedDate) : all;
+  }, [eventsByDate, selectedDate]);
+
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    // Auto-hide saat scroll ke bawah > 40px supaya event list dapat ruang lebih
+    if (y > 40 && showCalendar && y > lastScrollY.current) {
+      toggleCalendar(false);
+    }
+    lastScrollY.current = y;
+  };
+
+  const handleDateTap = (key: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.create(220, 'easeInEaseOut', 'opacity'));
+    setSelectedDate((prev) => (prev === key ? null : key));
+  };
 
   const renderItem = ({ item }: { item: [string, Kegiatan[]] }) => {
     const [key, list] = item;
@@ -141,6 +173,17 @@ export default function KalenderScreen() {
             </Text>
           </View>
         )}
+        <TouchableOpacity
+          onPress={() => toggleCalendar(!showCalendar)}
+          style={[styles.calToggle, showCalendar && styles.calToggleActive]}
+          hitSlop={8}
+        >
+          <Ionicons
+            name={showCalendar ? 'calendar' : 'calendar-outline'}
+            size={20}
+            color={showCalendar ? '#3b82f6' : '#8a94a6'}
+          />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.monthNav}>
@@ -163,17 +206,30 @@ export default function KalenderScreen() {
         </TouchableOpacity>
       </View>
 
-      {stats && (
-        <View style={styles.statsWrap}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.statsContent}
-          >
-            <StatBox label="Hari ini"   value={stats.hari_ini}   color="#3b82f6" />
-            <StatBox label="Minggu ini" value={stats.minggu_ini} color="#22c55e" />
-            <StatBox label="Mendatang"  value={stats.mendatang}  color="#f59e0b" />
-          </ScrollView>
+      {showCalendar && (
+        <MonthGrid
+          cursor={cursor}
+          eventsByDate={eventsByDate}
+          selectedDate={selectedDate}
+          onSelectDate={handleDateTap}
+        />
+      )}
+
+      {stats && !showCalendar && (
+        <View style={[styles.statsWrap, styles.statsContent]}>
+          <StatBox label="Hari ini"   value={stats.hari_ini}   color="#3b82f6" />
+          <StatBox label="Minggu ini" value={stats.minggu_ini} color="#22c55e" />
+          <StatBox label="Mendatang"  value={stats.mendatang}  color="#f59e0b" />
+        </View>
+      )}
+
+      {selectedDate && (
+        <View style={styles.filterBar}>
+          <Ionicons name="funnel" size={12} color="#3b82f6" />
+          <Text style={styles.filterText}>{formatGroupHeader(selectedDate)}</Text>
+          <TouchableOpacity onPress={() => handleDateTap(selectedDate)} hitSlop={6}>
+            <Ionicons name="close-circle" size={16} color="#8a94a6" />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -182,13 +238,17 @@ export default function KalenderScreen() {
         keyExtractor={(item) => item[0]}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
+        onScroll={onScroll}
+        scrollEventThrottle={32}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />
         }
         ListEmptyComponent={
           <View style={styles.center}>
             <Ionicons name="calendar-outline" size={48} color="#3b3f4a" />
-            <Text style={styles.empty}>Tidak ada jadwal di bulan ini.</Text>
+            <Text style={styles.empty}>
+              {selectedDate ? 'Tidak ada jadwal di tanggal ini.' : 'Tidak ada jadwal di bulan ini.'}
+            </Text>
           </View>
         }
       />
@@ -213,6 +273,80 @@ function StatBox({ label, value, color }: { label: string; value: number; color:
   );
 }
 
+function MonthGrid({ cursor, eventsByDate, selectedDate, onSelectDate }: {
+  cursor: Date;
+  eventsByDate: Map<string, Kegiatan[]>;
+  selectedDate: string | null;
+  onSelectDate: (key: string) => void;
+}) {
+  const year   = cursor.getFullYear();
+  const month  = cursor.getMonth();
+  const first  = new Date(year, month, 1);
+  const last   = new Date(year, month + 1, 0);
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < first.getDay(); i++) cells.push(null);
+  for (let d = 1; d <= last.getDate(); d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+  const rows: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+
+  const todayKey = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+
+  const cellTextColor = (col: number, isSelected: boolean) => {
+    if (isSelected) return '#fff';
+    if (col === 0) return '#ef4444';
+    if (col === 6) return '#3b82f6';
+    return '#fff';
+  };
+
+  return (
+    <View style={styles.calendar}>
+      <View style={styles.calRow}>
+        {HARI_INDO.map((h, i) => (
+          <Text key={h} style={[
+            styles.calHeaderText,
+            i === 0 && { color: '#ef4444' },
+            i === 6 && { color: '#3b82f6' },
+          ]}>{h}</Text>
+        ))}
+      </View>
+      {rows.map((row, ri) => (
+        <View key={ri} style={styles.calRow}>
+          {row.map((d, ci) => {
+            if (d === null) return <View key={ci} style={styles.calCell} />;
+            const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const hasEvent = eventsByDate.has(key);
+            const isToday    = key === todayKey;
+            const isSelected = key === selectedDate;
+            return (
+              <TouchableOpacity
+                key={ci}
+                onPress={() => onSelectDate(key)}
+                activeOpacity={0.7}
+                style={[
+                  styles.calCell,
+                  isSelected && styles.calCellSelected,
+                  isToday && !isSelected && styles.calCellToday,
+                ]}
+              >
+                <Text style={[styles.calCellText, { color: cellTextColor(ci, isSelected) }, isSelected && { fontWeight: '700' }]}>
+                  {d}
+                </Text>
+                {hasEvent && (
+                  <View style={[styles.calDot, isSelected && { backgroundColor: '#fff' }]} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0d1421' },
   center:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
@@ -231,6 +365,14 @@ const styles = StyleSheet.create({
   googleDisconnected: { backgroundColor: 'rgba(138,148,166,0.10)', borderColor: 'rgba(138,148,166,0.25)' },
   googleText: { fontSize: 10, fontWeight: '600' },
 
+  calToggle: {
+    width: 36, height: 36, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+    marginLeft: 4,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+  },
+  calToggleActive: { backgroundColor: 'rgba(59,130,246,0.15)', borderColor: '#3b82f6' },
+
   monthNav: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 12, marginBottom: 8,
@@ -244,13 +386,49 @@ const styles = StyleSheet.create({
     flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 4,
   },
   statBox: {
+    flex: 1,
     backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 10,
-    paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center',
+    paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     minWidth: 90,
   },
   statValue: { fontSize: 20, fontWeight: '700' },
   statLabel: { color: '#8a94a6', fontSize: 11, marginTop: 2 },
+
+  calendar: {
+    paddingHorizontal: 12, paddingVertical: 6, marginBottom: 6,
+  },
+  calRow: {
+    flexDirection: 'row',
+  },
+  calHeaderText: {
+    flex: 1, textAlign: 'center', color: '#8a94a6',
+    fontSize: 11, fontWeight: '700', paddingVertical: 6,
+    letterSpacing: 0.5,
+  },
+  calCell: {
+    flex: 1, aspectRatio: 1.1,
+    alignItems: 'center', justifyContent: 'center',
+    margin: 1, borderRadius: 8,
+    position: 'relative',
+  },
+  calCellText:    { color: '#fff', fontSize: 13, fontWeight: '500' },
+  calCellToday:   { backgroundColor: 'rgba(59,130,246,0.10)', borderWidth: 1, borderColor: '#3b82f6' },
+  calCellSelected:{ backgroundColor: '#3b82f6' },
+  calDot: {
+    position: 'absolute', bottom: 4,
+    width: 4, height: 4, borderRadius: 2,
+    backgroundColor: '#3b82f6',
+  },
+
+  filterBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(59,130,246,0.10)',
+    borderColor: 'rgba(59,130,246,0.30)', borderWidth: 1,
+    paddingHorizontal: 12, paddingVertical: 6,
+    marginHorizontal: 16, marginBottom: 6, borderRadius: 8,
+  },
+  filterText: { flex: 1, color: '#3b82f6', fontSize: 12, fontWeight: '600' },
 
   list: { padding: 16, paddingTop: 4 },
   empty: { color: '#8a94a6', fontSize: 14 },

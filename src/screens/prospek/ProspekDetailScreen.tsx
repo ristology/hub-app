@@ -40,7 +40,7 @@ export default function ProspekDetailScreen() {
   const navigation = useNavigation<any>();
   const { id, highlightKomentarId } = route.params;
   const queryClient = useQueryClient();
-  const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
+  const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady, scrollToKomentar } = useKomentarHighlight(highlightKomentarId);
   const [komentar, setKomentar] = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
@@ -105,10 +105,11 @@ export default function ProspekDetailScreen() {
 
   const commentMutation = useMutation({
     mutationFn: (text: string) => prospekApi.comment(id, text, replyTo?.id),
-    onSuccess: () => {
+    onSuccess: (response) => {
       setKomentar('');
       setReplyTo(null);
       queryClient.invalidateQueries({ queryKey: ['prospek', id] });
+      scrollToKomentar(response.data.id);
     },
     onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal kirim komentar.'),
   });
@@ -208,6 +209,9 @@ export default function ProspekDetailScreen() {
             <>
               <TouchableOpacity onPress={() => setPertemuanOpen(true)} style={styles.addBtn}>
                 <Ionicons name="add-circle-outline" size={22} color="#3b82f6" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.navigate('CreateProspek', { id })} style={styles.addBtn}>
+                <Ionicons name="create-outline" size={20} color="#3b82f6" />
               </TouchableOpacity>
               <TouchableOpacity onPress={confirmDeleteProspek} style={styles.addBtn}>
                 <Ionicons name="trash-outline" size={20} color="#ef4444" />

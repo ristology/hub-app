@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { chatApi, type ChatMessage } from '../../api/chat';
 import { useAuth } from '../../store/auth';
+import ImageViewerModal from '../../components/ImageViewerModal';
 
 type RouteParams = { roomId: number; nama: string; foto: string | null };
 
@@ -44,6 +45,7 @@ export default function ChatRoomScreen() {
   const [caption, setCaption] = useState('');
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [highlightedMsgId, setHighlightedMsgId] = useState<number | null>(null);
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
   // Pesan yang gagal kirim — disimpan local, tampil sebagai ghost bubble dgn icon error
   const [failedMessages, setFailedMessages] = useState<{ tempId: string; pesan: string; replyToId?: number }[]>([]);
   const flatListRef = useRef<FlatList>(null);
@@ -254,7 +256,14 @@ export default function ChatRoomScreen() {
           ) : (
             <>
               {item.foto_url && (
-                <Image source={{ uri: item.foto_url }} style={styles.bubbleImage} resizeMode="cover" />
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setViewerUri(item.foto_url)}
+                  onLongPress={() => handleLongPressMessage(item)}
+                  delayLongPress={350}
+                >
+                  <Image source={{ uri: item.foto_url }} style={styles.bubbleImage} resizeMode="cover" />
+                </TouchableOpacity>
               )}
               {item.pesan && (
                 <Text style={styles.bubbleText}>{item.pesan}</Text>
@@ -265,9 +274,9 @@ export default function ChatRoomScreen() {
             <Text style={styles.bubbleTime}>{formatTime(item.created_at)}</Text>
             {isMine && !isHapus && (
               getMessageStatus(item) === 'read' ? (
-                <Ionicons name="checkmark-done" size={16} color="#22d3ee" />
+                <Ionicons name="checkmark-done" size={16} color="#4ade80" />
               ) : (
-                <Ionicons name="checkmark" size={16} color="rgba(255,255,255,0.55)" />
+                <Ionicons name="checkmark" size={16} color="#fb923c" />
               )
             )}
           </View>
@@ -443,6 +452,8 @@ export default function ChatRoomScreen() {
           </View>
         </SafeAreaView>
       </Modal>
+
+      <ImageViewerModal uri={viewerUri} onClose={() => setViewerUri(null)} />
     </SafeAreaView>
   );
 }
@@ -474,7 +485,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   bubbleMine: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#1e3a8a',
     borderBottomRightRadius: 4,
   },
   bubbleOther: {

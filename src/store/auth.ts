@@ -62,6 +62,15 @@ export const useAuth = create<AuthState>((set) => ({
 
       // Re-register FCM token (token bisa berubah / device baru install)
       registerDeviceWithBackend().catch(() => {});
+
+      // Refresh user dari backend supaya field baru (mis. karyawan_id) ikut terisi
+      // bagi user lama yang sudah login sebelum field tsb ditambahkan.
+      authApi.me()
+        .then(async (fresh) => {
+          await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(fresh));
+          set({ user: fresh });
+        })
+        .catch(() => { /* offline / 401 ditangani interceptor */ });
     } else {
       set({ isInitializing: false });
     }

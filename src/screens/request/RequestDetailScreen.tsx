@@ -73,7 +73,7 @@ export default function RequestDetailScreen() {
     const hideSub = Keyboard.addListener(hideName, () => setKbHeight(0));
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
-  const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
+  const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady, scrollToKomentar } = useKomentarHighlight(highlightKomentarId);
 
   const [komentar, setKomentar] = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -122,7 +122,7 @@ export default function RequestDetailScreen() {
 
   const commentMut = useMutation({
     mutationFn: (text: string) => requestApi.comment(id, text, replyTo?.id),
-    onSuccess: () => { setKomentar(''); setReplyTo(null); invalidate(); },
+    onSuccess: (response) => { setKomentar(''); setReplyTo(null); invalidate(); scrollToKomentar(response.data.id); },
     onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal kirim komentar.'),
   });
 
@@ -194,9 +194,14 @@ export default function RequestDetailScreen() {
           </TouchableOpacity>
           <Text style={styles.topTitle}>Detail Request</Text>
           {r.can_edit && (
-            <TouchableOpacity onPress={confirmDelete} style={styles.backBtn}>
-              <Ionicons name="trash-outline" size={20} color="#ef4444" />
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity onPress={() => navigation.navigate('CreateRequest', { id })} style={styles.backBtn}>
+                <Ionicons name="create-outline" size={20} color="#3b82f6" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={confirmDelete} style={styles.backBtn}>
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              </TouchableOpacity>
+            </>
           )}
         </View>
 

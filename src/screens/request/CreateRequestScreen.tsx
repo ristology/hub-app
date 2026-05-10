@@ -5,8 +5,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { requestApi, type CreateRequestPayload, type KlienRingkas } from '../../api/clientRequest';
 import DatePickerInput from '../../components/DatePickerInput';
@@ -16,9 +16,14 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+type RouteParams = { id?: number };
+
 export default function CreateRequestScreen() {
   const navigation = useNavigation<any>();
+  const route      = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const queryClient = useQueryClient();
+  const editId = route.params?.id;
+  const isEdit = !!editId;
 
   const [namaKlien, setNamaKlien]     = useState('');
   const [klienId, setKlienId]         = useState<number | null>(null);
@@ -26,6 +31,24 @@ export default function CreateRequestScreen() {
   const [deadline, setDeadline]       = useState('');
   const [keterangan, setKeterangan]   = useState('');
   const [klienOpen, setKlienOpen]     = useState(false);
+  const [initialized, setInitialized] = useState(false);
+
+  const { data: existingData } = useQuery({
+    queryKey: ['request', editId],
+    queryFn:  () => requestApi.detail(editId!),
+    enabled:  isEdit,
+  });
+
+  useEffect(() => {
+    if (!isEdit || !existingData || initialized) return;
+    const r = existingData.data;
+    setNamaKlien(r.nama_klien ?? '');
+    setKlienId(r.klien_id ?? null);
+    setTglReq(r.tanggal_request ?? todayISO());
+    setDeadline(r.deadline ?? '');
+    setKeterangan(r.keterangan ?? '');
+    setInitialized(true);
+  }, [existingData, initialized, isEdit]);
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateRequestPayload) => requestApi.create(payload),
@@ -37,18 +60,32 @@ export default function CreateRequestScreen() {
     onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal simpan request.'),
   });
 
+  const updateMutation = useMutation({
+    mutationFn: (payload: Partial<CreateRequestPayload>) => requestApi.update(editId!, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['request'] });
+      queryClient.invalidateQueries({ queryKey: ['request', editId] });
+      navigation.goBack();
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal update request.'),
+  });
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
   const submit = () => {
     if (!namaKlien.trim())  return Alert.alert('Validasi', 'Nama klien wajib diisi.');
     if (!keterangan.trim()) return Alert.alert('Validasi', 'Keterangan wajib diisi.');
     if (!tanggalRequest)    return Alert.alert('Validasi', 'Tanggal request wajib diisi.');
 
-    createMutation.mutate({
+    const payload = {
       nama_klien:      namaKlien.trim(),
       klien_id:        klienId,
       tanggal_request: tanggalRequest,
       deadline:        deadline || undefined,
       keterangan:      keterangan.trim(),
-    });
+    };
+    if (isEdit) updateMutation.mutate(payload);
+    else        createMutation.mutate(payload);
   };
 
   return (
@@ -58,8 +95,8 @@ export default function CreateRequestScreen() {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="close" size={22} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.topTitle}>Request Baru</Text>
-          <SaveButton onPress={submit} loading={createMutation.isPending} />
+          <Text style={styles.topTitle}>{isEdit ? 'Edit Request' : 'Request Baru'}</Text>
+          <SaveButton onPress={submit} loading={isPending} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll}>

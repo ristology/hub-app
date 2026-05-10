@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, type RouteProp } from '@react-navigation/native';
 import { feedApi, type FeedKomentar, type KaryawanRingkas } from '../../api/feed';
+import { useAuth } from '../../store/auth';
 import PhotoCarousel  from '../../components/PhotoCarousel';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
@@ -17,10 +18,11 @@ type RouteParams = { id: number; highlightKomentarId?: number | null };
 
 export default function FeedDetailScreen() {
   const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { id, highlightKomentarId } = route.params;
-  const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
+  const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady, scrollToKomentar } = useKomentarHighlight(highlightKomentarId);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [komentar, setKomentar]       = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
@@ -39,7 +41,6 @@ export default function FeedDetailScreen() {
 
   const insertMention = (k: KaryawanRingkas) => {
     const tag = '@' + k.nama.replace(/\s+/g, '_') + ' ';
-
     if (mentionAt !== null) {
       const before = komentar.substring(0, mentionAt);
       const after  = komentar.substring(mentionAt + 1);
@@ -53,7 +54,7 @@ export default function FeedDetailScreen() {
   const { data, isLoading } = useQuery({
     queryKey: ['feed', id],
     queryFn:  () => feedApi.detail(id),
-    refetchInterval: 5000, // Polling utk update komentar realtime
+    refetchInterval: 5000,
   });
 
   const likeMutation = useMutation({
@@ -66,14 +67,31 @@ export default function FeedDetailScreen() {
 
   const commentMutation = useMutation({
     mutationFn: (text: string) => feedApi.comment(id, text, replyTo?.id),
-    onSuccess: () => {
+    onSuccess: (response) => {
       setKomentar('');
       setReplyTo(null);
       queryClient.invalidateQueries({ queryKey: ['feed', id] });
       queryClient.invalidateQueries({ queryKey: ['feed'] });
+      scrollToKomentar(response.data.id);
     },
     onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal kirim komentar.'),
   });
+
+  const destroyMutation = useMutation({
+    mutationFn: () => feedApi.destroy(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      navigation.goBack();
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal hapus feed.'),
+  });
+
+  const confirmDelete = () => {
+    Alert.alert('Hapus Feed?', 'Postingan beserta foto dan komentarnya akan dihapus permanen.', [
+      { text: 'Batal' },
+      { text: 'Hapus', style: 'destructive', onPress: () => destroyMutation.mutate() },
+    ]);
+  };
 
   if (isLoading || !data) {
     return (
@@ -86,6 +104,9 @@ export default function FeedDetailScreen() {
   }
 
   const feed = data.data;
+  const isOwner = (feed.karyawan?.user_id != null && feed.karyawan.user_id === user?.id)
+               || (user?.karyawan_id != null && feed.karyawan?.id === user.karyawan_id);
+  const canEdit = feed.can_edit || user?.role === 'admin' || isOwner;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -99,6 +120,16 @@ export default function FeedDetailScreen() {
             <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.topTitle}>Detail Feed</Text>
+          {canEdit && (
+            <>
+              <TouchableOpacity onPress={() => navigation.navigate('CreateFeed', { feedId: id })} style={styles.menuBtn} hitSlop={8}>
+                <Ionicons name="create-outline" size={20} color="#3b82f6" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={confirmDelete} style={styles.menuBtn} hitSlop={8}>
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         <ScrollView
@@ -125,17 +156,14 @@ export default function FeedDetailScreen() {
             </View>
           </View>
 
-          {/* Konten */}
           {feed.konten ? <MentionText text={feed.konten} style={styles.konten} /> : null}
 
-          {/* Foto carousel */}
           {feed.foto_urls?.length > 0 && (
             <View style={{ marginBottom: 12 }}>
               <PhotoCarousel fotos={feed.foto_urls} height={320} />
             </View>
           )}
 
-          {/* Lokasi (kalau ada) */}
           {feed.lokasi && (
             <View style={styles.lokasiBox}>
               <Ionicons name="location" size={14} color="#3b82f6" />
@@ -143,7 +171,6 @@ export default function FeedDetailScreen() {
             </View>
           )}
 
-          {/* Aksi like */}
           <View style={styles.actions}>
             <TouchableOpacity
               onPress={() => likeMutation.mutate()}
@@ -162,7 +189,6 @@ export default function FeedDetailScreen() {
             <Text style={styles.actionText}>{feed.jumlah_komentar} komentar</Text>
           </View>
 
-          {/* Komentar list */}
           <View style={styles.comments}>
             <Text style={styles.commentsTitle}>Komentar</Text>
             {feed.komentar?.length ? (
@@ -192,7 +218,6 @@ export default function FeedDetailScreen() {
           </View>
         </ScrollView>
 
-        {/* Reply banner */}
         {replyTo && (
           <View style={styles.replyBanner}>
             <Ionicons name="arrow-undo" size={14} color="#3b82f6" />
@@ -203,15 +228,10 @@ export default function FeedDetailScreen() {
           </View>
         )}
 
-        {/* Input komentar */}
         <View style={styles.inputBar}>
-          <TouchableOpacity
-            style={styles.mentionBtn}
-            onPress={() => setMentionOpen(true)}
-          >
+          <TouchableOpacity style={styles.mentionBtn} onPress={() => setMentionOpen(true)}>
             <Ionicons name="at" size={18} color="#3b82f6" />
           </TouchableOpacity>
-
           <TextInput
             style={styles.input}
             placeholder={replyTo ? `Balas ${replyTo.nama}...` : 'Tulis komentar... ketik @ untuk mention'}
@@ -274,7 +294,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   backBtn:   { padding: 8 },
-  topTitle:  { color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 4 },
+  topTitle:  { color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 4, flex: 1 },
+  menuBtn:   { padding: 8 },
   scroll:    { padding: 16, paddingBottom: 24 },
   header:    { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   avatar:    { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1c2333' },

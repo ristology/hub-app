@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   Modal, View, Text, TextInput, FlatList, Image, TouchableOpacity,
-  StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform,
+  StyleSheet, ActivityIndicator, Keyboard, Platform, Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { feedApi, type KaryawanRingkas } from '../api/feed';
 
@@ -26,11 +27,24 @@ export default function KaryawanPicker({
   selectedIds = [], onPick, title = 'Pilih Karyawan',
   searchFn,
 }: Props) {
+  const insets = useSafeAreaInsets();
+  const screenH = Dimensions.get('window').height;
   const [search, setSearch]   = useState('');
   const [results, setResults] = useState<KaryawanRingkas[]>([]);
   const [loading, setLoading] = useState(false);
+  const [kbHeight, setKbHeight] = useState(0);
 
   const doSearch: SearchFn = searchFn ?? feedApi.searchKaryawan;
+
+  // Manual keyboard handling — KeyboardAvoidingView buggy di Android edge-to-edge,
+  // dan tidak reliable di dalam Modal.
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvt, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   // Debounced search
   useEffect(() => {
@@ -84,13 +98,30 @@ export default function KaryawanPicker({
     );
   };
 
+  // Android: kbHeight dari `keyboardDidShow` TIDAK include IME suggestion/toolbar
+  // (Samsung Honeyboard punya bar ~60px di atas keys dengan icon clipboard/emoji/dst).
+  // iOS: kbHeight sudah akurat. Tambah safety margin Android-only.
+  const ANDROID_IME_SAFETY = 60;
+  const effectiveKb = kbHeight > 0
+    ? kbHeight + (Platform.OS === 'android' ? ANDROID_IME_SAFETY : 0)
+    : 0;
+
+  // Sheet butuh EXPLICIT height supaya FlatList flex:1 bisa fill ruang & internal scroll.
+  // Tanpa height eksplisit, flex:1 anak collapse ke 0 (tidak ada item tampil).
+  //   - keyboard naik: tinggi = ruang yg tersisa di atas keyboard
+  //   - keyboard tertutup: 70% layar (cukup untuk list + tombol selesai)
+  const availableH  = screenH - insets.top - 40;
+  const sheetH      = effectiveKb > 0
+    ? Math.max(280, availableH - effectiveKb)
+    : Math.min(600, availableH);
+  const backdropPadBottom = effectiveKb;
+  // Sheet sendiri pakai inset bawah saat keyboard tertutup (home indicator di Android).
+  const sheetPadBottom = kbHeight > 0 ? 12 : insets.bottom + 12;
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.backdrop}
-      >
-        <View style={styles.sheet}>
+      <View style={[styles.backdrop, { paddingBottom: backdropPadBottom }]}>
+        <View style={[styles.sheet, { height: sheetH, paddingBottom: sheetPadBottom }]}>
           <View style={styles.handle} />
 
           <View style={styles.header}>
@@ -117,6 +148,7 @@ export default function KaryawanPicker({
             <ActivityIndicator size="large" color="#3b82f6" style={{ marginTop: 30 }} />
           ) : (
             <FlatList
+              style={{ flex: 1 }}
               data={results}
               keyExtractor={(item) => String(item.id)}
               renderItem={renderItem}
@@ -126,7 +158,7 @@ export default function KaryawanPicker({
                   {search ? 'Tidak ada karyawan ditemukan.' : 'Mulai ketik untuk mencari.'}
                 </Text>
               }
-              contentContainerStyle={{ paddingBottom: 24 }}
+              contentContainerStyle={{ paddingBottom: 12 }}
             />
           )}
 
@@ -136,7 +168,7 @@ export default function KaryawanPicker({
             </TouchableOpacity>
           )}
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -145,7 +177,7 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: '#0d1421', borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    paddingHorizontal: 16, paddingBottom: 24, maxHeight: '80%', minHeight: '60%',
+    paddingHorizontal: 16,
   },
   handle: {
     width: 40, height: 4, borderRadius: 2,

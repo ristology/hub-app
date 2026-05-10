@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
-  TouchableOpacity, ScrollView, TextInput, Alert,
+  TouchableOpacity, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
@@ -11,7 +11,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { dokumenApi, type Dokumen } from '../../api/dokumen';
 import DokumenCard from './components/DokumenCard';
-import FolderChip from './components/FolderChip';
+import FolderGrid from './components/FolderGrid';
 
 type ParamList = {
   DokumenList: undefined;
@@ -103,45 +103,21 @@ export default function DokumenScreen() {
         ) : null}
       </View>
 
-      {/* Folder chips */}
-      {foldersData && foldersData.data.length > 0 && (
-        <View style={styles.foldersWrap}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.foldersContent}
-          >
-            <TouchableOpacity
-              onPress={() => setFolderId(null)}
-              style={[
-                styles.rootChip,
-                folderId === null && styles.rootChipActive,
-              ]}
-            >
-              <Ionicons name="albums-outline" size={16} color={folderId === null ? '#3b82f6' : '#8a94a6'} />
-              <Text style={[
-                styles.rootChipText,
-                folderId === null && { color: '#3b82f6', fontWeight: '700' },
-              ]}>Root</Text>
-            </TouchableOpacity>
-            {foldersData.data.map((f) => (
-              <FolderChip
-                key={f.id}
-                folder={f}
-                active={folderId === f.id}
-                onPress={() => setFolderId(f.id)}
-                onLongPress={() => navigation.navigate('ManageFolder', { id: f.id })}
-              />
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
+      {/* Breadcrumb saat di dalam folder */}
       {activeFolder && (
-        <View style={styles.activeFolderBar}>
+        <View style={styles.breadcrumb}>
+          <TouchableOpacity
+            onPress={() => setFolderId(null)}
+            style={styles.crumbBtn}
+            hitSlop={8}
+          >
+            <Ionicons name="arrow-back" size={16} color="#3b82f6" />
+            <Text style={styles.crumbBack}>Root</Text>
+          </TouchableOpacity>
+          <Ionicons name="chevron-forward" size={14} color="#6b7280" />
           <Ionicons name="folder" size={14} color={activeFolder.warna} />
-          <Text style={styles.activeFolderText}>{activeFolder.nama}</Text>
-          <Text style={styles.activeFolderCount}>{activeFolder.jumlah_dokumen} dokumen</Text>
+          <Text style={styles.crumbCurrent} numberOfLines={1}>{activeFolder.nama}</Text>
+          <Text style={styles.crumbCount}>{activeFolder.jumlah_dokumen} dok</Text>
         </View>
       )}
 
@@ -153,11 +129,29 @@ export default function DokumenScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />
         }
+        ListHeaderComponent={
+          folderId === null && !search && foldersData && foldersData.data.length > 0 ? (
+            <View style={styles.gridWrap}>
+              <FolderGrid
+                folders={foldersData.data}
+                onPress={(f) => setFolderId(f.id)}
+                onLongPress={(f) => navigation.navigate('ManageFolder', { id: f.id })}
+              />
+              {(data?.data?.length ?? 0) > 0 && (
+                <Text style={styles.docSection}>DOKUMEN DI ROOT</Text>
+              )}
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <View style={styles.center}>
             <Ionicons name="folder-outline" size={48} color="#3b3f4a" />
             <Text style={styles.empty}>
-              {search ? 'Tidak ada dokumen yang cocok.' : 'Belum ada dokumen di sini.'}
+              {search
+                ? 'Tidak ada dokumen yang cocok.'
+                : folderId === null
+                  ? 'Tidak ada dokumen di root.'
+                  : 'Folder ini masih kosong.'}
             </Text>
           </View>
         }
@@ -195,26 +189,20 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, color: '#fff', paddingVertical: 10, paddingHorizontal: 8, fontSize: 14 },
 
-  foldersWrap: { marginTop: 10 },
-  foldersContent: {
-    flexDirection: 'row', gap: 8,
-    paddingHorizontal: 16, paddingVertical: 4, alignItems: 'center',
-  },
-  rootChip: {
+  breadcrumb: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.10)',
+    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6,
   },
-  rootChipActive: { backgroundColor: 'rgba(59,130,246,0.15)', borderColor: '#3b82f6' },
-  rootChipText: { color: '#8a94a6', fontSize: 12 },
+  crumbBtn:     { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4 },
+  crumbBack:    { color: '#3b82f6', fontSize: 13, fontWeight: '600' },
+  crumbCurrent: { color: '#fff', fontSize: 13, fontWeight: '600', flex: 1, marginLeft: 2 },
+  crumbCount:   { color: '#8a94a6', fontSize: 11 },
 
-  activeFolderBar: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 20, paddingVertical: 8,
+  gridWrap:   { marginBottom: 4 },
+  docSection: {
+    color: '#6b7280', fontSize: 11, fontWeight: '700',
+    letterSpacing: 0.8, marginTop: 14, marginBottom: 6,
   },
-  activeFolderText: { color: '#fff', fontSize: 13, fontWeight: '600', flex: 1 },
-  activeFolderCount: { color: '#8a94a6', fontSize: 11 },
 
   list: { padding: 16, paddingTop: 8 },
   empty: { color: '#8a94a6', fontSize: 14, textAlign: 'center' },

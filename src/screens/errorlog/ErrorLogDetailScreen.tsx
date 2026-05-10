@@ -47,7 +47,7 @@ export default function ErrorLogDetailScreen() {
     const hideSub = Keyboard.addListener(hideName, () => setKbHeight(0));
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
-  const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady } = useKomentarHighlight(highlightKomentarId);
+  const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady, scrollToKomentar } = useKomentarHighlight(highlightKomentarId);
   const [komentar, setKomentar] = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
@@ -94,10 +94,11 @@ export default function ErrorLogDetailScreen() {
 
   const commentMutation = useMutation({
     mutationFn: (text: string) => errorLogApi.comment(id, text, replyTo?.id),
-    onSuccess: () => {
+    onSuccess: (response) => {
       setKomentar('');
       setReplyTo(null);
       queryClient.invalidateQueries({ queryKey: ['error-log', id] });
+      scrollToKomentar(response.data.id);
     },
     onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal kirim komentar.'),
   });

@@ -23,7 +23,7 @@ function formatDate(s: string | null): string {
 
 export default function TaskDetailScreen() {
   const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { id } = route.params;
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -86,9 +86,14 @@ export default function TaskDetailScreen() {
         </TouchableOpacity>
         <Text style={styles.topTitle}>Detail Task</Text>
         {canDelete && (
-          <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}>
-            <Ionicons name="trash-outline" size={20} color="#ef4444" />
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity onPress={() => navigation.navigate('CreateTask', { id })} style={styles.deleteBtn}>
+              <Ionicons name="create-outline" size={20} color="#3b82f6" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}>
+              <Ionicons name="trash-outline" size={20} color="#ef4444" />
+            </TouchableOpacity>
+          </>
         )}
       </View>
 

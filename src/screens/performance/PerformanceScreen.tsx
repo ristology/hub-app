@@ -76,25 +76,19 @@ export default function PerformanceScreen() {
       </View>
 
       {stats && (
-        <View style={styles.statsWrap}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.statsContent}
-          >
-            <StatBox
-              label={`Appointment ${stats.tahun}`}
-              value={stats.total_appointment}
-              color="#3b82f6"
-              icon="calendar"
-            />
-            <StatBox
-              label={`Kontrak ${stats.tahun}`}
-              value={stats.total_kontrak}
-              color="#22c55e"
-              icon="document-text"
-            />
-          </ScrollView>
+        <View style={[styles.statsWrap, styles.statsContent]}>
+          <StatBox
+            label={`Appointment ${stats.tahun}`}
+            value={stats.total_appointment}
+            color="#3b82f6"
+            icon="calendar"
+          />
+          <StatBox
+            label={`Kontrak ${stats.tahun}`}
+            value={stats.total_kontrak}
+            color="#22c55e"
+            icon="document-text"
+          />
         </View>
       )}
 
@@ -174,11 +168,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 4,
   },
   statBox: {
+    flex: 1,
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12,
-    paddingVertical: 12, paddingHorizontal: 16,
+    paddingVertical: 12, paddingHorizontal: 14,
     borderWidth: 1,
-    minWidth: 160,
   },
   statValue: { fontSize: 22, fontWeight: '700' },
   statLabel: { color: '#8a94a6', fontSize: 11 },

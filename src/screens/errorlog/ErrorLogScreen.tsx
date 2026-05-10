@@ -1,16 +1,17 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
-  TouchableOpacity, TextInput, Modal,
+  TouchableOpacity, TextInput, Modal, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { errorLogApi, type ErrorLog, type ErrorLogStatus } from '../../api/errorLog';
 import ErrorLogCard from './components/ErrorLogCard';
+import SwipeableCard, { type SwipeAction } from '../../components/SwipeableCard';
 
 type ErrorLogStackParamList = {
   ErrorLogList: undefined;
@@ -29,7 +30,8 @@ const FILTER_OPTIONS: { key: Filter; label: string; color: string }[] = [
 ];
 
 export default function ErrorLogScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<ErrorLogStackParamList>>();
+  const navigation   = useNavigation<NativeStackNavigationProp<ErrorLogStackParamList>>();
+  const queryClient  = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('semua');
   const [search, setSearch] = useState('');
@@ -55,6 +57,15 @@ export default function ErrorLogScreen() {
     queryFn:  errorLogApi.stats,
   });
 
+  const resolveMut = useMutation({
+    mutationFn: (id: number) => errorLogApi.updateStatus(id, 'resolved'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['error-log'] });
+      queryClient.invalidateQueries({ queryKey: ['error-log-stats'] });
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal ubah status.'),
+  });
+
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
   const onRefresh = useCallback(async () => {
@@ -63,12 +74,37 @@ export default function ErrorLogScreen() {
     setRefreshing(false);
   }, [refetch]);
 
-  const renderItem = ({ item }: { item: ErrorLog }) => (
-    <ErrorLogCard
-      log={item}
-      onPress={() => navigation.navigate('ErrorLogDetail', { id: item.id })}
-    />
-  );
+  const handleResolve = (item: ErrorLog) => {
+    Alert.alert(
+      'Tandai Resolved',
+      `Tandai error "${item.keterangan.slice(0, 60)}${item.keterangan.length > 60 ? '...' : ''}" sebagai resolved?`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        { text: 'Resolved', style: 'default', onPress: () => resolveMut.mutate(item.id) },
+      ],
+    );
+  };
+
+  const renderItem = ({ item }: { item: ErrorLog }) => {
+    const canResolve = item.can_update_status && item.status !== 'resolved';
+    const action: SwipeAction | undefined = canResolve
+      ? {
+          icon: 'checkmark-done',
+          label: 'Resolved',
+          color: '#22c55e',
+          onPress: () => handleResolve(item),
+        }
+      : undefined;
+
+    return (
+      <SwipeableCard rightAction={action}>
+        <ErrorLogCard
+          log={item}
+          onPress={() => navigation.navigate('ErrorLogDetail', { id: item.id })}
+        />
+      </SwipeableCard>
+    );
+  };
 
   const currentFilter = FILTER_OPTIONS.find((f) => f.key === filter) ?? FILTER_OPTIONS[0];
 

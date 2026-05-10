@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, ScrollView, TouchableOpacity, Image,
   StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { tugasApi, type TugasPrioritas, type TugasStatus } from '../../api/tugas';
 import { type KaryawanRingkas } from '../../api/feed';
@@ -28,29 +28,53 @@ const STATUS_OPTIONS: { key: TugasStatus; label: string }[] = [
 ];
 
 function isValidDate(s: string): boolean {
-  if (!s) return true; // optional, kosong OK
+  if (!s) return true;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const d = new Date(s);
-  return !Number.isNaN(d.getTime());
+  return !Number.isNaN(new Date(s).getTime());
 }
+
+type RouteParams = { id?: number };
 
 export default function CreateTaskScreen() {
   const navigation = useNavigation();
+  const route      = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const editId = route.params?.id;
+  const isEdit = !!editId;
 
-  const [judul, setJudul]         = useState('');
-  const [deskripsi, setDeskripsi] = useState('');
-  const [prioritas, setPrioritas] = useState<TugasPrioritas>('sedang');
-  const [status, setStatus]       = useState<TugasStatus>('belum');
-  const [tglMulai, setTglMulai]   = useState('');
+  const [judul, setJudul]           = useState('');
+  const [deskripsi, setDeskripsi]   = useState('');
+  const [prioritas, setPrioritas]   = useState<TugasPrioritas>('sedang');
+  const [status, setStatus]         = useState<TugasStatus>('belum');
+  const [tglMulai, setTglMulai]     = useState('');
   const [tglSelesai, setTglSelesai] = useState('');
-
-  const [assignee, setAssignee] = useState<KaryawanRingkas | null>(null);
-  const [tags, setTags]         = useState<KaryawanRingkas[]>([]);
-
+  const [assignee, setAssignee]     = useState<KaryawanRingkas | null>(null);
+  const [tags, setTags]             = useState<KaryawanRingkas[]>([]);
   const [assigneePickerOpen, setAssigneePickerOpen] = useState(false);
   const [tagPickerOpen,      setTagPickerOpen]      = useState(false);
+  const [initialized, setInitialized] = useState(false);
+
+  const { data: existingData } = useQuery({
+    queryKey: ['tugas', editId],
+    queryFn:  () => tugasApi.detail(editId!),
+    enabled:  isEdit,
+  });
+
+  useEffect(() => {
+    if (!isEdit || !existingData || initialized) return;
+    const t = existingData.data;
+    setJudul(t.judul ?? '');
+    setDeskripsi(t.deskripsi ?? '');
+    setPrioritas(t.prioritas ?? 'sedang');
+    setStatus(t.status ?? 'belum');
+    setTglMulai(t.tanggal_mulai ?? '');
+    setTglSelesai(t.tanggal_selesai ?? '');
+    if (t.karyawan) {
+      setAssignee({ id: t.karyawan.id, nama: t.karyawan.nama_lengkap, jabatan: t.karyawan.jabatan ?? null, foto: t.karyawan.foto ?? null });
+    }
+    setInitialized(true);
+  }, [existingData, initialized, isEdit]);
 
   const createMutation = useMutation({
     mutationFn: () => tugasApi.create({
@@ -67,26 +91,36 @@ export default function CreateTaskScreen() {
       toast.success('Task berhasil dibuat.');
       navigation.goBack();
     },
-    onError: (e: any) => {
-      const msg = e.response?.data?.message ?? 'Gagal buat task.';
-      Alert.alert('Error', msg);
-    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal buat task.'),
   });
 
+  const updateMutation = useMutation({
+    mutationFn: () => tugasApi.update(editId!, {
+      judul, deskripsi: deskripsi || undefined,
+      prioritas, status,
+      tanggal_mulai:   tglMulai   || undefined,
+      tanggal_selesai: tglSelesai || undefined,
+      karyawan_id: assignee?.id,
+      tags: tags.map((t) => t.id),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tugas'] });
+      queryClient.invalidateQueries({ queryKey: ['tugas', editId] });
+      queryClient.invalidateQueries({ queryKey: ['tugas-stats'] });
+      toast.success('Task berhasil diperbarui.');
+      navigation.goBack();
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal update task.'),
+  });
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
   const handleSubmit = () => {
-    if (!judul.trim()) {
-      Alert.alert('Error', 'Judul wajib diisi.');
-      return;
-    }
-    if (tglMulai && !isValidDate(tglMulai)) {
-      Alert.alert('Error', 'Format tanggal mulai salah. Pakai YYYY-MM-DD (contoh 2026-05-15).');
-      return;
-    }
-    if (tglSelesai && !isValidDate(tglSelesai)) {
-      Alert.alert('Error', 'Format tanggal selesai salah. Pakai YYYY-MM-DD.');
-      return;
-    }
-    createMutation.mutate();
+    if (!judul.trim()) { Alert.alert('Error', 'Judul wajib diisi.'); return; }
+    if (tglMulai   && !isValidDate(tglMulai))   { Alert.alert('Error', 'Format tanggal mulai salah.'); return; }
+    if (tglSelesai && !isValidDate(tglSelesai)) { Alert.alert('Error', 'Format tanggal selesai salah.'); return; }
+    if (isEdit) updateMutation.mutate();
+    else        createMutation.mutate();
   };
 
   const toggleTag = (k: KaryawanRingkas) => {
@@ -100,16 +134,11 @@ export default function CreateTaskScreen() {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.topTitle}>Task Baru</Text>
-          <SaveButton
-            onPress={handleSubmit}
-            loading={createMutation.isPending}
-            disabled={!judul.trim()}
-          />
+          <Text style={styles.topTitle}>{isEdit ? 'Edit Task' : 'Task Baru'}</Text>
+          <SaveButton onPress={handleSubmit} loading={isPending} disabled={!judul.trim()} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll}>
-          {/* Judul */}
           <Field label="Judul *">
             <TextInput
               style={styles.input}
@@ -121,7 +150,6 @@ export default function CreateTaskScreen() {
             />
           </Field>
 
-          {/* Deskripsi */}
           <Field label="Deskripsi (opsional)">
             <TextInput
               style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
@@ -134,7 +162,6 @@ export default function CreateTaskScreen() {
             />
           </Field>
 
-          {/* Prioritas */}
           <Field label="Prioritas">
             <View style={styles.chipRow}>
               {PRIORITAS_OPTIONS.map((opt) => (
@@ -144,15 +171,12 @@ export default function CreateTaskScreen() {
                   style={[styles.chip, prioritas === opt.key && { backgroundColor: opt.color + '30', borderColor: opt.color }]}
                 >
                   <View style={[styles.chipDot, { backgroundColor: opt.color }]} />
-                  <Text style={[styles.chipText, prioritas === opt.key && { color: opt.color, fontWeight: '600' }]}>
-                    {opt.label}
-                  </Text>
+                  <Text style={[styles.chipText, prioritas === opt.key && { color: opt.color, fontWeight: '600' }]}>{opt.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </Field>
 
-          {/* Status */}
           <Field label="Status">
             <View style={styles.chipRow}>
               {STATUS_OPTIONS.map((opt) => (
@@ -167,8 +191,7 @@ export default function CreateTaskScreen() {
             </View>
           </Field>
 
-          {/* Assignee */}
-          <Field label="Ditugaskan ke (opsional, default diri sendiri)">
+          <Field label="Ditugaskan ke (opsional)">
             <TouchableOpacity onPress={() => setAssigneePickerOpen(true)} style={styles.pickerBtn}>
               {assignee ? (
                 <>
@@ -196,7 +219,6 @@ export default function CreateTaskScreen() {
             </TouchableOpacity>
           </Field>
 
-          {/* Tanggal */}
           <View style={styles.dateRow}>
             <View style={{ flex: 1 }}>
               <Field label="Tgl Mulai">
@@ -210,7 +232,6 @@ export default function CreateTaskScreen() {
             </View>
           </View>
 
-          {/* Tag karyawan */}
           <Field label="Tag Karyawan (opsional)">
             <TouchableOpacity onPress={() => setTagPickerOpen(true)} style={styles.pickerBtn}>
               <Ionicons name="people-outline" size={18} color="#3b82f6" />
@@ -218,7 +239,6 @@ export default function CreateTaskScreen() {
                 {tags.length === 0 ? 'Tag karyawan' : `${tags.length} dipilih · tap untuk ubah`}
               </Text>
             </TouchableOpacity>
-
             {tags.length > 0 && (
               <View style={styles.tagChips}>
                 {tags.map((t) => (
@@ -280,52 +300,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingBottom: 12, gap: 12,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backBtn: { padding: 4 },
+  backBtn:  { padding: 4 },
   topTitle: { color: '#fff', fontSize: 16, fontWeight: '600', flex: 1 },
-  postBtn: { backgroundColor: '#3b82f6', paddingHorizontal: 18, paddingVertical: 8, borderRadius: 8 },
-  postBtnDisabled: { opacity: 0.5 },
-  postBtnText: { color: '#fff', fontWeight: '600' },
-  scroll: { padding: 16 },
-  field: { marginBottom: 16 },
-  label: { color: '#8a94a6', fontSize: 12, marginBottom: 6, fontWeight: '600' },
-  input: {
+  scroll:   { padding: 16 },
+  field:    { marginBottom: 16 },
+  label:    { color: '#8a94a6', fontSize: 12, marginBottom: 6, fontWeight: '600' },
+  input:    {
     backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff',
     borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
     fontSize: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
-  chipRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  chip: {
+  chipRow:  { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  chip:     {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
   },
-  chipActive: { backgroundColor: 'rgba(59,130,246,0.20)', borderColor: '#3b82f6' },
-  chipDot: { width: 8, height: 8, borderRadius: 4 },
-  chipText: { color: '#8a94a6', fontSize: 13 },
+  chipActive:     { backgroundColor: 'rgba(59,130,246,0.20)', borderColor: '#3b82f6' },
+  chipDot:        { width: 8, height: 8, borderRadius: 4 },
+  chipText:       { color: '#8a94a6', fontSize: 13 },
   chipTextActive: { color: '#3b82f6', fontWeight: '600' },
-  pickerBtn: {
+  pickerBtn:      {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
   },
   pickerPlaceholder: { color: '#8a94a6', fontSize: 14, flex: 1 },
-  pickerValue: { color: '#fff', fontSize: 14, fontWeight: '500' },
-  pickerSub:   { color: '#8a94a6', fontSize: 11, marginTop: 2 },
-  assigneeAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#1c2333' },
-  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  avatarTextSmall: { color: '#fff', fontWeight: '700', fontSize: 10 },
-  dateRow: { flexDirection: 'row', gap: 12 },
-  tagChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  tagChip: {
+  pickerValue:       { color: '#fff', fontSize: 14, fontWeight: '500' },
+  pickerSub:         { color: '#8a94a6', fontSize: 11, marginTop: 2 },
+  assigneeAvatar:    { width: 32, height: 32, borderRadius: 16, backgroundColor: '#1c2333' },
+  avatarFallback:    { alignItems: 'center', justifyContent: 'center' },
+  avatarText:        { color: '#fff', fontWeight: '700', fontSize: 14 },
+  avatarTextSmall:   { color: '#fff', fontWeight: '700', fontSize: 10 },
+  dateRow:           { flexDirection: 'row', gap: 12 },
+  tagChips:          { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  tagChip:           {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: 'rgba(59,130,246,0.12)',
     borderWidth: 1, borderColor: 'rgba(59,130,246,0.30)',
-    borderRadius: 16, paddingLeft: 4, paddingRight: 8, paddingVertical: 4,
-    maxWidth: 200,
+    borderRadius: 16, paddingLeft: 4, paddingRight: 8, paddingVertical: 4, maxWidth: 200,
   },
   tagAvatar: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#1c2333' },
-  tagText: { color: '#3b82f6', fontSize: 12, fontWeight: '500', flexShrink: 1 },
+  tagText:   { color: '#3b82f6', fontSize: 12, fontWeight: '500', flexShrink: 1 },
 });

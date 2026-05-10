@@ -14,7 +14,12 @@ type MenuItem = {
   color: string;
   screen?: string;
   disabled?: boolean;
+  /** Kalau ada, item hanya tampil saat predicate return true */
+  visibleFor?: (user: { role?: string; departemen?: string | null } | null) => boolean;
 };
+
+const isKeuangan = (u: { role?: string; departemen?: string | null } | null) =>
+  u?.role === 'admin' || (u?.departemen ?? '').toLowerCase() === 'keuangan';
 
 const MENU_ITEMS: MenuItem[] = [
   { icon: 'home-outline',          label: 'Beranda',     color: '#3b82f6', screen: 'Beranda' },
@@ -23,12 +28,13 @@ const MENU_ITEMS: MenuItem[] = [
   { icon: 'trending-up-outline',   label: 'Performance', color: '#22c55e', screen: 'Performance' },
   { icon: 'document-text-outline', label: 'Dokumen',     color: '#06b6d4', screen: 'Dokumen' },
   { icon: 'pulse-outline',         label: 'Aktivitas',   color: '#ec4899', screen: 'Aktivitas' },
-  { icon: 'receipt-outline',       label: 'Invoice',     color: '#f97316', screen: 'Invoice' },
+  { icon: 'receipt-outline',       label: 'Invoice',     color: '#f97316', screen: 'Invoice', visibleFor: isKeuangan },
 ];
 
 export default function MenuScreen() {
   const navigation = useNavigation<any>();
   const { user, logout } = useAuth();
+  const visibleMenu = MENU_ITEMS.filter((m) => !m.visibleFor || m.visibleFor(user));
 
   const renderMenu = (item: MenuItem) => (
     <TouchableOpacity
@@ -71,7 +77,7 @@ export default function MenuScreen() {
 
         {/* Grid menu */}
         <View style={styles.grid}>
-          {MENU_ITEMS.map(renderMenu)}
+          {visibleMenu.map(renderMenu)}
         </View>
 
         {/* Logout */}

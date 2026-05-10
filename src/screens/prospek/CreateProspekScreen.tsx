@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { prospekApi, type ProspekStatus } from '../../api/prospek';
 import DatePickerInput from '../../components/DatePickerInput';
@@ -26,10 +26,15 @@ function isValidDate(s: string): boolean {
   return !Number.isNaN(new Date(s).getTime());
 }
 
+type RouteParams = { id?: number };
+
 export default function CreateProspekScreen() {
   const navigation = useNavigation();
+  const route      = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const editId = route.params?.id;
+  const isEdit = !!editId;
 
   const [namaKlien,    setNamaKlien]    = useState('');
   const [alamat,       setAlamat]       = useState('');
@@ -40,6 +45,28 @@ export default function CreateProspekScreen() {
   const [status,       setStatus]       = useState<ProspekStatus>('prospek');
   const [tglPertama,   setTglPertama]   = useState('');
   const [tglBerikutnya, setTglBerikutnya] = useState('');
+  const [initialized,  setInitialized]  = useState(false);
+
+  const { data: existingData } = useQuery({
+    queryKey: ['prospek', editId],
+    queryFn:  () => prospekApi.detail(editId!),
+    enabled:  isEdit,
+  });
+
+  useEffect(() => {
+    if (!isEdit || !existingData || initialized) return;
+    const p = existingData.data;
+    setNamaKlien(p.nama_klien ?? '');
+    setAlamat(p.alamat ?? '');
+    setKota(p.kota ?? '');
+    setKontakNama(p.kontak_nama ?? '');
+    setKontakEmail(p.kontak_email ?? '');
+    setKontakHp(p.kontak_hp ?? '');
+    setStatus(p.status ?? 'prospek');
+    setTglPertama(p.tanggal_pertemuan_pertama ?? '');
+    setTglBerikutnya(p.tanggal_pertemuan_berikutnya ?? '');
+    setInitialized(true);
+  }, [existingData, initialized, isEdit]);
 
   const createMutation = useMutation({
     mutationFn: () => prospekApi.create({
@@ -64,11 +91,37 @@ export default function CreateProspekScreen() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: () => prospekApi.update(editId!, {
+      nama_klien:   namaKlien,
+      alamat:       alamat       || undefined,
+      kota:         kota         || undefined,
+      kontak_nama:  kontakNama   || undefined,
+      kontak_email: kontakEmail  || undefined,
+      kontak_hp:    kontakHp     || undefined,
+      status,
+      tanggal_pertemuan_pertama:    tglPertama   || undefined,
+      tanggal_pertemuan_berikutnya: tglBerikutnya || undefined,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['prospek'] });
+      queryClient.invalidateQueries({ queryKey: ['prospek', editId] });
+      toast.success('Prospek berhasil diperbarui.');
+      navigation.goBack();
+    },
+    onError: (e: any) => {
+      Alert.alert('Error', e.response?.data?.message ?? 'Gagal update prospek.');
+    },
+  });
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
   const handleSubmit = () => {
     if (!namaKlien.trim()) { Alert.alert('Error', 'Nama klien wajib diisi.'); return; }
-    if (tglPertama && !isValidDate(tglPertama))     { Alert.alert('Error', 'Format tanggal pertama salah. Pakai YYYY-MM-DD.'); return; }
-    if (tglBerikutnya && !isValidDate(tglBerikutnya)) { Alert.alert('Error', 'Format tanggal berikutnya salah. Pakai YYYY-MM-DD.'); return; }
-    createMutation.mutate();
+    if (tglPertama && !isValidDate(tglPertama))     { Alert.alert('Error', 'Format tanggal pertama salah.'); return; }
+    if (tglBerikutnya && !isValidDate(tglBerikutnya)) { Alert.alert('Error', 'Format tanggal berikutnya salah.'); return; }
+    if (isEdit) updateMutation.mutate();
+    else        createMutation.mutate();
   };
 
   return (
@@ -78,10 +131,10 @@ export default function CreateProspekScreen() {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.topTitle}>Prospek Baru</Text>
+          <Text style={styles.topTitle}>{isEdit ? 'Edit Prospek' : 'Prospek Baru'}</Text>
           <SaveButton
             onPress={handleSubmit}
-            loading={createMutation.isPending}
+            loading={isPending}
             disabled={!namaKlien.trim()}
           />
         </View>

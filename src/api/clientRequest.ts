@@ -101,6 +101,11 @@ export const requestApi = {
     return data;
   },
 
+  update: async (id: number, payload: Partial<CreateRequestPayload>): Promise<{ data: ClientRequest }> => {
+    const { data } = await apiClient.patch(`/request/${id}`, payload);
+    return data;
+  },
+
   destroy: async (id: number) => {
     const { data } = await apiClient.delete(`/request/${id}`);
     return data;
