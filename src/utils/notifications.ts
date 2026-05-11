@@ -112,7 +112,11 @@ export async function getNativePushToken(): Promise<string | null> {
 
 /**
  * Register device token ke backend Laravel.
- * Dipanggil setelah user login sukses.
+ * Dipanggil setelah user login sukses + saat app start.
+ *
+ * SELALU hit API (updateOrCreate di backend, idempotent) — supaya:
+ *  - Cache stale tidak block register saat backend kehilangan row (cleanup, switch env)
+ *  - last_seen ter-update tiap session → bisa cleanup token lama
  */
 export async function registerDeviceWithBackend(): Promise<void> {
   console.warn('[Push] registerDeviceWithBackend start');
@@ -122,12 +126,6 @@ export async function registerDeviceWithBackend(): Promise<void> {
   console.warn('[Push] token result:', token ? token.substring(0, 30) + '...' : 'NULL');
   if (!token) {
     console.warn('[Push] Token null — skip register');
-    return;
-  }
-
-  const cached = await SecureStore.getItemAsync(STORAGE_KEY_DEVICE_TOKEN);
-  if (cached === token) {
-    console.warn('[Push] Token sudah cached, skip API call');
     return;
   }
 
