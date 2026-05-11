@@ -11,6 +11,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { kalenderApi, type Kegiatan } from '../../api/kalender';
+import { syncReminders } from '../../utils/calendarReminders';
 import KegiatanCard from './components/KegiatanCard';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -84,6 +85,14 @@ export default function KalenderScreen() {
   });
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
+
+  // Sync local reminders setiap kali list event di-load — async, tidak block UI.
+  // Reminder akan fire walau app ditutup, karena dijadwalkan di OS notification scheduler.
+  React.useEffect(() => {
+    const events = data?.data ?? [];
+    if (events.length === 0) return;
+    syncReminders(events).catch((e) => console.warn('syncReminders failed', e));
+  }, [data]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

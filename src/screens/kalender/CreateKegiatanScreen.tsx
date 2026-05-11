@@ -15,6 +15,7 @@ import {
 import KaryawanPicker from '../../components/KaryawanPicker';
 import DatePickerInput from '../../components/DatePickerInput';
 import SaveButton from '../../components/SaveButton';
+import { REMINDER_PRESETS, formatOffset } from '../../utils/calendarReminders';
 import type { KaryawanRingkas } from '../../api/feed';
 
 type RouteParams = { id?: number };
@@ -71,6 +72,7 @@ export default function CreateKegiatanScreen() {
   const [visibilitas, setVisibilitas] = useState<Visibilitas>('tim');
   const [peserta, setPeserta]       = useState<KalenderKaryawanRingkas[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [reminderOffset, setReminderOffset] = useState<number | null>(15);
 
   // Load existing kegiatan saat edit
   const { data: existing } = useQuery({
@@ -95,6 +97,7 @@ export default function CreateKegiatanScreen() {
         id: p.karyawan_id, nama: p.nama, jabatan: null, foto: p.foto,
       })));
     }
+    setReminderOffset(k.reminder_offset_minutes);
   }, [existing]);
 
   const saveMut = useMutation({
@@ -128,6 +131,7 @@ export default function CreateKegiatanScreen() {
       seharian,
       kategori,
       visibilitas,
+      reminder_offset_minutes: reminderOffset,
       peserta:     peserta.map(p => p.id),
     });
   };
@@ -248,6 +252,35 @@ export default function CreateKegiatanScreen() {
               </TouchableOpacity>
             ))}
           </View>
+
+          <Text style={styles.label}>
+            <Ionicons name="notifications-outline" size={13} color="#8a94a6" /> Reminder
+          </Text>
+          <View style={styles.chipRow}>
+            {REMINDER_PRESETS.map((opt) => {
+              const active = reminderOffset === opt.value;
+              return (
+                <TouchableOpacity
+                  key={String(opt.value)}
+                  onPress={() => setReminderOffset(opt.value)}
+                  style={[
+                    styles.chip,
+                    active && { backgroundColor: 'rgba(245,158,11,0.20)', borderColor: '#f59e0b' },
+                  ]}
+                >
+                  <Text style={[
+                    styles.chipText,
+                    active && { color: '#f59e0b', fontWeight: '700' },
+                  ]}>{opt.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {reminderOffset !== null && (
+            <Text style={{ color: '#8a94a6', fontSize: 11, marginTop: 4, marginLeft: 2 }}>
+              Notifikasi akan muncul {formatOffset(reminderOffset)} sebelum jadwal mulai.
+            </Text>
+          )}
 
           <Text style={styles.label}>Peserta</Text>
           <TouchableOpacity style={styles.input} onPress={() => setPickerOpen(true)}>

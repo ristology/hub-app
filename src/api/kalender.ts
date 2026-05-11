@@ -25,6 +25,8 @@ export type Kegiatan = {
   kategori: KategoriKegiatan;
   visibilitas: Visibilitas;
   warna: string;
+  /** Reminder X menit sebelum mulai_at. null = tidak ada reminder */
+  reminder_offset_minutes: number | null;
   tugas_id: number | null;
   readonly: boolean;
   milikku: boolean;
@@ -57,6 +59,7 @@ export type CreateKegiatanPayload = {
   kategori: KategoriKegiatan;
   visibilitas: Visibilitas;
   warna?: string;
+  reminder_offset_minutes?: number | null;
   peserta?: number[];      // karyawan ids
 };
 
