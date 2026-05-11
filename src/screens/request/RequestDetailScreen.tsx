@@ -14,7 +14,8 @@ import {
   requestApi, type RequestKomentar, type PicRingkas,
 } from '../../api/clientRequest';
 import { notifApi, NotifModel } from '../../api/notif';
-import PhotoCarousel  from '../../components/PhotoCarousel';
+import PhotoCarousel    from '../../components/PhotoCarousel';
+import ImageViewerModal from '../../components/ImageViewerModal';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
 import { useKomentarHighlight } from '../../hooks/useKomentarHighlight';
@@ -84,6 +85,7 @@ export default function RequestDetailScreen() {
   const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady, scrollToKomentar } = useKomentarHighlight(highlightKomentarId);
 
   const [komentar, setKomentar] = useState('');
+  const [photoViewerUri, setPhotoViewerUri] = useState<string | null>(null);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
   const [replyTo,     setReplyTo]     = useState<{ id: number; nama: string } | null>(null);
@@ -228,7 +230,11 @@ export default function RequestDetailScreen() {
           {/* Lampiran gambar */}
           {r.gambar_urls && r.gambar_urls.length > 0 && (
             <View style={{ marginTop: 14 }}>
-              <PhotoCarousel fotos={r.gambar_urls} height={250} />
+              <PhotoCarousel
+                fotos={r.gambar_urls}
+                height={250}
+                onPressPhoto={(uri) => setPhotoViewerUri(uri)}
+              />
             </View>
           )}
 
@@ -441,6 +447,11 @@ export default function RequestDetailScreen() {
         canMarkProses={r.status === 'diterima'}
         onSubmit={(payload) => responMut.mutate(payload)}
         loading={responMut.isPending}
+      />
+
+      <ImageViewerModal
+        uri={photoViewerUri}
+        onClose={() => setPhotoViewerUri(null)}
       />
     </SafeAreaView>
   );
