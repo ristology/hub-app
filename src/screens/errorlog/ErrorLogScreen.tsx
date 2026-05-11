@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
   list:  { padding: 16, paddingTop: 4 },
   empty: { color: '#8a94a6', fontSize: 14, textAlign: 'center' },
   fab: {
-    position: 'absolute', right: 20, bottom: 110,
+    position: 'absolute', right: 20, bottom: Platform.OS === 'android' ? 140 : 110,
     width: 56, height: 56, borderRadius: 28,
     backgroundColor: '#3b82f6',
     alignItems: 'center', justifyContent: 'center',

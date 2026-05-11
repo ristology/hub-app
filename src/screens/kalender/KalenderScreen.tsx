@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
   },
 
   fab: {
-    position: 'absolute', right: 20, bottom: 110,
+    position: 'absolute', right: 20, bottom: Platform.OS === 'android' ? 140 : 110,
     width: 56, height: 56, borderRadius: 28,
     backgroundColor: '#3b82f6',
     alignItems: 'center', justifyContent: 'center',

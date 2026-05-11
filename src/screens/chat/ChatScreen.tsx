@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
-  TouchableOpacity, Image,
+  TouchableOpacity, Image, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   unreadText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   empty:     { color: '#8a94a6', fontSize: 14, textAlign: 'center' },
   fab: {
-    position: 'absolute', right: 20, bottom: 110,
+    position: 'absolute', right: 20, bottom: Platform.OS === 'android' ? 140 : 110,
     width: 56, height: 56, borderRadius: 28,
     backgroundColor: '#3b82f6',
     alignItems: 'center', justifyContent: 'center',

@@ -63,7 +63,14 @@ export default function PickerSheet({
     : Math.floor(screenH * 0.8);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+      hardwareAccelerated
+      onRequestClose={onClose}
+    >
       <View style={styles.backdrop}>
         <TouchableOpacity activeOpacity={1} style={{ flex: 1 }} onPress={onClose} />
         <View style={[styles.sheet, { marginBottom: sheetMarginBottom, maxHeight }]} onStartShouldSetResponder={() => true}>
