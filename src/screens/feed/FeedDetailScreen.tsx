@@ -10,7 +10,9 @@ import { useRoute, useNavigation, type RouteProp } from '@react-navigation/nativ
 import { feedApi, type FeedKomentar, type KaryawanRingkas } from '../../api/feed';
 import { notifApi, NotifModel } from '../../api/notif';
 import { useAuth } from '../../store/auth';
-import PhotoCarousel  from '../../components/PhotoCarousel';
+import PhotoCarousel     from '../../components/PhotoCarousel';
+import VideoThumbnail    from '../../components/VideoThumbnail';
+import VideoPlayerModal  from '../../components/VideoPlayerModal';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
 import { useKomentarHighlight } from '../../hooks/useKomentarHighlight';
@@ -41,6 +43,7 @@ export default function FeedDetailScreen() {
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
   const [replyTo,     setReplyTo]     = useState<{ id: number; nama: string } | null>(null);
+  const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);
 
   const handleKomentarChange = (next: string) => {
     if (next.length > komentar.length) {
@@ -178,6 +181,17 @@ export default function FeedDetailScreen() {
             </View>
           )}
 
+          {feed.video_thumbnail_url && feed.video_url && (
+            <View style={{ marginBottom: 12 }}>
+              <VideoThumbnail
+                thumbnailUri={feed.video_thumbnail_url}
+                durationSec={feed.video_duration_sec}
+                onPress={() => setVideoPlayerUri(feed.video_url)}
+                height={320}
+              />
+            </View>
+          )}
+
           {feed.lokasi && (
             <View style={styles.lokasiBox}>
               <Ionicons name="location" size={14} color="#3b82f6" />
@@ -273,6 +287,12 @@ export default function FeedDetailScreen() {
         mode="single"
         onPick={insertMention}
         title="Mention Karyawan"
+      />
+
+      <VideoPlayerModal
+        visible={!!videoPlayerUri}
+        videoUri={videoPlayerUri}
+        onClose={() => setVideoPlayerUri(null)}
       />
     </SafeAreaView>
   );

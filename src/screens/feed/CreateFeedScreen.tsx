@@ -11,8 +11,10 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location    from 'expo-location';
 import { feedApi, type Kategori, type KaryawanRingkas } from '../../api/feed';
 import KaryawanPicker from '../../components/KaryawanPicker';
+import VideoThumbnail from '../../components/VideoThumbnail';
 import { useToast } from '../../components/Toast';
 import SaveButton from '../../components/SaveButton';
+import { pickAndCompressVideo, type PickedVideo, formatDuration } from '../../utils/videoPicker';
 
 const MAX_PHOTOS = 6;
 type NewFoto     = { uri: string; name: string; type: string };
@@ -41,6 +43,14 @@ export default function CreateFeedScreen() {
   const [mentionAt, setMentionAt]         = useState<number | null>(null);
   const [initialized, setInitialized]     = useState(false);
 
+  // Video state — max 1 video per feed
+  const [newVideo, setNewVideo]                 = useState<PickedVideo | null>(null);
+  const [videoCompressing, setVideoCompressing] = useState(false);
+  const [existingVideoUrl, setExistingVideoUrl]       = useState<string | null>(null);
+  const [existingVideoThumbnailUrl, setExistingVideoThumbnailUrl] = useState<string | null>(null);
+  const [existingVideoDuration, setExistingVideoDuration]         = useState<number | null>(null);
+  const [removeExistingVideo, setRemoveExistingVideo] = useState(false);
+
   const { data: kategoriData } = useQuery({
     queryKey: ['feed-kategori'],
     queryFn:  feedApi.kategori,
@@ -64,6 +74,9 @@ export default function CreateFeedScreen() {
     const urls = f.foto_urls ?? [];
     const ids  = f.foto_ids  ?? [];
     setExistingFotos(urls.map((url, i) => ({ id: ids[i] ?? 0, url, markedForRemoval: false })));
+    setExistingVideoUrl(f.video_url);
+    setExistingVideoThumbnailUrl(f.video_thumbnail_url);
+    setExistingVideoDuration(f.video_duration_sec);
     setInitialized(true);
   }, [existingData, initialized, isEdit]);
 
@@ -89,6 +102,9 @@ export default function CreateFeedScreen() {
       kategori_kegiatan_id: kategoriId ?? undefined,
       fotos:                newFotos,
       tags:                 tags.length > 0 ? tags.map((t) => t.id) : undefined,
+      video:                newVideo?.video,
+      video_thumbnail:      newVideo?.thumbnail,
+      video_duration_sec:   newVideo?.video.durationSec,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
@@ -108,6 +124,10 @@ export default function CreateFeedScreen() {
       fotos:                newFotos.length > 0 ? newFotos : undefined,
       remove_photo_ids:     existingFotos.filter((p) => p.markedForRemoval).map((p) => p.id),
       tags:                 tags.map((t) => t.id),
+      video:                newVideo?.video,
+      video_thumbnail:      newVideo?.thumbnail,
+      video_duration_sec:   newVideo?.video.durationSec,
+      remove_video:         removeExistingVideo && !newVideo,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
@@ -157,6 +177,25 @@ export default function CreateFeedScreen() {
   };
 
   const removeNewFoto = (index: number) => setNewFotos((prev) => prev.filter((_, i) => i !== index));
+
+  // Video picker (max 1 video). Saat user pilih video baru, video existing
+  // (kalau ada) akan otomatis di-replace di backend.
+  const pickVideoFromGallery = async () => {
+    setVideoCompressing(true);
+    try {
+      const picked = await pickAndCompressVideo('gallery');
+      if (picked) setNewVideo(picked);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Gagal proses video.');
+    } finally {
+      setVideoCompressing(false);
+    }
+  };
+
+  const removeNewVideo = () => setNewVideo(null);
+  const toggleExistingVideoRemoval = () => setRemoveExistingVideo((v) => !v);
+
+  const hasActiveVideo = !!newVideo || (!!existingVideoUrl && !removeExistingVideo);
 
   const captureLocation = async () => {
     setGpsLoading(true);
@@ -280,8 +319,64 @@ export default function CreateFeedScreen() {
               <Ionicons name="camera-outline" size={20} color="#3b82f6" />
               <Text style={styles.mediaText}>Kamera</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              onPress={pickVideoFromGallery}
+              style={styles.mediaBtn}
+              disabled={videoCompressing || hasActiveVideo}
+            >
+              {videoCompressing
+                ? <ActivityIndicator size="small" color="#a855f7" />
+                : <Ionicons name="videocam-outline" size={20} color={hasActiveVideo ? '#6b7280' : '#a855f7'} />}
+              <Text style={[styles.mediaText, { color: hasActiveVideo ? '#6b7280' : '#a855f7' }]}>
+                {videoCompressing ? 'Kompresi...' : 'Video'}
+              </Text>
+            </TouchableOpacity>
             <Text style={styles.fotoCount}>{totalPhotos}/{MAX_PHOTOS}</Text>
           </View>
+
+          {/* Video preview — new video punya prioritas; kalau gak ada, tampilkan existing */}
+          {newVideo && (
+            <View style={styles.videoPreviewWrap}>
+              <Image source={{ uri: newVideo.thumbnail.uri }} style={styles.videoPreview} />
+              <View style={styles.videoOverlay}>
+                <Ionicons name="play-circle" size={48} color="rgba(255,255,255,0.9)" />
+              </View>
+              <View style={styles.videoDurationBadge}>
+                <Ionicons name="videocam" size={11} color="#fff" />
+                <Text style={styles.videoDurationText}>{formatDuration(newVideo.video.durationSec)}</Text>
+              </View>
+              <TouchableOpacity onPress={removeNewVideo} style={styles.videoRemoveBtn}>
+                <Ionicons name="close-circle" size={26} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+          )}
+          {!newVideo && existingVideoUrl && existingVideoThumbnailUrl && (
+            <TouchableOpacity onPress={toggleExistingVideoRemoval} activeOpacity={0.85} style={styles.videoPreviewWrap}>
+              <Image
+                source={{ uri: existingVideoThumbnailUrl }}
+                style={[styles.videoPreview, removeExistingVideo && { opacity: 0.35 }]}
+              />
+              {!removeExistingVideo && (
+                <View style={styles.videoOverlay}>
+                  <Ionicons name="play-circle" size={48} color="rgba(255,255,255,0.9)" />
+                </View>
+              )}
+              <View style={styles.videoDurationBadge}>
+                <Ionicons name="videocam" size={11} color="#fff" />
+                <Text style={styles.videoDurationText}>{formatDuration(existingVideoDuration)}</Text>
+              </View>
+              <View style={styles.videoRemoveBtn}>
+                <Ionicons
+                  name={removeExistingVideo ? 'add-circle' : 'close-circle'}
+                  size={26}
+                  color={removeExistingVideo ? '#22c55e' : '#ef4444'}
+                />
+              </View>
+              {removeExistingVideo && (
+                <Text style={styles.videoRemovedHint}>Tap untuk batalkan penghapusan</Text>
+              )}
+            </TouchableOpacity>
+          )}
 
           {/* Lokasi */}
           <View style={styles.field}>
@@ -413,6 +508,28 @@ const styles = StyleSheet.create({
     borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
   mediaBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  videoPreviewWrap: {
+    position: 'relative',
+    width: '100%', height: 220,
+    backgroundColor: '#1c2333',
+    borderRadius: 12, overflow: 'hidden',
+    marginBottom: 16,
+  },
+  videoPreview: { width: '100%', height: '100%' },
+  videoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.20)',
+  },
+  videoDurationBadge: {
+    position: 'absolute', bottom: 8, right: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 3,
+    backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: 4,
+  },
+  videoDurationText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  videoRemoveBtn: { position: 'absolute', top: 6, right: 6, backgroundColor: '#0d1421', borderRadius: 13 },
+  videoRemovedHint: { position: 'absolute', top: 8, left: 8, color: '#fff', fontSize: 11, fontStyle: 'italic', backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   mediaText:  { color: '#3b82f6', fontWeight: '500', fontSize: 13 },
   fotoCount:  { color: '#6b7280', fontSize: 12, marginLeft: 'auto' },
   field:      { marginBottom: 16 },

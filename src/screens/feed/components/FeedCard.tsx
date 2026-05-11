@@ -2,8 +2,9 @@ import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { Feed } from '../../../api/feed';
-import PhotoCarousel from '../../../components/PhotoCarousel';
-import MentionText   from '../../../components/MentionText';
+import PhotoCarousel  from '../../../components/PhotoCarousel';
+import VideoThumbnail from '../../../components/VideoThumbnail';
+import MentionText    from '../../../components/MentionText';
 
 type Props = {
   feed: Feed;
@@ -62,6 +63,18 @@ export default function FeedCard({ feed, onPress, onLike }: Props) {
       {feed.foto_urls?.length > 0 && (
         <View style={styles.photoWrap}>
           <PhotoCarousel fotos={feed.foto_urls} height={PHOTO_HEIGHT * 0.7} />
+        </View>
+      )}
+
+      {/* Video thumbnail — tap card untuk masuk detail (player) */}
+      {feed.video_thumbnail_url && (
+        <View style={styles.photoWrap}>
+          <VideoThumbnail
+            thumbnailUri={feed.video_thumbnail_url}
+            durationSec={feed.video_duration_sec}
+            onPress={onPress}
+            height={Math.round(PHOTO_HEIGHT * 0.6)}
+          />
         </View>
       )}
 

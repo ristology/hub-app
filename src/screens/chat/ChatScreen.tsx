@@ -80,6 +80,8 @@ export default function ChatScreen() {
             {item.last_message
               ? item.last_message.tipe === 'image'
                 ? '🖼️ Foto'
+                : item.last_message.tipe === 'video'
+                ? '🎬 Video'
                 : item.last_message.pesan ?? ''
               : '— Mulai chat —'}
           </Text>

@@ -9,6 +9,9 @@ export type Feed = {
   kategori: string | null;
   foto_urls: string[];
   foto_ids: number[];
+  video_url: string | null;
+  video_thumbnail_url: string | null;
+  video_duration_sec: number | null;
   karyawan: {
     id: number;
     user_id: number | null;
@@ -34,6 +37,10 @@ export type UpdateFeedPayload = {
   fotos?: { uri: string; name: string; type: string }[];
   remove_photo_ids?: number[];
   tags?: number[];
+  video?:              { uri: string; name: string; type: string };
+  video_thumbnail?:    { uri: string; name: string; type: string };
+  video_duration_sec?: number;
+  remove_video?:       boolean;
 };
 
 export type FeedKomentar = {
@@ -61,6 +68,9 @@ export type CreateFeedPayload = {
   kategori_kegiatan_id?: number;
   fotos?: { uri: string; name: string; type: string }[];
   tags?: number[];
+  video?:              { uri: string; name: string; type: string };
+  video_thumbnail?:    { uri: string; name: string; type: string };
+  video_duration_sec?: number;
 };
 
 export type KaryawanRingkas = {
@@ -112,6 +122,12 @@ export const feedApi = {
       formData.append(`tags[${i}]`, String(id));
     });
 
+    if (payload.video) {
+      formData.append('video', payload.video as any);
+      if (payload.video_thumbnail) formData.append('video_thumbnail', payload.video_thumbnail as any);
+      if (payload.video_duration_sec) formData.append('video_duration_sec', String(payload.video_duration_sec));
+    }
+
     const { data } = await apiClient.post('/feed', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -144,6 +160,13 @@ export const feedApi = {
     payload.tags?.forEach((tid, i) => {
       formData.append(`tags[${i}]`, String(tid));
     });
+
+    if (payload.video) {
+      formData.append('video', payload.video as any);
+      if (payload.video_thumbnail) formData.append('video_thumbnail', payload.video_thumbnail as any);
+      if (payload.video_duration_sec) formData.append('video_duration_sec', String(payload.video_duration_sec));
+    }
+    if (payload.remove_video) formData.append('remove_video', '1');
 
     const { data } = await apiClient.post(`/feed/${id}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

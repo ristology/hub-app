@@ -9,7 +9,7 @@ export type ChatRoom = {
   last_message: {
     id: number;
     pesan: string | null;
-    tipe: 'text' | 'image';
+    tipe: 'text' | 'image' | 'video';
     user_id: number;
     created_at: string;
   } | null;
@@ -21,7 +21,10 @@ export type ChatMessage = {
   user_id: number;
   pesan: string | null;
   foto_url: string | null;
-  tipe: 'text' | 'image';
+  tipe: 'text' | 'image' | 'video';
+  video_url:           string | null;
+  video_thumbnail_url: string | null;
+  video_duration_sec:  number | null;
   dihapus_at: string | null;
   created_at: string;
   user: {
@@ -32,7 +35,7 @@ export type ChatMessage = {
   reply_to?: {
     id: number;
     pesan: string | null;
-    tipe: 'text' | 'image';
+    tipe: 'text' | 'image' | 'video';
     dihapus: boolean;
     user_nama: string;
   } | null;
@@ -63,20 +66,31 @@ export const chatApi = {
     return data;
   },
 
-  /** Send message (text atau dengan foto, optional reply_to) */
+  /** Send message (text, foto, atau video — optional reply_to) */
   send: async (
     roomId: number,
     payload: {
       pesan?: string;
-      foto?: { uri: string; name: string; type: string };
+      foto?:               { uri: string; name: string; type: string };
+      video?:              { uri: string; name: string; type: string };
+      video_thumbnail?:    { uri: string; name: string; type: string };
+      video_duration_sec?: number;
       replyToId?: number;
     },
   ): Promise<{ data: ChatMessage }> => {
-    if (payload.foto) {
+    const hasAttachment = !!(payload.foto || payload.video);
+
+    if (hasAttachment) {
       const formData = new FormData();
       if (payload.pesan)     formData.append('pesan', payload.pesan);
       if (payload.replyToId) formData.append('reply_to_id', String(payload.replyToId));
-      formData.append('foto', payload.foto as any);
+      if (payload.foto)      formData.append('foto', payload.foto as any);
+
+      if (payload.video) {
+        formData.append('video', payload.video as any);
+        if (payload.video_thumbnail)    formData.append('video_thumbnail', payload.video_thumbnail as any);
+        if (payload.video_duration_sec) formData.append('video_duration_sec', String(payload.video_duration_sec));
+      }
 
       const { data } = await apiClient.post(`/chat/rooms/${roomId}/messages`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },

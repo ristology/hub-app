@@ -13,6 +13,7 @@ import { errorLogApi } from '../../api/errorLog';
 import { useToast } from '../../components/Toast';
 import PickerSheet, { type PickerOption } from '../../components/PickerSheet';
 import SaveButton from '../../components/SaveButton';
+import { pickAndCompressVideo, type PickedVideo, formatDuration } from '../../utils/videoPicker';
 
 const MAX_PHOTOS = 6;
 type NewFoto      = { uri: string; name: string; type: string };
@@ -39,6 +40,14 @@ export default function CreateErrorLogScreen() {
   const [kategoriOpen, setKategoriOpen]   = useState(false);
   const [initialized, setInitialized]     = useState(false);
 
+  // Video state — max 1 video per error log
+  const [newVideo, setNewVideo]                 = useState<PickedVideo | null>(null);
+  const [videoCompressing, setVideoCompressing] = useState(false);
+  const [existingVideoUrl, setExistingVideoUrl]       = useState<string | null>(null);
+  const [existingVideoThumbnailUrl, setExistingVideoThumbnailUrl] = useState<string | null>(null);
+  const [existingVideoDuration, setExistingVideoDuration]         = useState<number | null>(null);
+  const [removeExistingVideo, setRemoveExistingVideo] = useState(false);
+
   const { data: klienData }    = useQuery({ queryKey: ['error-log-klien'],    queryFn: errorLogApi.klien });
   const { data: kategoriData } = useQuery({ queryKey: ['error-log-kategori'], queryFn: errorLogApi.kategori });
 
@@ -61,6 +70,9 @@ export default function CreateErrorLogScreen() {
     const urls = log.foto_urls ?? [];
     const ids  = log.foto_ids  ?? [];
     setExistingFotos(urls.map((u, i) => ({ id: ids[i] ?? 0, url: u, markedForRemoval: false })));
+    setExistingVideoUrl(log.video_url);
+    setExistingVideoThumbnailUrl(log.video_thumbnail_url);
+    setExistingVideoDuration(log.video_duration_sec);
     setInitialized(true);
   }, [existingData, initialized, isEdit]);
 
@@ -76,6 +88,9 @@ export default function CreateErrorLogScreen() {
       username: username || undefined,
       password: password || undefined,
       fotos:    newFotos,
+      video:              newVideo?.video,
+      video_thumbnail:    newVideo?.thumbnail,
+      video_duration_sec: newVideo?.video.durationSec,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['error-log'] });
@@ -96,6 +111,10 @@ export default function CreateErrorLogScreen() {
       password:          password || null,
       fotos:             newFotos.length > 0 ? newFotos : undefined,
       remove_photo_ids:  existingFotos.filter((p) => p.markedForRemoval).map((p) => p.id),
+      video:              newVideo?.video,
+      video_thumbnail:    newVideo?.thumbnail,
+      video_duration_sec: newVideo?.video.durationSec,
+      remove_video:       removeExistingVideo && !newVideo,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['error-log'] });
@@ -145,6 +164,23 @@ export default function CreateErrorLogScreen() {
   };
 
   const removeNewFoto = (index: number) => setNewFotos((prev) => prev.filter((_, i) => i !== index));
+
+  // Video — max 1 per laporan error
+  const pickVideoFromGallery = async () => {
+    setVideoCompressing(true);
+    try {
+      const picked = await pickAndCompressVideo('gallery');
+      if (picked) setNewVideo(picked);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Gagal proses video.');
+    } finally {
+      setVideoCompressing(false);
+    }
+  };
+
+  const removeNewVideo = () => setNewVideo(null);
+  const toggleExistingVideoRemoval = () => setRemoveExistingVideo((v) => !v);
+  const hasActiveVideo = !!newVideo || (!!existingVideoUrl && !removeExistingVideo);
 
   const handleSubmit = () => {
     if (!keterangan.trim()) { Alert.alert('Error', 'Keterangan wajib diisi.'); return; }
@@ -246,8 +282,64 @@ export default function CreateErrorLogScreen() {
                 <Ionicons name="camera-outline" size={20} color="#3b82f6" />
                 <Text style={styles.mediaText}>Kamera</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                onPress={pickVideoFromGallery}
+                style={styles.mediaBtn}
+                disabled={videoCompressing || hasActiveVideo}
+              >
+                {videoCompressing
+                  ? <ActivityIndicator size="small" color="#a855f7" />
+                  : <Ionicons name="videocam-outline" size={20} color={hasActiveVideo ? '#6b7280' : '#a855f7'} />}
+                <Text style={[styles.mediaText, { color: hasActiveVideo ? '#6b7280' : '#a855f7' }]}>
+                  {videoCompressing ? 'Kompresi...' : 'Video'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </Field>
+
+          {/* Video preview */}
+          {(newVideo || (existingVideoUrl && existingVideoThumbnailUrl)) && (
+            <Field label="Video">
+              {newVideo ? (
+                <View style={styles.videoPreviewWrap}>
+                  <Image source={{ uri: newVideo.thumbnail.uri }} style={styles.videoPreview} />
+                  <View style={styles.videoOverlay}>
+                    <Ionicons name="play-circle" size={48} color="rgba(255,255,255,0.9)" />
+                  </View>
+                  <View style={styles.videoDurationBadge}>
+                    <Ionicons name="videocam" size={11} color="#fff" />
+                    <Text style={styles.videoDurationText}>{formatDuration(newVideo.video.durationSec)}</Text>
+                  </View>
+                  <TouchableOpacity onPress={removeNewVideo} style={styles.videoRemoveBtn}>
+                    <Ionicons name="close-circle" size={26} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity onPress={toggleExistingVideoRemoval} activeOpacity={0.85} style={styles.videoPreviewWrap}>
+                  <Image
+                    source={{ uri: existingVideoThumbnailUrl! }}
+                    style={[styles.videoPreview, removeExistingVideo && { opacity: 0.35 }]}
+                  />
+                  {!removeExistingVideo && (
+                    <View style={styles.videoOverlay}>
+                      <Ionicons name="play-circle" size={48} color="rgba(255,255,255,0.9)" />
+                    </View>
+                  )}
+                  <View style={styles.videoDurationBadge}>
+                    <Ionicons name="videocam" size={11} color="#fff" />
+                    <Text style={styles.videoDurationText}>{formatDuration(existingVideoDuration)}</Text>
+                  </View>
+                  <View style={styles.videoRemoveBtn}>
+                    <Ionicons
+                      name={removeExistingVideo ? 'add-circle' : 'close-circle'}
+                      size={26}
+                      color={removeExistingVideo ? '#22c55e' : '#ef4444'}
+                    />
+                  </View>
+                </TouchableOpacity>
+              )}
+            </Field>
+          )}
 
           <Field label="URL (opsional)">
             <TextInput
@@ -358,5 +450,25 @@ const styles = StyleSheet.create({
   removeHint: { color: '#8a94a6', fontSize: 11, fontStyle: 'italic', marginBottom: 8 },
   mediaRow:   { flexDirection: 'row', gap: 16, paddingTop: 4 },
   mediaBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  videoPreviewWrap: {
+    position: 'relative',
+    width: '100%', height: 200,
+    backgroundColor: '#1c2333',
+    borderRadius: 10, overflow: 'hidden',
+  },
+  videoPreview: { width: '100%', height: '100%' },
+  videoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.20)',
+  },
+  videoDurationBadge: {
+    position: 'absolute', bottom: 8, right: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 3,
+    backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: 4,
+  },
+  videoDurationText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  videoRemoveBtn: { position: 'absolute', top: 6, right: 6, backgroundColor: '#0d1421', borderRadius: 13 },
   mediaText:  { color: '#3b82f6', fontWeight: '500', fontSize: 13 },
 });

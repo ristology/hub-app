@@ -23,6 +23,9 @@ export type ErrorLog = {
   handler?: { id: number; nama_lengkap: string; foto: string | null } | null;
   foto_urls?: string[];
   foto_ids?: number[];
+  video_url: string | null;
+  video_thumbnail_url: string | null;
+  video_duration_sec: number | null;
   jumlah_komentar?: number;
   created_at: string;
   updated_at: string;
@@ -56,6 +59,9 @@ export type CreateErrorLogPayload = {
   keterangan: string;
   kategori_error_id: number;
   fotos?: { uri: string; name: string; type: string }[];
+  video?:              { uri: string; name: string; type: string };
+  video_thumbnail?:    { uri: string; name: string; type: string };
+  video_duration_sec?: number;
 };
 
 export type UpdateErrorLogPayload = {
@@ -67,6 +73,10 @@ export type UpdateErrorLogPayload = {
   kategori_error_id?: number;
   fotos?: { uri: string; name: string; type: string }[];
   remove_photo_ids?: number[];
+  video?:              { uri: string; name: string; type: string };
+  video_thumbnail?:    { uri: string; name: string; type: string };
+  video_duration_sec?: number;
+  remove_video?:       boolean;
 };
 
 type Paginated<T> = { data: T[]; meta?: { current_page: number; last_page: number; total: number } };
@@ -122,6 +132,12 @@ export const errorLogApi = {
       formData.append(`fotos[${i}]`, foto as any);
     });
 
+    if (payload.video) {
+      formData.append('video', payload.video as any);
+      if (payload.video_thumbnail) formData.append('video_thumbnail', payload.video_thumbnail as any);
+      if (payload.video_duration_sec) formData.append('video_duration_sec', String(payload.video_duration_sec));
+    }
+
     const { data } = await apiClient.post('/error-log', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -146,6 +162,13 @@ export const errorLogApi = {
     payload.remove_photo_ids?.forEach((pid, i) => {
       formData.append(`remove_photo_ids[${i}]`, String(pid));
     });
+
+    if (payload.video) {
+      formData.append('video', payload.video as any);
+      if (payload.video_thumbnail) formData.append('video_thumbnail', payload.video_thumbnail as any);
+      if (payload.video_duration_sec) formData.append('video_duration_sec', String(payload.video_duration_sec));
+    }
+    if (payload.remove_video) formData.append('remove_video', '1');
 
     const { data } = await apiClient.post(`/error-log/${id}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

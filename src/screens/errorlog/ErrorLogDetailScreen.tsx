@@ -11,7 +11,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { errorLogApi, type ErrorLogStatus, type ErrorLogKomentar } from '../../api/errorLog';
 import { notifApi, NotifModel } from '../../api/notif';
-import PhotoCarousel  from '../../components/PhotoCarousel';
+import PhotoCarousel    from '../../components/PhotoCarousel';
+import VideoThumbnail   from '../../components/VideoThumbnail';
+import VideoPlayerModal from '../../components/VideoPlayerModal';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
 import { useKomentarHighlight } from '../../hooks/useKomentarHighlight';
@@ -60,6 +62,7 @@ export default function ErrorLogDetailScreen() {
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
   const [replyTo,     setReplyTo]     = useState<{ id: number; nama: string } | null>(null);
+  const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);
 
   const handleKomentarChange = (next: string) => {
     if (next.length > komentar.length) {
@@ -193,6 +196,18 @@ export default function ErrorLogDetailScreen() {
           {log.foto_urls && log.foto_urls.length > 0 && (
             <View style={{ marginBottom: 12 }}>
               <PhotoCarousel fotos={log.foto_urls} height={250} />
+            </View>
+          )}
+
+          {/* Video */}
+          {log.video_thumbnail_url && log.video_url && (
+            <View style={{ marginBottom: 12 }}>
+              <VideoThumbnail
+                thumbnailUri={log.video_thumbnail_url}
+                durationSec={log.video_duration_sec}
+                onPress={() => setVideoPlayerUri(log.video_url)}
+                height={250}
+              />
             </View>
           )}
 
@@ -357,6 +372,12 @@ export default function ErrorLogDetailScreen() {
         mode="single"
         onPick={insertMention}
         title="Mention Karyawan"
+      />
+
+      <VideoPlayerModal
+        visible={!!videoPlayerUri}
+        videoUri={videoPlayerUri}
+        onClose={() => setVideoPlayerUri(null)}
       />
     </SafeAreaView>
   );

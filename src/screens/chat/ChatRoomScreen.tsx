@@ -12,6 +12,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { chatApi, type ChatMessage } from '../../api/chat';
 import { useAuth } from '../../store/auth';
 import ImageViewerModal from '../../components/ImageViewerModal';
+import VideoPlayerModal from '../../components/VideoPlayerModal';
+import VideoThumbnail   from '../../components/VideoThumbnail';
+import { pickAndCompressVideo, type PickedVideo, formatDuration } from '../../utils/videoPicker';
 
 type RouteParams = { roomId: number; nama: string; foto: string | null };
 
@@ -42,10 +45,13 @@ export default function ChatRoomScreen() {
   const { roomId, nama, foto } = route.params;
   const [pesan, setPesan] = useState('');
   const [pendingImage, setPendingImage] = useState<{ uri: string; name: string; type: string } | null>(null);
+  const [pendingVideo, setPendingVideo] = useState<PickedVideo | null>(null);
+  const [videoCompressing, setVideoCompressing] = useState(false);
   const [caption, setCaption] = useState('');
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [highlightedMsgId, setHighlightedMsgId] = useState<number | null>(null);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
+  const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);
   // Pesan yang gagal kirim — disimpan local, tampil sebagai ghost bubble dgn icon error
   const [failedMessages, setFailedMessages] = useState<{ tempId: string; pesan: string; replyToId?: number }[]>([]);
   const flatListRef = useRef<FlatList>(null);
@@ -70,7 +76,15 @@ export default function ChatRoomScreen() {
   }, [roomId, refetch]));
 
   const sendMutation = useMutation({
-    mutationFn: (payload: { pesan?: string; foto?: any; replyToId?: number; tempId?: string }) =>
+    mutationFn: (payload: {
+      pesan?: string;
+      foto?: any;
+      video?: any;
+      video_thumbnail?: any;
+      video_duration_sec?: number;
+      replyToId?: number;
+      tempId?: string;
+    }) =>
       chatApi.send(roomId, payload).then((r) => ({ ...r, tempId: payload.tempId })),
     onSuccess: (res) => {
       // Hapus dari failed kalau ini retry
@@ -79,6 +93,7 @@ export default function ChatRoomScreen() {
       }
       setPesan('');
       setPendingImage(null);
+      setPendingVideo(null);
       setCaption('');
       setReplyTo(null);
       queryClient.invalidateQueries({ queryKey: ['chat-room', roomId] });
@@ -148,6 +163,38 @@ export default function ChatRoomScreen() {
 
   const cancelPendingImage = () => {
     setPendingImage(null);
+    setCaption('');
+  };
+
+  // Video picker — kompres + thumbnail di videoPicker helper
+  const pickVideo = async () => {
+    setVideoCompressing(true);
+    try {
+      const picked = await pickAndCompressVideo('gallery');
+      if (picked) {
+        setPendingVideo(picked);
+        setCaption('');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Gagal proses video.');
+    } finally {
+      setVideoCompressing(false);
+    }
+  };
+
+  const sendPendingVideo = () => {
+    if (!pendingVideo) return;
+    sendMutation.mutate({
+      pesan: caption.trim() || undefined,
+      video:              pendingVideo.video,
+      video_thumbnail:    pendingVideo.thumbnail,
+      video_duration_sec: pendingVideo.video.durationSec,
+      replyToId:          replyTo?.id,
+    });
+  };
+
+  const cancelPendingVideo = () => {
+    setPendingVideo(null);
     setCaption('');
   };
 
@@ -265,6 +312,17 @@ export default function ChatRoomScreen() {
                   <Image source={{ uri: item.foto_url }} style={styles.bubbleImage} resizeMode="cover" />
                 </TouchableOpacity>
               )}
+              {item.video_thumbnail_url && item.video_url && (
+                <View style={{ width: 220, marginVertical: 2 }}>
+                  <VideoThumbnail
+                    thumbnailUri={item.video_thumbnail_url}
+                    durationSec={item.video_duration_sec}
+                    onPress={() => setVideoPlayerUri(item.video_url)}
+                    height={140}
+                    borderRadius={10}
+                  />
+                </View>
+              )}
               {item.pesan && (
                 <Text style={styles.bubbleText}>{item.pesan}</Text>
               )}
@@ -359,7 +417,9 @@ export default function ChatRoomScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.replyBannerLabel}>Membalas {replyTo.user.nama}</Text>
               <Text style={styles.replyBannerText} numberOfLines={1}>
-                {replyTo.tipe === 'image' && !replyTo.pesan
+                {replyTo.tipe === 'video' && !replyTo.pesan
+                  ? '🎬 Video'
+                  : replyTo.tipe === 'image' && !replyTo.pesan
                   ? '🖼️ Foto'
                   : replyTo.pesan}
               </Text>
@@ -374,6 +434,15 @@ export default function ChatRoomScreen() {
         <View style={styles.inputBar}>
           <TouchableOpacity onPress={pickImage} style={styles.iconBtn} disabled={sendMutation.isPending}>
             <Ionicons name="image-outline" size={22} color="#3b82f6" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={pickVideo}
+            style={styles.iconBtn}
+            disabled={sendMutation.isPending || videoCompressing}
+          >
+            {videoCompressing
+              ? <ActivityIndicator size="small" color="#a855f7" />
+              : <Ionicons name="videocam-outline" size={22} color="#a855f7" />}
           </TouchableOpacity>
           <TextInput
             style={styles.input}
@@ -453,7 +522,86 @@ export default function ChatRoomScreen() {
         </SafeAreaView>
       </Modal>
 
+      {/* Video preview modal — pattern sama dengan image preview */}
+      <Modal
+        visible={!!pendingVideo}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={cancelPendingVideo}
+      >
+        <SafeAreaView style={previewStyles.container} edges={['top']}>
+          <View style={previewStyles.topBar}>
+            <TouchableOpacity onPress={cancelPendingVideo} style={previewStyles.iconBtn}>
+              <Ionicons name="close" size={26} color="#fff" />
+            </TouchableOpacity>
+            <Text style={previewStyles.title}>Kirim Video</Text>
+          </View>
+
+          <View style={previewStyles.imageWrap}>
+            {pendingVideo && (
+              <View style={{ width: '90%', aspectRatio: 16 / 9, position: 'relative' }}>
+                <Image
+                  source={{ uri: pendingVideo.thumbnail.uri }}
+                  style={{ width: '100%', height: '100%', borderRadius: 12 }}
+                  resizeMode="cover"
+                />
+                <View style={{
+                  ...StyleSheet.absoluteFillObject,
+                  alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: 'rgba(0,0,0,0.2)',
+                }}>
+                  <Ionicons name="play-circle" size={64} color="rgba(255,255,255,0.9)" />
+                </View>
+                <View style={{
+                  position: 'absolute', bottom: 8, right: 8,
+                  flexDirection: 'row', alignItems: 'center', gap: 4,
+                  paddingHorizontal: 8, paddingVertical: 3,
+                  backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: 4,
+                }}>
+                  <Ionicons name="videocam" size={12} color="#fff" />
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>
+                    {formatDuration(pendingVideo.video.durationSec)}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+
+          <View style={[previewStyles.inputBar, {
+            paddingBottom: kbHeight > 0
+              ? 8 + (Platform.OS === 'android' ? insets.bottom : 0)
+              : 8 + insets.bottom,
+            marginBottom: kbHeight,
+          }]}>
+            <TextInput
+              style={previewStyles.input}
+              placeholder="Tambah keterangan (opsional)..."
+              placeholderTextColor="#6b7280"
+              value={caption}
+              onChangeText={setCaption}
+              multiline
+              maxLength={5000}
+            />
+            <TouchableOpacity
+              style={previewStyles.sendBtn}
+              onPress={sendPendingVideo}
+              disabled={sendMutation.isPending}
+            >
+              {sendMutation.isPending
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Ionicons name="send" size={20} color="#fff" />
+              }
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
       <ImageViewerModal uri={viewerUri} onClose={() => setViewerUri(null)} />
+      <VideoPlayerModal
+        visible={!!videoPlayerUri}
+        videoUri={videoPlayerUri}
+        onClose={() => setVideoPlayerUri(null)}
+      />
     </SafeAreaView>
   );
 }
