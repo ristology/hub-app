@@ -25,10 +25,15 @@ export default function FeedDetailScreen() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  // Tandai notifikasi terkait feed ini sebagai dibaca → badge berkurang
+  // Tandai notifikasi terkait feed ini sebagai dibaca → badge berkurang.
+  // Invalidate juga ['feed'] supaya list-nya refetch on focus dengan
+  // has_unread_notif=false (red dot kartu hilang).
   useEffect(() => {
     notifApi.markRead(NotifModel.Feed, id)
-      .then(() => queryClient.invalidateQueries({ queryKey: ['notif-count'] }))
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['notif-count'] });
+        queryClient.invalidateQueries({ queryKey: ['feed'] });
+      })
       .catch(() => {});
   }, [id]);
 

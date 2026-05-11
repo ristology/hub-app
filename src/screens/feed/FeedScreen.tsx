@@ -9,7 +9,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { Ionicons } from '@expo/vector-icons';
 import { feedApi, type Feed, type FeedFilters, type KaryawanRingkas } from '../../api/feed';
 import FeedCard from './components/FeedCard';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import KaryawanPicker from '../../components/KaryawanPicker';
@@ -134,6 +134,11 @@ export default function FeedScreen() {
   });
 
   const items = data?.pages.flatMap((p) => p.data) ?? [];
+
+  // Refetch list saat screen come into focus — supaya status unread red dot
+  // auto update setelah user buka detail atau ada notif baru. Pola sama dengan
+  // ProspekScreen, RequestScreen, dst.
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
   const likeMutation = useMutation({
     mutationFn: (id: number) => feedApi.toggleLike(id),
