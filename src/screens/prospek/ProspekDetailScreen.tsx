@@ -323,7 +323,7 @@ export default function ProspekDetailScreen() {
           ))}
           {p.can_edit && (
             <TouchableOpacity style={styles.addPertemuanBtn} onPress={() => setPertemuanOpen(true)}>
-              <Ionicons name="add-circle" size={18} color="#3b82f6" />
+              <Ionicons name="add-circle" size={18} color="#22c55e" />
               <Text style={styles.addPertemuanText}>Tambah catatan pertemuan</Text>
             </TouchableOpacity>
           )}
@@ -572,11 +572,11 @@ const styles = StyleSheet.create({
   pertemuanNext: { color: '#22c55e', fontSize: 11, marginTop: 4 },
   addPertemuanBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: 'rgba(59,130,246,0.10)',
-    borderWidth: 1, borderColor: 'rgba(59,130,246,0.30)', borderStyle: 'dashed',
+    backgroundColor: 'rgba(34,197,94,0.12)',
+    borderWidth: 1, borderColor: 'rgba(34,197,94,0.35)', borderStyle: 'dashed',
     paddingVertical: 12, borderRadius: 10, marginTop: 4,
   },
-  addPertemuanText: { color: '#3b82f6', fontSize: 13, fontWeight: '600' },
+  addPertemuanText: { color: '#22c55e', fontSize: 13, fontWeight: '600' },
 
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: {
