@@ -88,7 +88,17 @@ export default function BottomTabNavigator() {
       <Tab.Screen
         name="Feed"
         component={FeedStack}
-        options={{ tabBarBadge: badge(notif?.feed) }}
+        options={({ route }) => {
+          const focused = getFocusedRouteNameFromRoute(route);
+          return {
+            tabBarBadge: badge(notif?.feed),
+            // Hide tab bar saat di FeedDetail (supaya comment bar tidak tertutup)
+            // & saat di CreateFeed (modal form fullscreen).
+            tabBarStyle: focused === 'FeedDetail' || focused === 'CreateFeed'
+              ? { display: 'none' }
+              : tabBarStyle,
+          };
+        }}
       />
       <Tab.Screen
         name="Prospek"
@@ -110,7 +120,18 @@ export default function BottomTabNavigator() {
             : tabBarStyle,
         })}
       />
-      <Tab.Screen name="Task"     component={TaskStack} />
+      <Tab.Screen
+        name="Task"
+        component={TaskStack}
+        options={({ route }) => {
+          const focused = getFocusedRouteNameFromRoute(route);
+          return {
+            tabBarStyle: focused === 'TaskDetail' || focused === 'CreateTask'
+              ? { display: 'none' }
+              : tabBarStyle,
+          };
+        }}
+      />
       <Tab.Screen
         name="ErrorLog"
         component={ErrorLogStack}
