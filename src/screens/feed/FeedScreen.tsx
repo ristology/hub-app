@@ -13,6 +13,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import KaryawanPicker from '../../components/KaryawanPicker';
+import { useUIVisibility } from '../../store/uiVisibility';
 import PickerSheet, { type PickerOption } from '../../components/PickerSheet';
 import DatePickerInput from '../../components/DatePickerInput';
 
@@ -156,6 +157,30 @@ export default function FeedScreen() {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  // Auto-hide tab bar + FAB saat scroll ke bawah, tampil lagi saat scroll ke atas
+  const lastScrollY  = useRef(0);
+  const uiTranslate  = useUIVisibility((s) => s.translate);
+  const showUI       = useUIVisibility((s) => s.show);
+  const hideUI       = useUIVisibility((s) => s.hide);
+
+  // Pastikan tab bar selalu tampil saat keluar Feed screen
+  useFocusEffect(useCallback(() => {
+    return () => { showUI(); };
+  }, [showUI]));
+
+  const onScroll = useCallback((e: { nativeEvent: { contentOffset: { y: number } } }) => {
+    const y    = e.nativeEvent.contentOffset.y;
+    const diff = y - lastScrollY.current;
+
+    // Threshold 8px supaya scroll kecil/jitter tidak trigger
+    if (diff > 8 && y > 60) {
+      hideUI();
+    } else if (diff < -8) {
+      showUI();
+    }
+    lastScrollY.current = y;
+  }, [hideUI, showUI]);
+
   const renderItem = ({ item }: { item: Feed }) => (
     <FeedCard
       feed={item}
@@ -224,6 +249,8 @@ export default function FeedScreen() {
         contentContainerStyle={styles.list}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -251,13 +278,20 @@ export default function FeedScreen() {
         }
       />
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => navigation.navigate('CreateFeed')}
-        activeOpacity={0.85}
+      <Animated.View
+        style={[
+          styles.fab,
+          { transform: [{ translateY: uiTranslate }] },
+        ]}
       >
-        <Ionicons name="add" size={28} color="#fff" />
-      </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('CreateFeed')}
+          activeOpacity={0.85}
+          style={styles.fabInner}
+        >
+          <Ionicons name="add" size={28} color="#fff" />
+        </TouchableOpacity>
+      </Animated.View>
 
       {/* Filter sheet — animated overlay (not a Modal) so pickers can stack on top */}
       <FeedFilterSheet
@@ -567,12 +601,16 @@ const styles = StyleSheet.create({
   footerLoading: { paddingVertical: 16 },
   footerEnd:     { color: '#6b7280', fontSize: 11, textAlign: 'center', paddingVertical: 16 },
   fab: {
-    position: 'absolute', right: 20, bottom: 20,
+    position: 'absolute', right: 20, bottom: 80,
     width: 56, height: 56, borderRadius: 28,
     backgroundColor: '#3b82f6',
-    alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3, shadowRadius: 6, elevation: 6,
+  },
+  fabInner: {
+    width: '100%', height: '100%',
+    alignItems: 'center', justifyContent: 'center',
+    borderRadius: 28,
   },
 
   // Filter sheet

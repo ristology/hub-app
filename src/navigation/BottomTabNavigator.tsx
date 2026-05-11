@@ -17,6 +17,7 @@ import InvoiceStack    from './InvoiceStack';
 import HomeScreen      from '../screens/home/HomeScreen';
 import AktivitasScreen from '../screens/aktivitas/AktivitasScreen';
 import { notifApi } from '../api/notif';
+import AnimatedTabBar from './AnimatedTabBar';
 import { useTabBarStyle } from './useTabBarStyle';
 
 type TabIconName = keyof typeof Ionicons.glyphMap;
@@ -66,6 +67,7 @@ export default function BottomTabNavigator() {
 
   return (
     <Tab.Navigator
+      tabBar={(props) => <AnimatedTabBar {...props} />}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
