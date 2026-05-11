@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, Image, TextInput, TouchableOpacity,
-  ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Alert,
+  ActivityIndicator, Keyboard, Platform, StyleSheet, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, type RouteProp } from '@react-navigation/native';
@@ -46,6 +46,18 @@ export default function FeedDetailScreen() {
   const [replyTo,     setReplyTo]     = useState<{ id: number; nama: string } | null>(null);
   const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);
   const [photoViewerUri, setPhotoViewerUri] = useState<string | null>(null);
+
+  // Manual keyboard listener — per feedback_mobile_keyboard_patterns memory,
+  // JANGAN pakai KeyboardAvoidingView (buggy di Android edge-to-edge).
+  const insets = useSafeAreaInsets();
+  const [kbHeight, setKbHeight] = useState(0);
+  useEffect(() => {
+    const showName = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideName = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showName, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideName, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   const handleKomentarChange = (next: string) => {
     if (next.length > komentar.length) {
@@ -129,10 +141,12 @@ export default function FeedDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
+      <View style={{
+        flex: 1,
+        paddingBottom: kbHeight > 0
+          ? kbHeight + (Platform.OS === 'android' ? insets.bottom : 0)
+          : 0,
+      }}>
         {/* Top bar */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -285,7 +299,12 @@ export default function FeedDetailScreen() {
             }
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+
+        {/* Spacer warna sama dgn input bar — supaya tidak floating saat keyboard tidak aktif */}
+        {kbHeight === 0 && (
+          <View style={{ height: insets.bottom, backgroundColor: '#0a0f1a' }} />
+        )}
+      </View>
 
       <KaryawanPicker
         visible={mentionOpen}
