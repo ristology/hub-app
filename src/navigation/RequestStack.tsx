@@ -14,7 +14,7 @@ export default function RequestStack() {
       <Stack.Screen
         name="CreateRequest"
         component={CreateRequestScreen}
-        options={{ presentation: 'modal' }}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
     </Stack.Navigator>
   );

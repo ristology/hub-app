@@ -14,7 +14,7 @@ export default function KalenderStack() {
       <Stack.Screen
         name="CreateKegiatan"
         component={CreateKegiatanScreen}
-        options={{ presentation: 'modal' }}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
     </Stack.Navigator>
   );

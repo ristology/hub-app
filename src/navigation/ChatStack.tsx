@@ -15,12 +15,12 @@ export default function ChatStack() {
       <Stack.Screen
         name="NewChat"
         component={NewChatScreen}
-        options={{ presentation: 'modal' }}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
         name="CreateGroup"
         component={CreateGroupScreen}
-        options={{ presentation: 'modal' }}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
     </Stack.Navigator>
   );

@@ -14,7 +14,7 @@ export default function PerformanceStack() {
       <Stack.Screen
         name="CreatePerformance"
         component={CreatePerformanceScreen}
-        options={{ presentation: 'modal' }}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
     </Stack.Navigator>
   );

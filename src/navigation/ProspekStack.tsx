@@ -15,12 +15,12 @@ export default function ProspekStack() {
       <Stack.Screen
         name="CreateProspek"
         component={CreateProspekScreen}
-        options={{ presentation: 'modal' }}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
         name="AddPertemuan"
         component={AddPertemuanScreen}
-        options={{ presentation: 'modal' }}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
     </Stack.Navigator>
   );

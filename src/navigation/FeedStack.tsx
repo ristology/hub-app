@@ -14,7 +14,7 @@ export default function FeedStack() {
       <Stack.Screen
         name="CreateFeed"
         component={CreateFeedScreen}
-        options={{ presentation: 'modal' }}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
     </Stack.Navigator>
   );

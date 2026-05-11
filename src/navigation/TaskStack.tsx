@@ -14,7 +14,7 @@ export default function TaskStack() {
       <Stack.Screen
         name="CreateTask"
         component={CreateTaskScreen}
-        options={{ presentation: 'modal' }}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
     </Stack.Navigator>
   );

@@ -15,12 +15,12 @@ export default function DokumenStack() {
       <Stack.Screen
         name="UploadDokumen"
         component={UploadDokumenScreen}
-        options={{ presentation: 'modal' }}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
         name="ManageFolder"
         component={ManageFolderScreen}
-        options={{ presentation: 'modal' }}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
     </Stack.Navigator>
   );
