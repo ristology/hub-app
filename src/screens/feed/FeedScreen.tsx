@@ -13,7 +13,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import KaryawanPicker from '../../components/KaryawanPicker';
-import { useUIVisibility } from '../../store/uiVisibility';
+import { useUIVisibility, useHideAnim } from '../../store/uiVisibility';
 import PickerSheet, { type PickerOption } from '../../components/PickerSheet';
 import DatePickerInput from '../../components/DatePickerInput';
 
@@ -157,11 +157,13 @@ export default function FeedScreen() {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Auto-hide tab bar + FAB saat scroll ke bawah, tampil lagi saat scroll ke atas
-  const lastScrollY  = useRef(0);
-  const uiTranslate  = useUIVisibility((s) => s.translate);
-  const showUI       = useUIVisibility((s) => s.show);
-  const hideUI       = useUIVisibility((s) => s.hide);
+  // Auto-hide tab bar + top bar + FAB saat scroll ke bawah, show saat ke atas
+  const lastScrollY = useRef(0);
+  const showUI      = useUIVisibility((s) => s.show);
+  const hideUI      = useUIVisibility((s) => s.hide);
+  // Animated values per-komponen — top bar slide ke atas (-100), FAB slide ke bawah (+120)
+  const topTranslate = useHideAnim({ hidden: -100 });
+  const fabTranslate = useHideAnim({ hidden: 120 });
 
   // Pastikan tab bar selalu tampil saat keluar Feed screen
   useFocusEffect(useCallback(() => {
@@ -203,21 +205,23 @@ export default function FeedScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Feed</Text>
-        <TouchableOpacity
-          onPress={openFilterSheet}
-          style={[styles.searchBtn, activeCount > 0 && styles.searchBtnActive]}
-          hitSlop={8}
-        >
-          <Ionicons name="search" size={20} color={activeCount > 0 ? '#3b82f6' : '#fff'} />
-          {activeCount > 0 && (
-            <View style={styles.searchBadge}>
-              <Text style={styles.searchBadgeText}>{activeCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
+      <Animated.View style={{ transform: [{ translateY: topTranslate }] }}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Feed</Text>
+          <TouchableOpacity
+            onPress={openFilterSheet}
+            style={[styles.searchBtn, activeCount > 0 && styles.searchBtnActive]}
+            hitSlop={8}
+          >
+            <Ionicons name="search" size={20} color={activeCount > 0 ? '#3b82f6' : '#fff'} />
+            {activeCount > 0 && (
+              <View style={styles.searchBadge}>
+                <Text style={styles.searchBadgeText}>{activeCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
 
       {activeCount > 0 && (
         <View style={styles.filterChipsRow}>
@@ -281,7 +285,7 @@ export default function FeedScreen() {
       <Animated.View
         style={[
           styles.fab,
-          { transform: [{ translateY: uiTranslate }] },
+          { transform: [{ translateY: fabTranslate }] },
         ]}
       >
         <TouchableOpacity
@@ -601,7 +605,7 @@ const styles = StyleSheet.create({
   footerLoading: { paddingVertical: 16 },
   footerEnd:     { color: '#6b7280', fontSize: 11, textAlign: 'center', paddingVertical: 16 },
   fab: {
-    position: 'absolute', right: 20, bottom: 80,
+    position: 'absolute', right: 20, bottom: 20,
     width: 56, height: 56, borderRadius: 28,
     backgroundColor: '#3b82f6',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 },

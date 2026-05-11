@@ -1,35 +1,25 @@
 /**
  * AnimatedTabBar — wrap default BottomTabBar dgn Animated.View supaya
- * tab bar bisa slide turun/naik based on scroll direction.
+ * tab bar bisa slide turun/naik berdasarkan state UIVisibility.
  *
- * Pakai shared Animated.Value dari useUIVisibility store.
+ * Penting: TIDAK pakai position absolute → tab bar tetap in-flow di layout
+ * navigator. Animasi hanya mengubah visual position via transform, tidak
+ * reclaim space. Layout screen lain tetap normal, FAB di modul lain tetap
+ * di posisi-nya di atas tab bar.
  */
 import React from 'react';
-import { Animated, StyleSheet } from 'react-native';
+import { Animated } from 'react-native';
 import { BottomTabBar, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
-import { useUIVisibility } from '../store/uiVisibility';
+import { useHideAnim } from '../store/uiVisibility';
 
 export default function AnimatedTabBar(props: BottomTabBarProps) {
-  const translate = useUIVisibility((s) => s.translate);
+  // Tab bar tinggi ~56-80px; translate 120 utk pastikan hide total
+  const translate = useHideAnim({ hidden: 120 });
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        { transform: [{ translateY: translate }] },
-      ]}
-    >
+    <Animated.View style={{ transform: [{ translateY: translate }] }}>
       <BottomTabBar {...props} />
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-});
