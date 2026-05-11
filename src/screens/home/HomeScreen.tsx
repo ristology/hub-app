@@ -8,6 +8,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '../../store/auth';
+import ProfileSheet from '../../components/ProfileSheet';
 import { tugasApi }       from '../../api/tugas';
 import { prospekApi }     from '../../api/prospek';
 import { errorLogApi }    from '../../api/errorLog';
@@ -27,6 +28,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<any>();
   const [refreshing, setRefreshing] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const tugas       = useQuery({ queryKey: ['home-tugas'],     queryFn: tugasApi.stats });
   const prospek     = useQuery({ queryKey: ['home-prospek'],   queryFn: prospekApi.stats });
@@ -64,14 +66,19 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
+        {/* Header — tap untuk buka profile sheet */}
+        <TouchableOpacity
+          style={styles.header}
+          onPress={() => setProfileOpen(true)}
+          activeOpacity={0.7}
+        >
           <View style={{ flex: 1 }}>
             <Text style={styles.greeting}>{greetingByHour()},</Text>
             <Text style={styles.name}>{user?.name}</Text>
             {user?.departemen && (
               <Text style={styles.role}>{user.departemen}</Text>
             )}
+            <Text style={styles.tapHint}>Tap untuk lihat profil</Text>
           </View>
           {user?.foto ? (
             <Image source={{ uri: user.foto }} style={styles.avatar} />
@@ -80,7 +87,7 @@ export default function HomeScreen() {
               <Text style={styles.avatarText}>{userInitial}</Text>
             </View>
           )}
-        </View>
+        </TouchableOpacity>
 
         {/* Hari Ini */}
         <Text style={styles.sectionLabel}>HARI INI</Text>
@@ -181,6 +188,8 @@ export default function HomeScreen() {
         </View>
 
       </ScrollView>
+
+      <ProfileSheet visible={profileOpen} onClose={() => setProfileOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -244,6 +253,7 @@ const styles = StyleSheet.create({
   greeting: { color: '#8a94a6', fontSize: 13 },
   name:     { color: '#fff', fontSize: 22, fontWeight: '700', marginTop: 4 },
   role:     { color: '#3b82f6', fontSize: 11, marginTop: 4, fontWeight: '600' },
+  tapHint:  { color: '#6b7280', fontSize: 10, marginTop: 6, fontStyle: 'italic' },
   avatar: {
     width: 48, height: 48, borderRadius: 24,
     backgroundColor: '#3b82f6',

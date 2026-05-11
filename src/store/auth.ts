@@ -13,9 +13,10 @@ type AuthState = {
   login:    (email: string, password: string, deviceName: string) => Promise<void>;
   logout:   () => Promise<void>;
   bootstrap: () => Promise<void>;
+  setUserFoto: (foto: string | null) => void;
 };
 
-export const useAuth = create<AuthState>((set) => ({
+export const useAuth = create<AuthState>((set, get) => ({
   user: null,
   token: null,
   isLoading: false,
@@ -51,6 +52,14 @@ export const useAuth = create<AuthState>((set) => ({
     await SecureStore.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);
     await SecureStore.deleteItemAsync(STORAGE_KEYS.USER_DATA);
     set({ user: null, token: null });
+  },
+
+  setUserFoto: (foto) => {
+    const current = get().user;
+    if (!current) return;
+    const updated = { ...current, foto };
+    SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(updated)).catch(() => {});
+    set({ user: updated });
   },
 
   bootstrap: async () => {
