@@ -164,9 +164,10 @@ export default function FeedScreen() {
   const hideUI      = useUIVisibility((s) => s.hide);
   // Animated values per-komponen — pakai range cukup utk full hide:
   // top bar: -(headerHeight + 30) supaya status bar area + header off-screen
-  // FAB: Android butuh translate lebih besar karena nav bar tambahan di bawah
+  // FAB iOS bottom 110 + height 56 = 166 → translate 200 utk full clear off-screen
+  // FAB Android bottom 120 + height 56 + nav bar = perlu 220
   const topTranslate = useHideAnim({ hidden: -(insets.top + 90) });
-  const fabTranslate = useHideAnim({ hidden: Platform.OS === 'android' ? 220 : 160 });
+  const fabTranslate = useHideAnim({ hidden: Platform.OS === 'android' ? 220 : 200 });
 
   // Pastikan tab bar selalu tampil saat keluar Feed screen
   useFocusEffect(useCallback(() => {
