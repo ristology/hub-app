@@ -162,9 +162,11 @@ export default function FeedScreen() {
   const lastScrollY = useRef(0);
   const showUI      = useUIVisibility((s) => s.show);
   const hideUI      = useUIVisibility((s) => s.hide);
-  // Animated values per-komponen — top bar slide ke atas (-100), FAB slide ke bawah (+120)
-  const topTranslate = useHideAnim({ hidden: -100 });
-  const fabTranslate = useHideAnim({ hidden: 120 });
+  // Animated values per-komponen — pakai range cukup utk full hide:
+  // top bar: -(headerHeight + 30) supaya status bar area + header off-screen
+  // FAB: tab bar height (~80) + FAB height (56) + margin = ~160 px
+  const topTranslate = useHideAnim({ hidden: -(insets.top + 90) });
+  const fabTranslate = useHideAnim({ hidden: 160 });
 
   // Pastikan tab bar selalu tampil saat keluar Feed screen
   useFocusEffect(useCallback(() => {
