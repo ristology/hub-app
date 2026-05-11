@@ -56,6 +56,7 @@ function formatTanggal(s?: string): string {
 export default function FeedScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<FeedStackParamList>>();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
 
   // Applied filters (used for query)
@@ -203,9 +204,17 @@ export default function FeedScreen() {
     );
   }
 
+  // Total tinggi header overlay = status bar + header content (~58 px)
+  const headerHeight = insets.top + 58;
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <Animated.View style={{ transform: [{ translateY: topTranslate }] }}>
+    <View style={styles.container}>
+      <Animated.View
+        style={[
+          styles.headerOverlay,
+          { paddingTop: insets.top, transform: [{ translateY: topTranslate }] },
+        ]}
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Feed</Text>
           <TouchableOpacity
@@ -221,36 +230,39 @@ export default function FeedScreen() {
             )}
           </TouchableOpacity>
         </View>
-      </Animated.View>
 
-      {activeCount > 0 && (
-        <View style={styles.filterChipsRow}>
-          {filters.search?.trim() && (
-            <FilterChip label={`"${filters.search.trim()}"`} onClear={() => setFilters({ ...filters, search: '' })} />
-          )}
-          {filters.karyawan_id && (
-            <FilterChip label="Pencatat ✓" onClear={() => setFilters({ ...filters, karyawan_id: null })} />
-          )}
-          {filters.kategori_id && (
-            <FilterChip label="Kategori ✓" onClear={() => setFilters({ ...filters, kategori_id: null })} />
-          )}
-          {filters.bulan && (
-            <FilterChip label={formatBulan(filters.bulan)} onClear={() => setFilters({ ...filters, bulan: undefined })} />
-          )}
-          {filters.tanggal && (
-            <FilterChip label={formatTanggal(filters.tanggal)} onClear={() => setFilters({ ...filters, tanggal: undefined })} />
-          )}
-          <TouchableOpacity onPress={() => setFilters({})} style={styles.clearAllBtn}>
-            <Text style={styles.clearAllText}>Reset</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        {activeCount > 0 && (
+          <View style={styles.filterChipsRow}>
+            {filters.search?.trim() && (
+              <FilterChip label={`"${filters.search.trim()}"`} onClear={() => setFilters({ ...filters, search: '' })} />
+            )}
+            {filters.karyawan_id && (
+              <FilterChip label="Pencatat ✓" onClear={() => setFilters({ ...filters, karyawan_id: null })} />
+            )}
+            {filters.kategori_id && (
+              <FilterChip label="Kategori ✓" onClear={() => setFilters({ ...filters, kategori_id: null })} />
+            )}
+            {filters.bulan && (
+              <FilterChip label={formatBulan(filters.bulan)} onClear={() => setFilters({ ...filters, bulan: undefined })} />
+            )}
+            {filters.tanggal && (
+              <FilterChip label={formatTanggal(filters.tanggal)} onClear={() => setFilters({ ...filters, tanggal: undefined })} />
+            )}
+            <TouchableOpacity onPress={() => setFilters({})} style={styles.clearAllBtn}>
+              <Text style={styles.clearAllText}>Reset</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </Animated.View>
 
       <FlatList
         data={items}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[
+          styles.list,
+          { paddingTop: headerHeight + (activeCount > 0 ? 36 : 4), paddingBottom: 90 + insets.bottom },
+        ]}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
         onScroll={onScroll}
@@ -341,7 +353,7 @@ export default function FeedScreen() {
         onPick={handlePickBulan}
         onClose={() => setPickerOpen(null)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -565,6 +577,12 @@ function FieldButton({ value, empty, onPress, onClear }: {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0d1421' },
   center:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
+  headerOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(13,20,33,0.92)', // semi-glass agar konten tetap terbaca samar saat scroll
+    zIndex: 10,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
   header:    {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12, gap: 8,
@@ -605,7 +623,7 @@ const styles = StyleSheet.create({
   footerLoading: { paddingVertical: 16 },
   footerEnd:     { color: '#6b7280', fontSize: 11, textAlign: 'center', paddingVertical: 16 },
   fab: {
-    position: 'absolute', right: 20, bottom: 20,
+    position: 'absolute', right: 20, bottom: 90,
     width: 56, height: 56, borderRadius: 28,
     backgroundColor: '#3b82f6',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 },

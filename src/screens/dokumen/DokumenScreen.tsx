@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   empty: { color: '#8a94a6', fontSize: 14, textAlign: 'center' },
 
   fab: {
-    position: 'absolute', right: 20, bottom: 20,
+    position: 'absolute', right: 20, bottom: 90,
     width: 56, height: 56, borderRadius: 28,
     backgroundColor: '#3b82f6',
     alignItems: 'center', justifyContent: 'center',

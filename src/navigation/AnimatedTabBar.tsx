@@ -1,25 +1,35 @@
 /**
- * AnimatedTabBar — wrap default BottomTabBar dgn Animated.View supaya
- * tab bar bisa slide turun/naik berdasarkan state UIVisibility.
+ * AnimatedTabBar — overlay tab bar (position: absolute) yang slide turun
+ * berdasarkan state UIVisibility. Saat hidden, area bawah otomatis "fill"
+ * oleh content (FB-style).
  *
- * Penting: TIDAK pakai position absolute → tab bar tetap in-flow di layout
- * navigator. Animasi hanya mengubah visual position via transform, tidak
- * reclaim space. Layout screen lain tetap normal, FAB di modul lain tetap
- * di posisi-nya di atas tab bar.
+ * Konsekuensi: screen content extend sampai bottom — FAB di tiap screen
+ * harus position di atas tab bar (bottom: ~80 atau pakai insets+tabBarHeight).
  */
 import React from 'react';
-import { Animated } from 'react-native';
+import { Animated, StyleSheet } from 'react-native';
 import { BottomTabBar, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
 import { useHideAnim } from '../store/uiVisibility';
 
 export default function AnimatedTabBar(props: BottomTabBarProps) {
-  // Tab bar tinggi ~56-80px; translate 120 utk pastikan hide total
   const translate = useHideAnim({ hidden: 120 });
 
   return (
-    <Animated.View style={{ transform: [{ translateY: translate }] }}>
+    <Animated.View
+      style={[
+        styles.container,
+        { transform: [{ translateY: translate }] },
+      ]}
+    >
       <BottomTabBar {...props} />
     </Animated.View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+  },
+});
