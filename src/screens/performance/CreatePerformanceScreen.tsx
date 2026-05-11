@@ -180,6 +180,15 @@ export default function CreatePerformanceScreen() {
           <Text style={styles.label}>Tanggal <Text style={styles.req}>*</Text></Text>
           <DatePickerInput value={tanggal} onChange={setTanggal} />
 
+          {jenis === 'appointment' && (
+            <View style={styles.syncNote}>
+              <Ionicons name="calendar" size={13} color="#60a5fa" />
+              <Text style={styles.syncNoteText}>
+                Tersinkron otomatis ke Kalender PIC & Google Calendar (jika PIC sudah connect).
+              </Text>
+            </View>
+          )}
+
           {jenis === 'kontrak' && (
             <>
               <Text style={styles.label}>Tanggal Mulai Kontrak <Text style={styles.req}>*</Text></Text>
@@ -273,6 +282,15 @@ const styles = StyleSheet.create({
     marginTop: 12, marginBottom: 6, letterSpacing: 0.5,
   },
   req: { color: '#ef4444' },
+  syncNote: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 10, paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(59,130,246,0.10)',
+    borderWidth: 1, borderColor: 'rgba(59,130,246,0.25)',
+  },
+  syncNoteText: { color: '#93c5fd', fontSize: 11, flex: 1, lineHeight: 16 },
   input: {
     backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff',
     paddingHorizontal: 14, paddingVertical: 11, borderRadius: 10,
