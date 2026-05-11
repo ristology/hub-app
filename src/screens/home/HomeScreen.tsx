@@ -158,19 +158,19 @@ export default function HomeScreen() {
             icon="newspaper"
             label="Posting Feed"
             color="#3b82f6"
-            onPress={() => navigation.navigate('Feed', { screen: 'CreateFeed' })}
+            onPress={() => navigation.navigate('Feed', { screen: 'CreateFeed', initial: false })}
           />
           <QuickAction
             icon="add-circle"
             label="Task Baru"
             color="#f59e0b"
-            onPress={() => navigation.navigate('Task', { screen: 'CreateTask' })}
+            onPress={() => navigation.navigate('Task', { screen: 'CreateTask', initial: false })}
           />
           <QuickAction
             icon="bug"
             label="Lapor Error"
             color="#ef4444"
-            onPress={() => navigation.navigate('ErrorLog', { screen: 'CreateErrorLog' })}
+            onPress={() => navigation.navigate('ErrorLog', { screen: 'CreateErrorLog', initial: false })}
           />
           <QuickAction
             icon="chatbubbles"
