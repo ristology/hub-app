@@ -21,7 +21,8 @@ Notifications.setNotificationHandler({
 });
 
 /**
- * Setup channel notif Android (wajib untuk Android 8+).
+ * Setup channels notif Android (wajib untuk Android 8+).
+ * Channel terpisah supaya bisa beda suara + importance per kategori.
  */
 export async function setupAndroidChannel() {
   if (Platform.OS !== 'android') return;
@@ -32,6 +33,30 @@ export async function setupAndroidChannel() {
     vibrationPattern: [0, 250, 250, 250],
     lightColor: '#3b82f6',
     sound: 'default',
+  });
+
+  // Chat — banner heads-up, suara default (akan diganti custom sound nanti)
+  await Notifications.setNotificationChannelAsync('chat', {
+    name: 'Pesan Chat',
+    description: 'Notifikasi pesan chat masuk',
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 200, 100, 200],
+    lightColor: '#3b82f6',
+    sound: 'default',
+    enableLights: true,
+    enableVibrate: true,
+  });
+
+  // Error Log — importance tinggi karena biasanya urgent
+  await Notifications.setNotificationChannelAsync('error-log', {
+    name: 'Error Log',
+    description: 'Notifikasi laporan error yang ditugaskan ke kamu',
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 300, 200, 300],
+    lightColor: '#ef4444',
+    sound: 'default',
+    enableLights: true,
+    enableVibrate: true,
   });
 }
 
