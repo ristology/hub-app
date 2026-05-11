@@ -625,7 +625,7 @@ const styles = StyleSheet.create({
   footerLoading: { paddingVertical: 16 },
   footerEnd:     { color: '#6b7280', fontSize: 11, textAlign: 'center', paddingVertical: 16 },
   fab: {
-    position: 'absolute', right: 20, bottom: 90,
+    position: 'absolute', right: 20, bottom: 110,
     width: 56, height: 56, borderRadius: 28,
     backgroundColor: '#3b82f6',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
