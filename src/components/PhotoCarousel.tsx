@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, Image, FlatList, Dimensions, StyleSheet,
+  View, Text, Image, TouchableOpacity, FlatList, Dimensions, StyleSheet,
   type NativeSyntheticEvent, type NativeScrollEvent,
 } from 'react-native';
 
@@ -8,11 +8,13 @@ type Props = {
   fotos: string[];
   height?: number;
   borderRadius?: number;
+  /** Optional — kalau dikasih, tap foto akan trigger callback (mis. buka lightbox). */
+  onPressPhoto?: (uri: string, index: number) => void;
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-export default function PhotoCarousel({ fotos, height = 280, borderRadius = 10 }: Props) {
+export default function PhotoCarousel({ fotos, height = 280, borderRadius = 10, onPressPhoto }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [containerWidth, setContainerWidth] = useState(SCREEN_WIDTH - 32);
 
@@ -20,13 +22,18 @@ export default function PhotoCarousel({ fotos, height = 280, borderRadius = 10 }
 
   // 1 foto saja → tidak perlu pager
   if (fotos.length === 1) {
-    return (
+    const img = (
       <Image
         source={{ uri: fotos[0] }}
         style={[styles.single, { height, borderRadius }]}
         resizeMode="cover"
       />
     );
+    return onPressPhoto ? (
+      <TouchableOpacity activeOpacity={0.85} onPress={() => onPressPhoto(fotos[0], 0)}>
+        {img}
+      </TouchableOpacity>
+    ) : img;
   }
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -47,13 +54,20 @@ export default function PhotoCarousel({ fotos, height = 280, borderRadius = 10 }
         showsHorizontalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
-        renderItem={({ item }) => (
-          <Image
-            source={{ uri: item }}
-            style={{ width: containerWidth, height }}
-            resizeMode="cover"
-          />
-        )}
+        renderItem={({ item, index }) => {
+          const img = (
+            <Image
+              source={{ uri: item }}
+              style={{ width: containerWidth, height }}
+              resizeMode="cover"
+            />
+          );
+          return onPressPhoto ? (
+            <TouchableOpacity activeOpacity={0.85} onPress={() => onPressPhoto(item, index)}>
+              {img}
+            </TouchableOpacity>
+          ) : img;
+        }}
       />
 
       {/* Counter pojok kanan atas */}

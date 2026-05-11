@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { Feed } from '../../../api/feed';
-import PhotoCarousel  from '../../../components/PhotoCarousel';
-import VideoThumbnail from '../../../components/VideoThumbnail';
-import MentionText    from '../../../components/MentionText';
+import PhotoCarousel     from '../../../components/PhotoCarousel';
+import VideoThumbnail    from '../../../components/VideoThumbnail';
+import ImageViewerModal  from '../../../components/ImageViewerModal';
+import MentionText       from '../../../components/MentionText';
 
 type Props = {
   feed: Feed;
@@ -29,6 +30,7 @@ function ringkasLokasi(lokasi: string): string {
 }
 
 export default function FeedCard({ feed, onPress, onLike }: Props) {
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
   return (
     <View style={[styles.card, feed.has_unread_notif && styles.cardUnread]}>
       {feed.has_unread_notif && <View style={styles.unreadDot} />}
@@ -59,10 +61,14 @@ export default function FeedCard({ feed, onPress, onLike }: Props) {
         </TouchableOpacity>
       ) : null}
 
-      {/* Foto carousel — tidak terbungkus touchable supaya swipe lancar */}
+      {/* Foto carousel — tap foto buka lightbox fullscreen, swipe untuk pindah halaman */}
       {feed.foto_urls?.length > 0 && (
         <View style={styles.photoWrap}>
-          <PhotoCarousel fotos={feed.foto_urls} height={PHOTO_HEIGHT * 0.7} />
+          <PhotoCarousel
+            fotos={feed.foto_urls}
+            height={PHOTO_HEIGHT * 0.7}
+            onPressPhoto={(uri) => setViewerUri(uri)}
+          />
         </View>
       )}
 
@@ -105,6 +111,8 @@ export default function FeedCard({ feed, onPress, onLike }: Props) {
           </View>
         ) : null}
       </View>
+
+      <ImageViewerModal uri={viewerUri} onClose={() => setViewerUri(null)} />
     </View>
   );
 }

@@ -13,6 +13,7 @@ import { useAuth } from '../../store/auth';
 import PhotoCarousel     from '../../components/PhotoCarousel';
 import VideoThumbnail    from '../../components/VideoThumbnail';
 import VideoPlayerModal  from '../../components/VideoPlayerModal';
+import ImageViewerModal  from '../../components/ImageViewerModal';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
 import { useKomentarHighlight } from '../../hooks/useKomentarHighlight';
@@ -44,6 +45,7 @@ export default function FeedDetailScreen() {
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
   const [replyTo,     setReplyTo]     = useState<{ id: number; nama: string } | null>(null);
   const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);
+  const [photoViewerUri, setPhotoViewerUri] = useState<string | null>(null);
 
   const handleKomentarChange = (next: string) => {
     if (next.length > komentar.length) {
@@ -177,7 +179,11 @@ export default function FeedDetailScreen() {
 
           {feed.foto_urls?.length > 0 && (
             <View style={{ marginBottom: 12 }}>
-              <PhotoCarousel fotos={feed.foto_urls} height={320} />
+              <PhotoCarousel
+                fotos={feed.foto_urls}
+                height={320}
+                onPressPhoto={(uri) => setPhotoViewerUri(uri)}
+              />
             </View>
           )}
 
@@ -293,6 +299,11 @@ export default function FeedDetailScreen() {
         visible={!!videoPlayerUri}
         videoUri={videoPlayerUri}
         onClose={() => setVideoPlayerUri(null)}
+      />
+
+      <ImageViewerModal
+        uri={photoViewerUri}
+        onClose={() => setPhotoViewerUri(null)}
       />
     </SafeAreaView>
   );

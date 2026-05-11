@@ -14,6 +14,7 @@ import { notifApi, NotifModel } from '../../api/notif';
 import PhotoCarousel    from '../../components/PhotoCarousel';
 import VideoThumbnail   from '../../components/VideoThumbnail';
 import VideoPlayerModal from '../../components/VideoPlayerModal';
+import ImageViewerModal from '../../components/ImageViewerModal';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
 import { useKomentarHighlight } from '../../hooks/useKomentarHighlight';
@@ -63,6 +64,7 @@ export default function ErrorLogDetailScreen() {
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
   const [replyTo,     setReplyTo]     = useState<{ id: number; nama: string } | null>(null);
   const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);
+  const [photoViewerUri, setPhotoViewerUri] = useState<string | null>(null);
 
   const handleKomentarChange = (next: string) => {
     if (next.length > komentar.length) {
@@ -195,7 +197,11 @@ export default function ErrorLogDetailScreen() {
           {/* Foto carousel */}
           {log.foto_urls && log.foto_urls.length > 0 && (
             <View style={{ marginBottom: 12 }}>
-              <PhotoCarousel fotos={log.foto_urls} height={250} />
+              <PhotoCarousel
+                fotos={log.foto_urls}
+                height={250}
+                onPressPhoto={(uri) => setPhotoViewerUri(uri)}
+              />
             </View>
           )}
 
@@ -378,6 +384,11 @@ export default function ErrorLogDetailScreen() {
         visible={!!videoPlayerUri}
         videoUri={videoPlayerUri}
         onClose={() => setVideoPlayerUri(null)}
+      />
+
+      <ImageViewerModal
+        uri={photoViewerUri}
+        onClose={() => setPhotoViewerUri(null)}
       />
     </SafeAreaView>
   );
