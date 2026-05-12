@@ -364,13 +364,16 @@ Afresto HUB butuh login, provide demo account di "Review Information":
 
 ```
 Username: reviewer@afresto.id
-Password: ReviewerDemo2026!
+Password: <SET-A-STRONG-RANDOM-PASSWORD-HERE-DO-NOT-COMMIT>
 Notes: Demo account dengan data dummy. Tidak ada interaksi real. Reviewer
 boleh post di feed (akan di-cleanup berkala). Untuk test chat, kirim ke user
 "Demo Bot" yang sudah ada di kontak.
 ```
 
-**TODO:** create demo account di production DB sebelum submission.
+**TODO:**
+1. Create demo account `reviewer@afresto.id` di production DB sebelum submission
+2. Generate password kuat secara LOKAL (mis. via `php artisan tinker` → `Str::random(16)`)
+3. **JANGAN commit password ke git** — kirim langsung ke Apple/Google reviewer via App Store Connect / Play Console "Review Information" field (field tersebut private, hanya reviewer yg lihat)
 
 ---
 
