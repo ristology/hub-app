@@ -61,7 +61,12 @@
         {
           "icon": "./assets/icon.png",
           "color": "#3b82f6",
-          "defaultChannel": "default"
+          "defaultChannel": "default",
+          "sounds": [
+            "./assets/sounds/afresto_chat.wav",
+            "./assets/sounds/afresto_error.wav",
+            "./assets/sounds/afresto_reminder.wav"
+          ]
         }
       ],
       "@react-native-community/datetimepicker"

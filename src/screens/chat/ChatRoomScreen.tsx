@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, useFocusEffect, type RouteProp } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
+import { Image as ExpoImage } from 'expo-image';
 
 import { chatApi, type ChatMessage } from '../../api/chat';
 import { useAuth } from '../../store/auth';
@@ -138,15 +139,19 @@ export default function ChatRoomScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
+      // Tidak set quality utk GIF — supaya animation tidak hilang
+      quality: 0.85,
     });
 
     if (!result.canceled && result.assets[0]) {
       const a = result.assets[0];
+      const isGif = (a.mimeType?.includes('gif')) || a.uri.toLowerCase().endsWith('.gif');
+      const ext   = isGif ? 'gif' : 'jpg';
+      const mime  = a.mimeType ?? (isGif ? 'image/gif' : 'image/jpeg');
       setPendingImage({
         uri: a.uri,
-        name: a.fileName ?? `chat-${Date.now()}.jpg`,
-        type: a.mimeType ?? 'image/jpeg',
+        name: a.fileName ?? `chat-${Date.now()}.${ext}`,
+        type: mime,
       });
       setCaption('');
     }
@@ -309,7 +314,7 @@ export default function ChatRoomScreen() {
                   onLongPress={() => handleLongPressMessage(item)}
                   delayLongPress={350}
                 >
-                  <Image source={{ uri: item.foto_url }} style={styles.bubbleImage} resizeMode="cover" />
+                  <ExpoImage source={{ uri: item.foto_url }} style={styles.bubbleImage} contentFit="cover" />
                 </TouchableOpacity>
               )}
               {item.video_thumbnail_url && item.video_url && (
