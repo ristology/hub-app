@@ -21,6 +21,7 @@ import { profileApi, type ProfileResponse } from '../api/profile';
 import { useAuth } from '../store/auth';
 import { useToast } from './Toast';
 import SaveButton from './SaveButton';
+import ImageViewerModal from './ImageViewerModal';
 
 type Props = {
   visible: boolean;
@@ -44,6 +45,7 @@ export default function ProfileSheet({ visible, onClose }: Props) {
   const [pwBaru, setPwBaru]           = useState('');
   const [pwKonfirm, setPwKonfirm]     = useState('');
   const [pwShow, setPwShow]           = useState(false);
+  const [fotoViewerUri, setFotoViewerUri] = useState<string | null>(null);
 
   // Fetch profile saat sheet dibuka
   const { data, isLoading, refetch } = useQuery({
@@ -189,7 +191,9 @@ export default function ProfileSheet({ visible, onClose }: Props) {
               <View style={styles.avatarSection}>
                 <View style={styles.avatarWrap}>
                   {k?.foto_url ? (
-                    <Image source={{ uri: k.foto_url }} style={styles.avatar} />
+                    <TouchableOpacity activeOpacity={0.85} onPress={() => setFotoViewerUri(k.foto_url)}>
+                      <Image source={{ uri: k.foto_url }} style={styles.avatar} />
+                    </TouchableOpacity>
                   ) : (
                     <View style={[styles.avatar, styles.avatarFb]}>
                       <Text style={styles.avatarText}>{u?.name?.charAt(0)?.toUpperCase() ?? '?'}</Text>
@@ -263,6 +267,9 @@ export default function ProfileSheet({ visible, onClose }: Props) {
           )}
         </ScrollView>
       </Animated.View>
+
+      {/* Fullscreen photo viewer (tap avatar utk perbesar) */}
+      <ImageViewerModal uri={fotoViewerUri} onClose={() => setFotoViewerUri(null)} />
 
       {/* Modal Ganti Password */}
       <Modal visible={pwModalOpen} animationType="fade" transparent onRequestClose={() => setPwModalOpen(false)}>

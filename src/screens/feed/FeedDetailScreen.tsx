@@ -172,10 +172,12 @@ export default function FeedDetailScreen() {
           onScroll={onScroll}
           scrollEventThrottle={16}
         >
-          {/* Header — pengirim */}
+          {/* Header — pengirim, avatar tap utk perbesar */}
           <View style={styles.header}>
             {feed.karyawan.foto ? (
-              <Image source={{ uri: feed.karyawan.foto }} style={styles.avatar} />
+              <TouchableOpacity activeOpacity={0.85} onPress={() => setPhotoViewerUri(feed.karyawan.foto!)}>
+                <Image source={{ uri: feed.karyawan.foto }} style={styles.avatar} />
+              </TouchableOpacity>
             ) : (
               <View style={[styles.avatar, styles.avatarFallback]}>
                 <Text style={styles.avatarText}>

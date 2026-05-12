@@ -266,7 +266,9 @@ export default function ChatRoomScreen() {
       <View style={[styles.bubbleRow, isMine ? styles.bubbleRowRight : styles.bubbleRowLeft]}>
         {!isMine && (
           item.user.foto ? (
-            <Image source={{ uri: item.user.foto }} style={styles.bubbleAvatar} />
+            <TouchableOpacity activeOpacity={0.85} onPress={() => setViewerUri(item.user.foto!)}>
+              <Image source={{ uri: item.user.foto }} style={styles.bubbleAvatar} />
+            </TouchableOpacity>
           ) : (
             <View style={[styles.bubbleAvatar, styles.bubbleAvatarFallback]}>
               <Text style={styles.bubbleAvatarText}>{item.user.nama?.charAt(0).toUpperCase() ?? '?'}</Text>
@@ -364,7 +366,9 @@ export default function ChatRoomScreen() {
             <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
           {foto ? (
-            <Image source={{ uri: foto }} style={styles.topAvatar} />
+            <TouchableOpacity activeOpacity={0.85} onPress={() => setViewerUri(foto)}>
+              <Image source={{ uri: foto }} style={styles.topAvatar} />
+            </TouchableOpacity>
           ) : (
             <View style={[styles.topAvatar, styles.bubbleAvatarFallback]}>
               <Text style={styles.bubbleAvatarText}>{nama.charAt(0).toUpperCase()}</Text>

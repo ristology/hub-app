@@ -34,10 +34,12 @@ export default function FeedCard({ feed, onPress, onLike }: Props) {
   return (
     <View style={[styles.card, feed.has_unread_notif && styles.cardUnread]}>
       {feed.has_unread_notif && <View style={styles.unreadDot} />}
-      {/* Header — tap masuk detail */}
-      <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={styles.header}>
+      {/* Header — avatar tap perbesar foto, sisanya tap masuk detail */}
+      <View style={styles.header}>
         {feed.karyawan.foto ? (
-          <Image source={{ uri: feed.karyawan.foto }} style={styles.avatar} />
+          <TouchableOpacity activeOpacity={0.85} onPress={() => setViewerUri(feed.karyawan.foto!)}>
+            <Image source={{ uri: feed.karyawan.foto }} style={styles.avatar} />
+          </TouchableOpacity>
         ) : (
           <View style={[styles.avatar, styles.avatarFallback]}>
             <Text style={styles.avatarText}>
@@ -45,14 +47,14 @@ export default function FeedCard({ feed, onPress, onLike }: Props) {
             </Text>
           </View>
         )}
-        <View style={{ flex: 1, marginLeft: 10 }}>
+        <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={{ flex: 1, marginLeft: 10 }}>
           <Text style={styles.name} numberOfLines={1}>{feed.karyawan.nama_lengkap}</Text>
           <Text style={styles.meta} numberOfLines={1}>
             {feed.karyawan.jabatan ?? '—'}
             {feed.kategori ? ` · ${feed.kategori}` : ''}
           </Text>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </View>
 
       {/* Konten — tap masuk detail */}
       {feed.konten ? (
