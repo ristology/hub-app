@@ -535,6 +535,7 @@ function AssignPicModal({ visible, target, loading, onClose, onSubmit }: {
   onClose: () => void;
   onSubmit: (picUserId: number) => void;
 }) {
+  const insets = useSafeAreaInsets();
   const [picList, setPicList]       = useState<PicRingkas[]>([]);
   const [loadingPic, setLoadingPic] = useState(false);
 
@@ -547,9 +548,9 @@ function AssignPicModal({ visible, target, loading, onClose, onSubmit }: {
   }, [visible]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent onRequestClose={onClose}>
       <View style={picStyles.backdrop}>
-        <View style={picStyles.sheet}>
+        <View style={[picStyles.sheet, { maxHeight: '85%' }]}>
           <View style={picStyles.handle} />
           <View style={picStyles.header}>
             <View style={{ flex: 1 }}>
@@ -590,6 +591,7 @@ function AssignPicModal({ visible, target, loading, onClose, onSubmit }: {
                 </TouchableOpacity>
               )}
               ItemSeparatorComponent={() => <View style={picStyles.sep} />}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
             />
           )}
         </View>
