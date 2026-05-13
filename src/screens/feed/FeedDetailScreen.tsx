@@ -17,6 +17,7 @@ import ImageViewerModal  from '../../components/ImageViewerModal';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
 import { useKomentarHighlight } from '../../hooks/useKomentarHighlight';
+import { formatRelativeWaktu, formatTanggalLengkap } from '../../utils/formatDate';
 
 type RouteParams = { id: number; highlightKomentarId?: number | null };
 
@@ -188,6 +189,10 @@ export default function FeedDetailScreen() {
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={styles.name}>{feed.karyawan.nama_lengkap}</Text>
               <Text style={styles.meta}>{feed.karyawan.jabatan ?? '—'}</Text>
+              <Text style={styles.waktu}>
+                <Ionicons name="time-outline" size={11} color="#6b7280" />
+                {' '}{formatRelativeWaktu(feed.created_at)} · {formatTanggalLengkap(feed.created_at)}
+              </Text>
             </View>
           </View>
 
@@ -369,6 +374,7 @@ const styles = StyleSheet.create({
   avatarText:{ color: '#fff', fontWeight: '700', fontSize: 16 },
   name:      { color: '#fff', fontWeight: '700', fontSize: 15 },
   meta:      { color: '#8a94a6', fontSize: 12, marginTop: 1 },
+  waktu:     { color: '#6b7280', fontSize: 11, marginTop: 3 },
   konten:    { color: '#d6dce6', fontSize: 14, lineHeight: 21, marginBottom: 12 },
   lokasiBox: {
     flexDirection: 'row', alignItems: 'center', gap: 6,

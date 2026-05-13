@@ -6,6 +6,7 @@ import PhotoCarousel     from '../../../components/PhotoCarousel';
 import VideoThumbnail    from '../../../components/VideoThumbnail';
 import ImageViewerModal  from '../../../components/ImageViewerModal';
 import MentionText       from '../../../components/MentionText';
+import { formatRelativeWaktu, formatTanggalJam } from '../../../utils/formatDate';
 
 type Props = {
   feed: Feed;
@@ -52,6 +53,10 @@ export default function FeedCard({ feed, onPress, onLike }: Props) {
           <Text style={styles.meta} numberOfLines={1}>
             {feed.karyawan.jabatan ?? '—'}
             {feed.kategori ? ` · ${feed.kategori}` : ''}
+          </Text>
+          <Text style={styles.waktu} numberOfLines={1}>
+            <Ionicons name="time-outline" size={10} color="#6b7280" />
+            {' '}{formatRelativeWaktu(feed.created_at)} · {formatTanggalJam(feed.created_at)}
           </Text>
         </TouchableOpacity>
       </View>
@@ -151,6 +156,7 @@ const styles = StyleSheet.create({
   avatarText:{ color: '#fff', fontWeight: '700' },
   name:      { color: '#fff', fontWeight: '600', fontSize: 14 },
   meta:      { color: '#8a94a6', fontSize: 11, marginTop: 1 },
+  waktu:     { color: '#6b7280', fontSize: 10, marginTop: 2 },
   konten:    { color: '#d6dce6', fontSize: 14, lineHeight: 20, marginBottom: 10 },
   photoWrap: { marginBottom: 10 },
   footer:    { flexDirection: 'row', alignItems: 'center', gap: 18 },
