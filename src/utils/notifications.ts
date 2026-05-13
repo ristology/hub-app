@@ -35,14 +35,14 @@ export async function setupAndroidChannel() {
     sound: 'default',
   });
 
-  // Chat — banner heads-up, custom sound Afresto
+  // Chat — banner heads-up, sound default HP (user pilih custom HP sendiri kalau mau)
   await Notifications.setNotificationChannelAsync('chat', {
     name: 'Pesan Chat',
     description: 'Notifikasi pesan chat masuk',
     importance: Notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 200, 100, 200],
     lightColor: '#3b82f6',
-    sound: 'afresto_chat.wav',
+    sound: 'default',
     enableLights: true,
     enableVibrate: true,
   });
