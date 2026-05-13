@@ -442,7 +442,9 @@ function FeedFilterSheet({
     ? Math.max(320, availableH - effectiveKb)
     : Math.min(640, availableH);
   const backdropPadBottom = effectiveKb;
-  const sheetPadBottom    = kbHeight > 0 ? 12 : insets.bottom + 12;
+  // Clear tab bar (height 56 + safe-area inset) supaya tombol bawah tidak tertutup
+  const tabBarH        = 56 + Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 4);
+  const sheetPadBottom = kbHeight > 0 ? 12 : tabBarH + 12;
 
   const selectedKategoriLabel = useMemo(() => {
     if (!draft.kategori_id) return 'Semua kategori';
@@ -466,7 +468,8 @@ function FeedFilterSheet({
       <Animated.View
         style={[
           styles.fsSheetOverlay,
-          { height: sheetH, paddingBottom: sheetPadBottom, transform: [{ translateY: slideY }] },
+          { height: sheetH, paddingBottom: sheetPadBottom, bottom: effectiveKb,
+            transform: [{ translateY: slideY }] },
         ]}
       >
           <View style={styles.fsHandle} />

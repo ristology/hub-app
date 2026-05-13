@@ -415,6 +415,9 @@ function FilterSheet({
   const sheetH      = effectiveKb > 0
     ? Math.max(320, availableH - effectiveKb)
     : Math.min(640, availableH);
+  // Clear tab bar (height 56 + safe-area inset) supaya tombol bawah tidak tertutup
+  const tabBarH        = 56 + Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 4);
+  const sheetPadBottom = kbHeight > 0 ? 12 : tabBarH + 12;
 
   if (!mounted) return null;
 
@@ -426,7 +429,7 @@ function FilterSheet({
       <Animated.View
         style={[
           fsStyles.sheet,
-          { height: sheetH, paddingBottom: kbHeight > 0 ? 12 : insets.bottom + 12,
+          { height: sheetH, paddingBottom: sheetPadBottom, bottom: effectiveKb,
             transform: [{ translateY: slideY }] },
         ]}
       >
