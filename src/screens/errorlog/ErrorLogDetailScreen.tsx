@@ -17,6 +17,7 @@ import VideoPlayerModal from '../../components/VideoPlayerModal';
 import ImageViewerModal from '../../components/ImageViewerModal';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
+import LinkText       from '../../components/LinkText';
 import { useKomentarHighlight } from '../../hooks/useKomentarHighlight';
 import type { KaryawanRingkas } from '../../api/feed';
 
@@ -395,11 +396,16 @@ export default function ErrorLogDetailScreen() {
 }
 
 function InfoRow({ icon, label, value }: { icon: any; label: string; value: string }) {
+  const isUrlField = label.toUpperCase() === 'URL';
   return (
     <View style={infoStyles.row}>
       <Ionicons name={icon} size={14} color="#3b82f6" />
       <Text style={infoStyles.label}>{label}:</Text>
-      <Text style={infoStyles.value} selectable>{value}</Text>
+      {isUrlField ? (
+        <LinkText text={value} style={infoStyles.value} />
+      ) : (
+        <Text style={infoStyles.value} selectable>{value}</Text>
+      )}
     </View>
   );
 }

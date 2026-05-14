@@ -9,6 +9,7 @@ import { useRoute, useNavigation, type RouteProp } from '@react-navigation/nativ
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { kalenderApi, type Peserta } from '../../api/kalender';
+import LinkText from '../../components/LinkText';
 
 type RouteParams = { id: number };
 
@@ -166,7 +167,7 @@ export default function KegiatanDetailScreen() {
         {k.deskripsi && (
           <>
             <Text style={styles.sectionLabel}>DESKRIPSI</Text>
-            <Text style={styles.deskripsi}>{k.deskripsi}</Text>
+            <LinkText text={k.deskripsi} style={styles.deskripsi} />
           </>
         )}
 

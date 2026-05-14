@@ -18,6 +18,7 @@ import PhotoCarousel    from '../../components/PhotoCarousel';
 import ImageViewerModal from '../../components/ImageViewerModal';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
+import LinkText       from '../../components/LinkText';
 import { useKomentarHighlight } from '../../hooks/useKomentarHighlight';
 import type { KaryawanRingkas } from '../../api/feed';
 
@@ -240,7 +241,7 @@ export default function RequestDetailScreen() {
 
           {/* Keterangan */}
           <Text style={styles.sectionLabel}>KETERANGAN</Text>
-          <Text style={styles.keterangan}>{r.keterangan}</Text>
+          <LinkText text={r.keterangan} style={styles.keterangan} />
 
           {/* Tanggal & deadline */}
           <Text style={styles.sectionLabel}>JADWAL</Text>
