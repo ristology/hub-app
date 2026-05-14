@@ -9,7 +9,7 @@ import { useRoute, useNavigation, type RouteProp } from '@react-navigation/nativ
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { dokumenApi } from '../../api/dokumen';
-import { openDocumentSmart } from '../../utils/openDocument';
+import { openDocumentExternal, openDocumentSmart } from '../../utils/openDocument';
 
 type RouteParams = { id: number };
 
@@ -43,8 +43,9 @@ export default function DokumenDetailScreen() {
   const navigation = useNavigation<any>();
   const { id } = route.params;
   const queryClient = useQueryClient();
-  const [opening, setOpening] = useState(false);
-  const [imgViewer, setImgViewer] = useState(false);
+  const [opening, setOpening]         = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [imgViewer, setImgViewer]     = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['dokumen', id],
@@ -93,6 +94,16 @@ export default function DokumenDetailScreen() {
     setOpening(true);
     const ok = await openDocumentSmart(dok.file_url, dok.file_nama_asli);
     setOpening(false);
+    if (ok) trackMut.mutate();
+  };
+
+  // Download: pakai share sheet supaya user bisa pilih "Save to Files" / "Save
+  // to Downloads" / kirim ke app lain. Counter unduhan tetap di-increment.
+  const handleDownload = async () => {
+    if (!data) return;
+    setDownloading(true);
+    const ok = await openDocumentExternal(dok.file_url, dok.file_nama_asli);
+    setDownloading(false);
     if (ok) trackMut.mutate();
   };
 
@@ -153,7 +164,7 @@ export default function DokumenDetailScreen() {
           <InfoRow icon="download-outline" label="Total Unduhan" value={`${dok.jumlah_unduhan}x`} />
         </View>
 
-        {/* Action button */}
+        {/* Action buttons */}
         <TouchableOpacity
           style={styles.openBtn}
           onPress={handleOpen}
@@ -176,10 +187,30 @@ export default function DokumenDetailScreen() {
             )
           }
         </TouchableOpacity>
+
+        {dok.tipe !== 'image' && (
+          <TouchableOpacity
+            style={styles.downloadBtn}
+            onPress={handleDownload}
+            disabled={downloading}
+            activeOpacity={0.85}
+          >
+            {downloading
+              ? <ActivityIndicator color="#3b82f6" />
+              : (
+                <>
+                  <Ionicons name="download-outline" size={20} color="#3b82f6" />
+                  <Text style={styles.downloadText}>Download</Text>
+                </>
+              )
+            }
+          </TouchableOpacity>
+        )}
+
         <Text style={styles.openHint}>
           {dok.tipe === 'image'
             ? 'Tampilkan dalam aplikasi'
-            : 'Akan dibuka dengan aplikasi yang terinstall di HP'}
+            : 'Buka untuk preview di browser. Download untuk simpan ke HP.'}
         </Text>
       </ScrollView>
 
@@ -270,6 +301,16 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   openText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+
+  downloadBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: 'rgba(59,130,246,0.10)',
+    borderWidth: 1, borderColor: '#3b82f6',
+    paddingVertical: 14, borderRadius: 12,
+    marginTop: 10,
+  },
+  downloadText: { color: '#3b82f6', fontSize: 14, fontWeight: '700' },
+
   openHint: { color: '#6b7280', fontSize: 11, textAlign: 'center', marginTop: 8 },
 
   imgOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center' },
