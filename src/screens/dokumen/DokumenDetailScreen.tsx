@@ -9,7 +9,7 @@ import { useRoute, useNavigation, type RouteProp } from '@react-navigation/nativ
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { dokumenApi } from '../../api/dokumen';
-import { openDocumentExternal } from '../../utils/openDocument';
+import { openDocumentSmart } from '../../utils/openDocument';
 
 type RouteParams = { id: number };
 
@@ -88,9 +88,10 @@ export default function DokumenDetailScreen() {
       trackMut.mutate();
       return;
     }
-    // Lainnya: download + open via OS
+    // PDF → browser native viewer. Office (docx/xlsx/pptx) → MS Office Online
+    // Viewer di browser (pola sama dengan web Afresto). Format lain: share sheet.
     setOpening(true);
-    const ok = await openDocumentExternal(dok.file_url, dok.file_nama_asli);
+    const ok = await openDocumentSmart(dok.file_url, dok.file_nama_asli);
     setOpening(false);
     if (ok) trackMut.mutate();
   };

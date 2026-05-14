@@ -1,12 +1,67 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing    from 'expo-sharing';
-import { Alert, Platform } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
+
+/**
+ * Buka dokumen di browser default device — tanpa app chooser yang membingungkan.
+ *
+ * Routing per format (sama pola dengan web Afresto):
+ *   - PDF / image / text → buka URL langsung; browser handle native preview
+ *     (Chrome on Android: PDF viewer built-in; Safari on iOS: Quick Look)
+ *   - docx/xlsx/pptx (Office) → wrap dengan Microsoft Office Online Viewer URL
+ *     supaya render readable preview di browser tanpa user perlu install Word/Excel/PPT
+ *   - Format lain → fallback ke share sheet (download + OS "Open with...")
+ *
+ * Syarat: fileUrl harus publicly accessible (server MS Office Online perlu fetch).
+ * File Afresto disimpan di Storage::disk('public'), URL via /storage/dokumen/* —
+ * sudah publik, tidak perlu signed URL.
+ */
+export async function openDocumentSmart(
+  fileUrl: string,
+  filename: string,
+): Promise<boolean> {
+  try {
+    const ext = filename.toLowerCase().split('.').pop() ?? '';
+
+    // Office docs: route via MS Office Online Viewer (same as web Afresto)
+    if (OFFICE_EXTS.has(ext)) {
+      const viewerUrl =
+        'https://view.officeapps.live.com/op/embed.aspx?src=' +
+        encodeURIComponent(fileUrl);
+      const can = await Linking.canOpenURL(viewerUrl);
+      if (!can) {
+        Alert.alert('Tidak dapat membuka', 'Browser tidak tersedia.');
+        return false;
+      }
+      await Linking.openURL(viewerUrl);
+      return true;
+    }
+
+    // PDF / image / text / other browser-native — buka langsung di browser
+    if (BROWSER_NATIVE_EXTS.has(ext)) {
+      await Linking.openURL(fileUrl);
+      return true;
+    }
+
+    // Format lain (zip, csv, format aneh) — fallback ke share sheet
+    return await openDocumentExternal(fileUrl, filename);
+  } catch (e: any) {
+    Alert.alert('Gagal buka dokumen', e?.message ?? 'Terjadi kesalahan tidak dikenal.');
+    return false;
+  }
+}
+
+const OFFICE_EXTS = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']);
+const BROWSER_NATIVE_EXTS = new Set(['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'txt']);
 
 /**
  * Download dokumen ke cache lokal lalu trigger native "Open with..." sheet.
  *
  * Pattern ala WhatsApp/Telegram: app unduh ke cache, OS yang handle pemilihan
  * aplikasi pembuka (Word, Excel, PDF reader, dll).
+ *
+ * Note: pakai openDocumentSmart() untuk default UX (no chooser). Fungsi ini
+ * berguna untuk tombol "Bagikan" atau "Simpan ke device" eksplisit.
  */
 export async function openDocumentExternal(
   fileUrl: string,
