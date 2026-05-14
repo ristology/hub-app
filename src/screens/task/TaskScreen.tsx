@@ -70,6 +70,13 @@ export default function TaskScreen() {
   const openFilterSheet = () => { setDraft(filters); setFilterOpen(true); };
 
   const handlePickStatus    = (opt: PickerOption) => { setDraft((d) => ({ ...d, status:     opt.id as TugasStatus | null })); setPickerOpen(null); };
+
+  // Toggle stat-box quick filter — tap status box jadi filter
+  const handleTapStat = useCallback((status: TugasStatus) => {
+    setFilters((prev) => prev.status === status
+      ? { ...prev, status: null }
+      : { ...prev, status });
+  }, []);
   const handlePickPrioritas = (opt: PickerOption) => { setDraft((d) => ({ ...d, prioritas:  opt.id as TugasPrioritas | null })); setPickerOpen(null); };
   const handlePickKaryawan  = (k: KaryawanRingkas) => { setDraft((d) => ({ ...d, karyawan_id: k.id })); setKaryawanNama(k.nama); setPickerOpen(null); };
 
@@ -157,11 +164,11 @@ export default function TaskScreen() {
         </View>
       )}
 
-      {stats && activeCount === 0 && (
+      {stats && (
         <View style={styles.statsRow}>
-          <StatBox label="Belum"   value={stats.belum}   color="#6b7280" />
-          <StatBox label="Proses"  value={stats.proses}  color="#3b82f6" />
-          <StatBox label="Selesai" value={stats.selesai} color="#22c55e" />
+          <StatBox label="Belum"   value={stats.belum}   color="#6b7280" active={filters.status === 'belum'}   onPress={() => handleTapStat('belum')} />
+          <StatBox label="Proses"  value={stats.proses}  color="#3b82f6" active={filters.status === 'proses'}  onPress={() => handleTapStat('proses')} />
+          <StatBox label="Selesai" value={stats.selesai} color="#22c55e" active={filters.status === 'selesai'} onPress={() => handleTapStat('selesai')} />
         </View>
       )}
 
@@ -248,12 +255,18 @@ function Chip({ label, onClear }: { label: string; onClear: () => void }) {
   );
 }
 
-function StatBox({ label, value, color }: { label: string; value: number; color: string }) {
+function StatBox({ label, value, color, active, onPress }: {
+  label: string; value: number; color: string; active?: boolean; onPress?: () => void;
+}) {
   return (
-    <View style={styles.statBox}>
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      style={[styles.statBox, active && { borderColor: color, borderWidth: 1.5 }]}
+    >
       <Text style={[styles.statValue, { color }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 

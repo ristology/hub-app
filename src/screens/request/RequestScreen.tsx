@@ -34,12 +34,15 @@ const STATUS_OPTIONS: PickerOption[] = [
   { id: 'ditolak',  label: 'Ditolak' },
 ];
 
+type QuickFilter = 'menunggu' | 'proses' | 'selesai' | 'overdue';
+
 type Filters = {
   search?: string;
   status?: RequestStatus | null;
   klien?:  number | null;
   dari?:   string;
   sampai?: string;
+  quick_filter?: QuickFilter;
 };
 
 function countActive(f: Filters): number {
@@ -49,6 +52,7 @@ function countActive(f: Filters): number {
   if (f.klien)          n++;
   if (f.dari)           n++;
   if (f.sampai)         n++;
+  if (f.quick_filter)   n++;
   return n;
 }
 
@@ -78,12 +82,20 @@ export default function RequestScreen() {
   const handlePickKlien  = (k: KlienRingkas)   => { setDraft((d) => ({ ...d, klien: k.id })); setKlienNama(k.nama); setKlienPickerOpen(false); };
 
   const apiParams = useMemo(() => ({
-    ...(filters.status && { status: filters.status }),
-    ...(filters.klien  && { klien:  filters.klien }),
-    ...(filters.dari   && { dari:   filters.dari }),
-    ...(filters.sampai && { sampai: filters.sampai }),
+    ...(filters.status       && { status:       filters.status }),
+    ...(filters.klien        && { klien:        filters.klien }),
+    ...(filters.dari         && { dari:         filters.dari }),
+    ...(filters.sampai       && { sampai:       filters.sampai }),
+    ...(filters.quick_filter && { quick_filter: filters.quick_filter }),
     ...(filters.search?.trim() && { search: filters.search.trim() }),
   }), [filters]);
+
+  // Toggle stat-box quick filter
+  const handleTapStat = useCallback((qf: QuickFilter) => {
+    setFilters((prev) => prev.quick_filter === qf
+      ? { ...prev, quick_filter: undefined }
+      : { ...prev, quick_filter: qf });
+  }, []);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['request', apiParams],
@@ -163,12 +175,12 @@ export default function RequestScreen() {
         </View>
       )}
 
-      {stats && activeCount === 0 && (
+      {stats && (
         <View style={styles.statsRow}>
-          <StatBox label="Menunggu" value={stats.menunggu} color="#8a94a6" />
-          <StatBox label="Proses"   value={(stats.diterima ?? 0) + (stats.proses ?? 0)} color="#f59e0b" />
-          <StatBox label="Selesai"  value={stats.selesai}  color="#22c55e" />
-          <StatBox label="Overdue"  value={stats.overdue}  color="#ef4444" />
+          <StatBox label="Menunggu" value={stats.menunggu} color="#8a94a6" active={filters.quick_filter === 'menunggu'} onPress={() => handleTapStat('menunggu')} />
+          <StatBox label="Proses"   value={(stats.diterima ?? 0) + (stats.proses ?? 0)} color="#f59e0b" active={filters.quick_filter === 'proses'}   onPress={() => handleTapStat('proses')} />
+          <StatBox label="Selesai"  value={stats.selesai}  color="#22c55e" active={filters.quick_filter === 'selesai'}  onPress={() => handleTapStat('selesai')} />
+          <StatBox label="Overdue"  value={stats.overdue}  color="#ef4444" active={filters.quick_filter === 'overdue'}  onPress={() => handleTapStat('overdue')} />
         </View>
       )}
 
@@ -241,12 +253,18 @@ function Chip({ label, onClear }: { label: string; onClear: () => void }) {
   );
 }
 
-function StatBox({ label, value, color }: { label: string; value: number; color: string }) {
+function StatBox({ label, value, color, active, onPress }: {
+  label: string; value: number; color: string; active?: boolean; onPress?: () => void;
+}) {
   return (
-    <View style={styles.statBox}>
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      style={[styles.statBox, active && { borderColor: color, borderWidth: 1.5 }]}
+    >
       <Text style={[styles.statValue, { color }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 

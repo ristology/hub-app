@@ -115,6 +115,13 @@ export default function ErrorLogScreen() {
   }, []);
 
   const handlePickStatus   = (opt: PickerOption) => { setDraft((d) => ({ ...d, status:     (opt.id as ErrorLogStatus | null) })); setPickerOpen(null); };
+
+  // Toggle stat-box quick filter — tap status box jadi filter
+  const handleTapStat = useCallback((status: ErrorLogStatus) => {
+    setFilters((prev) => prev.status === status
+      ? { ...prev, status: null }
+      : { ...prev, status });
+  }, []);
   const handlePickKategori = (opt: PickerOption) => { setDraft((d) => ({ ...d, kategori:   opt.id == null ? null : Number(opt.id) })); setPickerOpen(null); };
   const handlePickKlien    = (opt: PickerOption) => { setDraft((d) => ({ ...d, klien:      opt.id == null ? null : Number(opt.id) })); setPickerOpen(null); };
   const handlePickHandler  = (k: KaryawanRingkas) => { setDraft((d) => ({ ...d, handler_id: k.id })); setKaryawanNama(k.nama); setPickerOpen(null); };
@@ -229,12 +236,12 @@ export default function ErrorLogScreen() {
         </View>
       )}
 
-      {stats && activeCount === 0 && (
+      {stats && (
         <View style={styles.statsRow}>
-          <StatBox label="Open"     value={stats.open}        color="#ef4444" />
-          <StatBox label="Proses"   value={stats.in_progress} color="#f59e0b" />
-          <StatBox label="Resolved" value={stats.resolved}    color="#22c55e" />
-          <StatBox label="Closed"   value={stats.closed}      color="#6b7280" />
+          <StatBox label="Open"     value={stats.open}        color="#ef4444" active={filters.status === 'open'}        onPress={() => handleTapStat('open')} />
+          <StatBox label="Proses"   value={stats.in_progress} color="#f59e0b" active={filters.status === 'in_progress'} onPress={() => handleTapStat('in_progress')} />
+          <StatBox label="Resolved" value={stats.resolved}    color="#22c55e" active={filters.status === 'resolved'}    onPress={() => handleTapStat('resolved')} />
+          <StatBox label="Closed"   value={stats.closed}      color="#6b7280" active={filters.status === 'closed'}      onPress={() => handleTapStat('closed')} />
         </View>
       )}
 
@@ -336,12 +343,18 @@ function Chip({ label, onClear }: { label: string; onClear: () => void }) {
   );
 }
 
-function StatBox({ label, value, color }: { label: string; value: number; color: string }) {
+function StatBox({ label, value, color, active, onPress }: {
+  label: string; value: number; color: string; active?: boolean; onPress?: () => void;
+}) {
   return (
-    <View style={styles.statBox}>
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      style={[styles.statBox, active && { borderColor: color, borderWidth: 1.5 }]}
+    >
       <Text style={[styles.statValue, { color }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 

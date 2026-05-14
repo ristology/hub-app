@@ -53,12 +53,15 @@ function formatGroupHeader(key: string): string {
   return `${HARI_INDO[d.getDay()]}, ${d.getDate()} ${BULAN_INDO[d.getMonth()].slice(0, 3)} ${d.getFullYear()}`;
 }
 
+type QuickFilter = 'hari_ini' | 'minggu_ini' | 'mendatang';
+
 export default function KalenderScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<KalenderStackParamList>>();
   const [refreshing, setRefreshing] = useState(false);
   const [cursor, setCursor] = useState(() => new Date());
   const [showCalendar, setShowCalendar]   = useState(false);
   const [selectedDate, setSelectedDate]   = useState<string | null>(null);
+  const [quickFilter, setQuickFilter]     = useState<QuickFilter | null>(null);
   const lastScrollY = useRef(0);
 
   const toggleCalendar = (next: boolean) => {
@@ -114,8 +117,31 @@ export default function KalenderScreen() {
 
   const groups = useMemo(() => {
     const all = Array.from(eventsByDate.entries()).sort(([a], [b]) => a.localeCompare(b));
-    return selectedDate ? all.filter(([k]) => k === selectedDate) : all;
-  }, [eventsByDate, selectedDate]);
+    if (selectedDate) return all.filter(([k]) => k === selectedDate);
+
+    if (quickFilter) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const todayKey = today.toISOString().slice(0, 10);
+      // Senin minggu ini (ISO week)
+      const dow = today.getDay() === 0 ? 6 : today.getDay() - 1;
+      const monday = new Date(today); monday.setDate(today.getDate() - dow);
+      const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+      const mondayKey = monday.toISOString().slice(0, 10);
+      const sundayKey = sunday.toISOString().slice(0, 10);
+
+      return all.filter(([k]) => {
+        if (quickFilter === 'hari_ini')   return k === todayKey;
+        if (quickFilter === 'minggu_ini') return k >= mondayKey && k <= sundayKey;
+        if (quickFilter === 'mendatang')  return k > todayKey;
+        return true;
+      });
+    }
+    return all;
+  }, [eventsByDate, selectedDate, quickFilter]);
+
+  const handleTapStat = useCallback((qf: QuickFilter) => {
+    setQuickFilter((prev) => prev === qf ? null : qf);
+  }, []);
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = e.nativeEvent.contentOffset.y;
@@ -223,9 +249,9 @@ export default function KalenderScreen() {
 
       {stats && !showCalendar && (
         <View style={[styles.statsWrap, styles.statsContent]}>
-          <StatBox label="Hari ini"   value={stats.hari_ini}   color="#3b82f6" />
-          <StatBox label="Minggu ini" value={stats.minggu_ini} color="#22c55e" />
-          <StatBox label="Mendatang"  value={stats.mendatang}  color="#f59e0b" />
+          <StatBox label="Hari ini"   value={stats.hari_ini}   color="#3b82f6" active={quickFilter === 'hari_ini'}   onPress={() => handleTapStat('hari_ini')} />
+          <StatBox label="Minggu ini" value={stats.minggu_ini} color="#22c55e" active={quickFilter === 'minggu_ini'} onPress={() => handleTapStat('minggu_ini')} />
+          <StatBox label="Mendatang"  value={stats.mendatang}  color="#f59e0b" active={quickFilter === 'mendatang'}  onPress={() => handleTapStat('mendatang')} />
         </View>
       )}
 
@@ -270,12 +296,18 @@ export default function KalenderScreen() {
   );
 }
 
-function StatBox({ label, value, color }: { label: string; value: number; color: string }) {
+function StatBox({ label, value, color, active, onPress }: {
+  label: string; value: number; color: string; active?: boolean; onPress?: () => void;
+}) {
   return (
-    <View style={styles.statBox}>
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      style={[styles.statBox, active && { borderColor: color, borderWidth: 1.5 }]}
+    >
       <Text style={[styles.statValue, { color }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 
