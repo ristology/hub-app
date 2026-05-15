@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Afresto HUB — Icon Generator</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0d1421;
+    color: #fff;
+    padding: 24px;
+    margin: 0;
+    text-align: center;
+  }
+  h1 { margin: 0 0 4px; font-size: 24px; }
+  p  { color: #8a94a6; margin: 0 0 24px; font-size: 14px; }
+
+  .preview {
+    display: inline-block;
+    background: #1a2236;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+  }
+  .preview svg { display: block; width: 320px; height: 320px; border-radius: 0; }
+
+  .sizes {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+  }
+  .size-preview {
+    text-align: center;
+  }
+  .size-preview .icon {
+    background: #1a2236;
+    padding: 4px;
+    border-radius: 8px;
+    display: inline-block;
+  }
+  .size-preview .icon svg { display: block; border-radius: 4px; }
+  .size-preview .label { font-size: 11px; color: #8a94a6; margin-top: 6px; }
+
+  .actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  button {
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  button:hover { transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+  button.alt { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); }
+
+  .info {
+    max-width: 520px;
+    margin: 32px auto 0;
+    padding: 16px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.08);
+    text-align: left;
+    font-size: 13px;
+    color: #b4c2d6;
+    line-height: 1.6;
+  }
+  .info code {
+    background: rgba(0,0,0,0.4);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #f5a623;
+  }
+</style>
+</head>
+<body>
+
+<h1>Afresto HUB — App Icon</h1>
+<p>Variant A: Diamond Frame + A symbol</p>
+
+<!-- Preview besar -->
+<div class="preview">
+  <svg id="iconSvg" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background gradient navy -->
+    <defs>
+      <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="#0a1628"/>
+        <stop offset="100%" stop-color="#152944"/>
+      </linearGradient>
+      <linearGradient id="goldGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%"   stop-color="#F5A623"/>
+        <stop offset="100%" stop-color="#E89108"/>
+      </linearGradient>
+      <linearGradient id="greenGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="#22C55E"/>
+        <stop offset="100%" stop-color="#16A34A"/>
+      </linearGradient>
+    </defs>
+
+    <!-- Background solid + gradient overlay -->
+    <rect width="1024" height="1024" fill="url(#bgGrad)"/>
+
+    <!--
+      Diamond frame — pentagon-like shape mengikuti logo asli Afresto:
+      runcing di atas, miring di kanan-kiri tengah, miring tertutup di bawah.
+      Stroke kuning emas, no fill.
+    -->
+    <path
+      d="M 512 160
+         L 832 432
+         L 752 632
+         L 272 632
+         L 192 432
+         Z"
+      fill="none"
+      stroke="url(#goldGrad)"
+      stroke-width="64"
+      stroke-linejoin="round"
+      stroke-linecap="round"/>
+
+    <!--
+      Aksen bawah — garis miring kanan ke bawah (signature element dari logo Afresto)
+    -->
+    <path
+      d="M 752 632 L 880 712"
+      fill="none"
+      stroke="url(#goldGrad)"
+      stroke-width="56"
+      stroke-linecap="round"/>
+
+    <!--
+      Huruf A stylized — geometric, hijau, di tengah diamond
+    -->
+    <path
+      d="M 512 280
+         L 380 540
+         L 432 540
+         L 460 482
+         L 564 482
+         L 592 540
+         L 644 540
+         Z
+         M 484 432
+         L 540 432
+         L 512 376
+         Z"
+      fill="url(#greenGrad)"/>
+
+    <!-- Stroke garis miring akhir A — extension green ke bawah-kanan -->
+    <path
+      d="M 644 540 L 700 600"
+      fill="none"
+      stroke="url(#greenGrad)"
+      stroke-width="48"
+      stroke-linecap="round"/>
+  </svg>
+</div>
+
+<!-- Preview small sizes -->
+<div class="sizes">
+  <div class="size-preview">
+    <div class="icon"><svg viewBox="0 0 1024 1024" width="180" height="180"><use href="#iconSvg" /></svg></div>
+    <div class="label">180×180 (iPhone home)</div>
+  </div>
+  <div class="size-preview">
+    <div class="icon"><svg viewBox="0 0 1024 1024" width="120" height="120"><use href="#iconSvg" /></svg></div>
+    <div class="label">120×120 (iPhone settings)</div>
+  </div>
+  <div class="size-preview">
+    <div class="icon"><svg viewBox="0 0 1024 1024" width="60" height="60"><use href="#iconSvg" /></svg></div>
+    <div class="label">60×60 (small)</div>
+  </div>
+</div>
+
+<!-- Download buttons -->
+<div class="actions">
+  <button onclick="downloadPng(1024, 'afresto-hub-icon-1024.png')">⬇ Download 1024×1024 (Master)</button>
+  <button onclick="downloadPng(512, 'afresto-hub-icon-512.png')" class="alt">⬇ 512×512 (Play Store)</button>
+  <button onclick="downloadPng(180, 'afresto-hub-icon-180.png')" class="alt">⬇ 180×180 (iPhone)</button>
+</div>
+
+<div class="info">
+  <strong>Cara pakai:</strong><br>
+  1. Klik <code>Download 1024×1024 (Master)</code> → file PNG ke-download<br>
+  2. Replace <code>assets/icon.png</code> di project mobile dengan file ini<br>
+  3. PNG sudah <strong>sudut tajam</strong> (no pre-round) → iOS/Android otomatis kasih rounded corner<br>
+  4. PNG sudah <strong>solid background</strong> (no alpha) → lolos App Store guideline<br><br>
+  Kalau mau adjust warna / shape, edit file ini di text editor — semua angka di <code>&lt;path d="..."&gt;</code> bisa diubah.
+</div>
+
+<script>
+function downloadPng(size, filename) {
+  const svg = document.getElementById('iconSvg');
+  // Clone supaya tidak ubah preview
+  const clone = svg.cloneNode(true);
+  clone.setAttribute('width',  size);
+  clone.setAttribute('height', size);
+
+  const xml = new XMLSerializer().serializeToString(clone);
+  const svg64 = btoa(unescape(encodeURIComponent(xml)));
+  const img = new Image();
+
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width  = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, size, size);
+
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }, 'image/png');
+  };
+  img.src = 'data:image/svg+xml;base64,' + svg64;
+}
+</script>
+
+</body>
+</html>
