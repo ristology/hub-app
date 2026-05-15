@@ -14,7 +14,7 @@
     },
     "ios": {
       "bundleIdentifier": "id.afresto.hub",
-      "supportsTablet": true,
+      "supportsTablet": false,
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSCameraUsageDescription": "Aplikasi membutuhkan akses kamera untuk memposting foto ke Feed.",
