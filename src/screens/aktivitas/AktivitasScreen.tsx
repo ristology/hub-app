@@ -119,16 +119,16 @@ export default function AktivitasScreen() {
       return { tab: 'ErrorLog', screen: 'ErrorLogDetail', params: { id } };
     }
     if (mt.endsWith('\\ClientRequest') || mt === 'App\\Models\\ClientRequest') {
-      return { tab: 'Menu', screen: 'Request', params: { screen: 'RequestDetail', params: { id } } };
+      return { tab: 'Request', screen: 'RequestDetail', params: { id } };
     }
     if (mt.endsWith('\\KalenderKegiatan') || mt === 'App\\Models\\KalenderKegiatan') {
-      return { tab: 'Menu', screen: 'Kalender', params: { screen: 'KegiatanDetail', params: { id } } };
+      return { tab: 'Kalender', screen: 'KegiatanDetail', params: { id } };
     }
     if (mt.endsWith('\\Tugas') || mt === 'App\\Models\\Tugas') {
       return { tab: 'Task', screen: 'TaskDetail', params: { id } };
     }
     if (mt.endsWith('\\Performance') || mt === 'App\\Models\\Performance') {
-      return { tab: 'Menu', screen: 'Performance', params: { screen: 'PerformanceDetail', params: { id } } };
+      return { tab: 'Performance', screen: 'PerformanceDetail', params: { id } };
     }
     return null;
   };
