@@ -17,9 +17,10 @@
       "supportsTablet": false,
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "NSCameraUsageDescription": "Aplikasi membutuhkan akses kamera untuk memposting foto ke Feed.",
-        "NSPhotoLibraryUsageDescription": "Aplikasi membutuhkan akses galeri untuk memilih foto.",
-        "NSLocationWhenInUseUsageDescription": "Aplikasi membutuhkan lokasi untuk menandai lokasi posting Feed.",
+        "NSCameraUsageDescription": "Afresto HUB butuh akses kamera untuk mengambil foto/video yang akan diposting di Feed, dilampirkan di pesan Chat, dan dokumentasi laporan Error sistem klien.",
+        "NSPhotoLibraryUsageDescription": "Afresto HUB butuh akses galeri untuk memilih foto/video yang akan diposting di Feed, dilampirkan di pesan Chat, atau diupload sebagai dokumen perusahaan. Foto/video Anda tidak dibagikan ke pihak ketiga, hanya disimpan di server perusahaan untuk komunikasi internal antar karyawan.",
+        "NSLocationWhenInUseUsageDescription": "Afresto HUB butuh akses lokasi untuk menandai lokasi posting Feed (opsional - hanya saat Anda memilih untuk menambahkan geo-tag). Lokasi tidak di-track di background, hanya saat aktif posting.",
+        "NSMicrophoneUsageDescription": "Afresto HUB butuh akses mikrofon untuk merekam audio pada video yang dilampirkan di Feed dan Chat.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -46,14 +47,15 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Aplikasi membutuhkan akses galeri untuk memilih foto.",
-          "cameraPermission": "Aplikasi membutuhkan akses kamera untuk memposting foto ke Feed."
+          "photosPermission": "Afresto HUB butuh akses galeri untuk memilih foto/video yang akan diposting di Feed, dilampirkan di Chat, atau diupload sebagai dokumen perusahaan.",
+          "cameraPermission": "Afresto HUB butuh akses kamera untuk mengambil foto/video yang akan diposting di Feed, Chat, dan laporan Error sistem klien.",
+          "microphonePermission": "Afresto HUB butuh akses mikrofon untuk merekam audio pada video yang dilampirkan di Feed dan Chat."
         }
       ],
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Aplikasi membutuhkan lokasi untuk menandai lokasi posting Feed."
+          "locationAlwaysAndWhenInUsePermission": "Afresto HUB butuh akses lokasi untuk menandai lokasi posting Feed (opsional). Lokasi tidak di-track di background, hanya saat aktif posting."
         }
       ],
       [
