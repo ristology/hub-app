@@ -75,6 +75,12 @@
         "projectId": "210a5516-9b22-4214-bb41-7896eb6bf56c"
       }
     },
-    "owner": "ristonoraga"
+    "owner": "ristonoraga",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/210a5516-9b22-4214-bb41-7896eb6bf56c"
+    }
   }
 }
