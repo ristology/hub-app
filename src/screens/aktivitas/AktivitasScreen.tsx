@@ -137,7 +137,10 @@ export default function AktivitasScreen() {
     const target = getNavTarget(a);
     if (!target) return;
     if (target.screen) {
-      navigation.navigate(target.tab, { screen: target.screen, params: target.params });
+      // initial: false → stack tetap mulai dari list screen (mis. KalenderList),
+      // detail di-push di atasnya. Tanpa ini, back langsung lompat ke Beranda
+      // karena stack hanya berisi detail screen saja.
+      navigation.navigate(target.tab, { screen: target.screen, initial: false, params: target.params });
     } else {
       navigation.navigate(target.tab, target.params);
     }

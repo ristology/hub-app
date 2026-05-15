@@ -97,7 +97,13 @@ function dispatchNavigation(target: ReturnType<typeof resolveTarget>) {
   const { tab, screen, params } = target;
 
   if (screen) {
-    navigationRef.navigate(tab, { screen, params });
+    // initial: false → tetap mount list screen sebagai initial route, push detail di atasnya.
+    // Tanpa ini, back dari detail langsung lompat ke Beranda krn stack hanya berisi detail.
+    // 3-level (MainTabs > Kalender > KegiatanDetail): inner params juga butuh initial: false.
+    const innerParams = params && typeof params === 'object' && (params as any).screen
+      ? { ...(params as any), initial: false }
+      : params;
+    navigationRef.navigate(tab, { screen, initial: false, params: innerParams });
   } else {
     navigationRef.navigate(tab, params);
   }
