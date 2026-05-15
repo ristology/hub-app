@@ -68,7 +68,11 @@
           ]
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "./plugins/with-adi-registration.js",
+        { "token": "DNDCYAW7MPKX4AAAAAAAAAAAAA" }
+      ]
     ],
     "extra": {
       "eas": {
