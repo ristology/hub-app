@@ -1,9 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
-  TouchableOpacity, Image, Platform,
+  TouchableOpacity, Image, Platform, TextInput,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -29,7 +29,9 @@ function formatTime(iso: string | null): string {
 
 export default function ChatScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ChatStackParamList>>();
+  const insets     = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch]         = useState('');
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['chat-rooms'],
@@ -50,6 +52,14 @@ export default function ChatScreen() {
     await refetch();
     setRefreshing(false);
   }, [refetch]);
+
+  // Client-side filter by nama room (case-insensitive substring match)
+  const filteredRooms = useMemo(() => {
+    const rooms = data?.data ?? [];
+    const q = search.trim().toLowerCase();
+    if (!q) return rooms;
+    return rooms.filter((r) => r.nama.toLowerCase().includes(q));
+  }, [data, search]);
 
   const renderItem = ({ item }: { item: ChatRoom }) => (
     <TouchableOpacity
@@ -111,19 +121,49 @@ export default function ChatScreen() {
         <Text style={styles.title}>Chat</Text>
       </View>
 
+      <View style={styles.searchWrap}>
+        <View style={styles.searchBox}>
+          <Ionicons name="search" size={18} color="#6b7280" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Cari chat..."
+            placeholderTextColor="#6b7280"
+            value={search}
+            onChangeText={setSearch}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color="#6b7280" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       <FlatList
-        data={data?.data ?? []}
+        data={filteredRooms}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />
         }
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
           <View style={styles.center}>
-            <Ionicons name="chatbubbles-outline" size={48} color="#3b3f4a" />
-            <Text style={styles.empty}>Belum ada chat. Mulai chat baru.</Text>
+            <Ionicons
+              name={search ? 'search-outline' : 'chatbubbles-outline'}
+              size={48}
+              color="#3b3f4a"
+            />
+            <Text style={styles.empty}>
+              {search
+                ? `Tidak ada chat dengan nama "${search}"`
+                : 'Belum ada chat. Mulai chat baru.'}
+            </Text>
           </View>
         }
       />
@@ -142,8 +182,23 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0d1421' },
   center:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
-  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12, gap: 4 },
+  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, gap: 4 },
   title:     { color: '#fff', fontSize: 24, fontWeight: '700' },
+
+  // Search bar style WhatsApp — translucent rounded, icon kiri, padding nyaman
+  searchWrap: { paddingHorizontal: 16, paddingBottom: 12 },
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  },
+  searchInput: {
+    flex: 1, color: '#fff', fontSize: 14,
+    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
+  },
+
   list:      { paddingHorizontal: 16 },
   separator: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginLeft: 60 },
   roomItem:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
