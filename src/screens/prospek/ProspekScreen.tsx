@@ -63,6 +63,7 @@ function formatBulan(s?: string): string {
 
 export default function ProspekScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProspekStackParamList>>();
+  const insets     = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
 
   const [filters, setFilters]       = useState<Filters>({});
@@ -187,7 +188,7 @@ export default function ProspekScreen() {
         data={data?.data ?? []}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />}
         ListEmptyComponent={
           <View style={styles.center}>

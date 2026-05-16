@@ -4,7 +4,7 @@ import {
   TouchableOpacity, LayoutAnimation, Platform, UIManager,
   type NativeSyntheticEvent, type NativeScrollEvent,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -57,6 +57,7 @@ type QuickFilter = 'hari_ini' | 'minggu_ini' | 'mendatang';
 
 export default function KalenderScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<KalenderStackParamList>>();
+  const insets     = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [cursor, setCursor] = useState(() => new Date());
   const [showCalendar, setShowCalendar]   = useState(false);
@@ -269,7 +270,7 @@ export default function KalenderScreen() {
         data={groups}
         keyExtractor={(item) => item[0]}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
         onScroll={onScroll}
         scrollEventThrottle={32}
         refreshControl={

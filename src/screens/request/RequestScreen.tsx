@@ -66,6 +66,7 @@ function formatTanggal(s?: string): string {
 export default function RequestScreen() {
   const navigation  = useNavigation<NativeStackNavigationProp<RequestStackParamList>>();
   const queryClient = useQueryClient();
+  const insets      = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
 
   const [filters, setFilters]       = useState<Filters>({});
@@ -188,7 +189,7 @@ export default function RequestScreen() {
         data={data?.data ?? []}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />}
         ListEmptyComponent={
           <View style={styles.center}>

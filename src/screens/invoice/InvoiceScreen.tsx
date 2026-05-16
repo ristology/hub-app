@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
   TouchableOpacity, ScrollView, Alert, Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -36,6 +36,7 @@ function formatRupiahCompact(n: number): string {
 export default function InvoiceScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ParamList>>();
   const queryClient = useQueryClient();
+  const insets     = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('semua');
   const [openId, setOpenId] = useState<number | null>(null);
@@ -228,7 +229,7 @@ export default function InvoiceScreen() {
         data={data?.data ?? []}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />
         }

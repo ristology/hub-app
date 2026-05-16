@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
   TouchableOpacity, ScrollView, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -28,6 +28,7 @@ const FILTER_OPTIONS: { key: Filter; label: string }[] = [
 
 export default function PerformanceScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ParamList>>();
+  const insets     = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('semua');
 
@@ -113,7 +114,7 @@ export default function PerformanceScreen() {
         data={data?.data ?? []}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />
         }

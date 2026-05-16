@@ -57,6 +57,7 @@ function countActive(f: Filters): number {
 export default function TaskScreen() {
   const navigation  = useNavigation<NativeStackNavigationProp<TaskStackParamList>>();
   const queryClient = useQueryClient();
+  const insets      = useSafeAreaInsets();
   const { user } = useAuth();
   const isAdminHr = user?.role === 'admin' || user?.role === 'hr';
   const [refreshing, setRefreshing] = useState(false);
@@ -185,7 +186,7 @@ export default function TaskScreen() {
             </SwipeableCard>
           );
         }}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />}
         ListEmptyComponent={
           <View style={styles.center}>

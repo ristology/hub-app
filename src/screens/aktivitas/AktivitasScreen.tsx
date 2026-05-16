@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
   TouchableOpacity, TextInput,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useInfiniteQuery, keepPreviousData } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -62,6 +62,7 @@ function formatTime(s: string): string {
 
 export default function AktivitasScreen() {
   const navigation = useNavigation<any>();
+  const insets     = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [tipe, setTipe] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -222,7 +223,7 @@ export default function AktivitasScreen() {
             </View>
           );
         }}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />
         }

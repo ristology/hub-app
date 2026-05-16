@@ -64,6 +64,7 @@ function formatBulan(s?: string): string {
 export default function ErrorLogScreen() {
   const navigation   = useNavigation<NativeStackNavigationProp<ErrorLogStackParamList>>();
   const queryClient  = useQueryClient();
+  const insets       = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
 
   // Applied filters
@@ -249,7 +250,7 @@ export default function ErrorLogScreen() {
         data={data?.data ?? []}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />}
         ListEmptyComponent={
           <View style={styles.center}>

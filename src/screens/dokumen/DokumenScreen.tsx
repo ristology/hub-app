@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
   TouchableOpacity, TextInput, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -22,6 +22,7 @@ type ParamList = {
 
 export default function DokumenScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ParamList>>();
+  const insets     = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [folderId, setFolderId] = useState<number | null>(null);
   const [search, setSearch]     = useState('');
@@ -122,7 +123,7 @@ export default function DokumenScreen() {
         data={data?.data ?? []}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />
         }
