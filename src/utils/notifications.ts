@@ -7,22 +7,18 @@ import { deviceApi } from '../api/device';
 
 const STORAGE_KEY_DEVICE_TOKEN = 'fcm_device_token';
 
-/**
- * Konfigurasi global cara notif tampil saat app foreground.
- */
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList:   true,
-    shouldPlaySound:  true,
-    shouldSetBadge:   true,
-    shouldShowAlert:  true,
-  }),
-});
+// NOTE: setNotificationHandler dipanggil terpusat di App.tsx — JANGAN dipanggil
+// di sini (modul-level side effect dengan property deprecated `shouldShowAlert`
+// menyebabkan silent fail di Android SDK 54).
 
 /**
  * Setup channels notif Android (wajib untuk Android 8+).
  * Channel terpisah supaya bisa beda suara + importance per kategori.
+ *
+ * **Idempotent**: aman dipanggil berulang. Channel sticky setelah pertama dibuat.
+ * Dipanggil dari App.tsx saat startup (tidak menunggu login), supaya channel
+ * sudah siap menerima push begitu push pertama tiba — bahkan kalau registrasi
+ * device token gagal.
  */
 export async function setupAndroidChannel() {
   if (Platform.OS !== 'android') return;

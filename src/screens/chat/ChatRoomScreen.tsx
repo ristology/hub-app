@@ -214,16 +214,34 @@ export default function ChatRoomScreen() {
     return otherMaxRead >= msg.id ? 'read' : 'sent';
   };
 
-  // Scroll FlatList ke pesan yg di-reply + highlight sebentar
+  // Scroll FlatList ke pesan yg di-reply + highlight sebentar.
+  // Inverted FlatList scrollToIndex sering flaky di iOS — wrapper sini retry
+  // dgn ascending delay supaya pasti landing setelah virtualization render item.
   const scrollToMessage = (messageId: number) => {
     const idx = messages.findIndex((m) => m.id === messageId);
     if (idx < 0) {
       // Pesan tidak ada di list yg sudah di-load (mungkin di history lebih lama)
       return;
     }
-    flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
     setHighlightedMsgId(messageId);
     setTimeout(() => setHighlightedMsgId(null), 2500);
+
+    // Try scrollToIndex; kalau item belum rendered → onScrollToIndexFailed handler
+    // bawah otomatis retry. Tambah 2nd attempt dgn delay sebagai safety net
+    // untuk inverted list yg kadang gagal apply animation pertama kalinya.
+    const attempt = (animated: boolean) => {
+      try {
+        flatListRef.current?.scrollToIndex({ index: idx, animated, viewPosition: 0.5 });
+      } catch (e) {
+        // scrollToIndex bisa throw kalau ref unavailable — silent ignore, retry akan jalan
+      }
+    };
+    attempt(true);
+    // Retry 150ms kemudian dgn animated=false sebagai fallback kalau attempt pertama
+    // gagal (inverted FlatList iOS sometimes ignore first animated scroll)
+    setTimeout(() => attempt(false), 150);
+    // Final safety: animated scroll lagi setelah list settle
+    setTimeout(() => attempt(true), 400);
   };
 
   const handleLongPressMessage = (msg: ChatMessage) => {
