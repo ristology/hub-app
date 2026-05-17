@@ -35,7 +35,7 @@ export default function ProfileSheet({ visible, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const toast = useToast();
-  const { setUserFoto } = useAuth();
+  const { setUserFoto, logout } = useAuth();
 
   const slideAnim = useRef(new Animated.Value(-SCREEN_H)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -124,6 +124,16 @@ export default function ProfileSheet({ visible, onClose }: Props) {
       name: `foto.${ext}`,
       type: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
     });
+  };
+
+  const confirmLogout = () => {
+    onClose();
+    setTimeout(() => {
+      Alert.alert('Logout', 'Yakin ingin logout?', [
+        { text: 'Batal', style: 'cancel' },
+        { text: 'Logout', style: 'destructive', onPress: () => logout() },
+      ]);
+    }, ANIM_DURATION);
   };
 
   const submitUbahPw = () => {
@@ -259,6 +269,12 @@ export default function ProfileSheet({ visible, onClose }: Props) {
               <TouchableOpacity style={styles.actionBtn} onPress={() => setPwModalOpen(true)}>
                 <Ionicons name="key-outline" size={18} color="#f59e0b" />
                 <Text style={styles.actionText}>Ganti Password</Text>
+                <Ionicons name="chevron-forward" size={16} color="#6b7280" />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.actionBtn} onPress={confirmLogout}>
+                <Ionicons name="log-out-outline" size={18} color="#ef4444" />
+                <Text style={[styles.actionText, { color: '#ef4444' }]}>Logout</Text>
                 <Ionicons name="chevron-forward" size={16} color="#6b7280" />
               </TouchableOpacity>
 

@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, Animated, StyleSheet, Dimensions,
-  PanResponder, BackHandler, Alert, ScrollView,
+  PanResponder, BackHandler,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useAppDrawer } from '../context/AppDrawerContext';
@@ -13,12 +12,16 @@ import { notifApi } from '../api/notif';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
-const PANEL_WIDTH      = 88;
+const PANEL_WIDTH      = 96;   // outer wrapper — slides off-screen; includes left edge gap
+const CARD_WIDTH       = 88;   // inner glass card (visible width)
+const CARD_GAP_LEFT    = 8;    // gap card → edge layar
 const HANDLE_TOUCH_W   = 14;   // tap area — sengaja dibatasi 14px supaya tidak overlap
                                //  dengan FlatList paddingHorizontal:16 (cek SwipeableCard di Request).
 const HANDLE_BAR_W     = 5;    // bar visual
 const HANDLE_BAR_H     = 90;
+const HANDLE_AREA_H    = HANDLE_BAR_H + 20;     // tinggi container handleArea (bar di-center di dalam)
 const HANDLE_TOP       = SCREEN_H * 0.40;
+const HANDLE_CENTER_Y  = HANDLE_TOP + HANDLE_AREA_H / 2;  // pusat vertikal fin merah
 
 // Threshold untuk swipe gesture
 const SWIPE_OPEN_DX    = PANEL_WIDTH * 0.35;
@@ -33,8 +36,7 @@ type DrawerItem = {
 
 export default function AppDrawer() {
   const { isOpen, open, close } = useAppDrawer();
-  const { user, logout } = useAuth();
-  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
 
   // Notif count untuk badge — share queryKey dengan BottomTabNavigator supaya
   // tidak duplikat fetch.
@@ -137,8 +139,9 @@ export default function AppDrawer() {
     }),
   ).current;
 
+  // Beranda dihilangkan dari slide panel — sudah ada di bottom tab navigation,
+  // tidak perlu duplikat.
   const items: DrawerItem[] = [
-    { key: 'beranda',     label: 'Beranda',     icon: 'home-outline',         route: 'MainTabs' },
     { key: 'kalender',    label: 'Kalender',    icon: 'calendar-outline',     route: 'Kalender' },
     { key: 'request',     label: 'Request',     icon: 'mail-outline',         route: 'Request' },
     { key: 'performance', label: 'Perform.',    icon: 'trending-up-outline',  route: 'Performance' },
@@ -163,16 +166,6 @@ export default function AppDrawer() {
     }, 220);
   };
 
-  const confirmLogout = () => {
-    animateClose();
-    setTimeout(() => {
-      Alert.alert('Logout', 'Yakin ingin logout?', [
-        { text: 'Batal', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: () => logout() },
-      ]);
-    }, 220);
-  };
-
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {/* Backdrop — render saat overlay aktif, tap untuk tutup */}
@@ -184,25 +177,22 @@ export default function AppDrawer() {
         />
       )}
 
-      {/* Panel — selalu mounted, hanya digeser. pointerEvents=none saat tertutup
+      {/* Panel wrapper — selalu mounted, full-height, hanya digeser.
+          Transparan; berfungsi sebagai container untuk slide animation +
+          vertical centering inner card. pointerEvents=none saat tertutup
           supaya tidak intercept tap/swipe pada child di belakangnya (di Android
           translateX tidak otomatis pindahkan hitbox). */}
       <Animated.View
         style={[
-          styles.panel,
-          {
-            paddingTop:    insets.top + 12,
-            paddingBottom: insets.bottom + 12,
-            transform: [{ translateX: slideX }],
-          },
+          styles.panelWrapper,
+          { transform: [{ translateX: slideX }] },
         ]}
         pointerEvents={isOpen ? 'auto' : 'none'}
         {...(isOpen ? panelPan.panHandlers : {})}
       >
-        <ScrollView
-          contentContainerStyle={styles.panelContent}
-          showsVerticalScrollIndicator={false}
-        >
+        {/* Inner card — glass panel sesungguhnya. Auto-height (menyesuaikan
+            items), vertically centered oleh wrapper, rounded di kiri & kanan. */}
+        <View style={styles.panelCard}>
           {items.map((item) => {
             const count = item.key === 'request' ? requestUnread : 0;
             return (
@@ -224,14 +214,7 @@ export default function AppDrawer() {
               </TouchableOpacity>
             );
           })}
-
-          <View style={styles.divider} />
-
-          <TouchableOpacity onPress={confirmLogout} style={styles.item} activeOpacity={0.6}>
-            <Ionicons name="log-out-outline" size={24} color="#ef4444" />
-            <Text style={[styles.itemLabel, { color: '#ef4444' }]}>Logout</Text>
-          </TouchableOpacity>
-        </ScrollView>
+        </View>
       </Animated.View>
 
       {/* Fin/handle — selalu visible di edge kiri, tap atau swipe untuk buka.
@@ -254,23 +237,32 @@ export default function AppDrawer() {
 const styles = StyleSheet.create({
   backdrop: { backgroundColor: 'rgba(0,0,0,0.45)' },
 
-  // Glass panel — rgba dengan border tipis untuk efek transparan
-  panel: {
-    position: 'absolute', left: 0, top: 0, bottom: 0,
+  // Outer wrapper — container untuk slide animation & vertical centering inner
+  // card. Tidak ada glass styling di sini. Bottom dipotong supaya wrapper
+  // height = 2 * HANDLE_CENTER_Y → justifyContent center menempatkan card
+  // tepat di pusat handle fin merah (bukan pusat layar).
+  panelWrapper: {
+    position: 'absolute', left: 0, top: 0,
+    bottom: Math.max(0, SCREEN_H - 2 * HANDLE_CENTER_Y),
     width: PANEL_WIDTH,
-    backgroundColor: 'rgba(20, 30, 50, 0.78)',
-    borderRightWidth: 1,
-    borderRightColor: 'rgba(255,255,255,0.10)',
-    // subtle shadow ke kanan
-    shadowColor: '#000',
-    shadowOffset: { width: 4, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    justifyContent: 'center',
   },
-  panelContent: {
+
+  // Inner glass card — rounded di kiri & kanan, ada gap dari edge layar.
+  panelCard: {
+    width: CARD_WIDTH,
+    marginLeft: CARD_GAP_LEFT,
+    paddingVertical: 12,
     alignItems: 'center',
-    paddingVertical: 6,
+    backgroundColor: 'rgba(20, 30, 50, 0.78)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
   },
 
   item: {
@@ -301,12 +293,6 @@ const styles = StyleSheet.create({
   },
   itemBadgeText: {
     color: '#fff', fontSize: 9, fontWeight: '700',
-  },
-
-  divider: {
-    width: '70%', height: 1,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    marginVertical: 6,
   },
 
   // Fin/handle pada edge kiri
