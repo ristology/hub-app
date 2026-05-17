@@ -149,7 +149,7 @@ export async function registerDeviceWithBackend(): Promise<{
   } catch (e: any) {
     const result = { ok: false, step: 'channel', message: `Setup channel gagal: ${e.message}` };
     console.error('[Push]', result);
-    Alert.alert('Push DEBUG — Step 1', result.message);
+    if (debug) Alert.alert('Push DEBUG — Step 1', result.message);
     return result;
   }
 
@@ -157,7 +157,7 @@ export async function registerDeviceWithBackend(): Promise<{
   if (!Device.isDevice) {
     const result = { ok: false, step: 'device', message: 'Bukan physical device — simulator/emulator tidak support push' };
     console.warn('[Push]', result);
-    Alert.alert('Push DEBUG — Step 2', result.message);
+    if (debug) Alert.alert('Push DEBUG — Step 2', result.message);
     return result;
   }
 
@@ -172,13 +172,13 @@ export async function registerDeviceWithBackend(): Promise<{
     if (finalStatus !== 'granted') {
       const result = { ok: false, step: 'permission', message: `Permission ${finalStatus} — buka Settings → Apps → Afresto HUB → Notifications` };
       console.warn('[Push]', result);
-      Alert.alert('Push DEBUG — Step 3', result.message);
+      if (debug) Alert.alert('Push DEBUG — Step 3', result.message);
       return result;
     }
   } catch (e: any) {
     const result = { ok: false, step: 'permission', message: `Permission check gagal: ${e.message}` };
     console.error('[Push]', result);
-    Alert.alert('Push DEBUG — Step 3', result.message);
+    if (debug) Alert.alert('Push DEBUG — Step 3', result.message);
     return result;
   }
 
@@ -197,14 +197,14 @@ export async function registerDeviceWithBackend(): Promise<{
   } catch (e: any) {
     const result = { ok: false, step: 'token', message: `getDevicePushTokenAsync gagal: ${e.message ?? e}. FCM/google-services issue?` };
     console.error('[Push]', result);
-    Alert.alert('Push DEBUG — Step 4', result.message);
+    if (debug) Alert.alert('Push DEBUG — Step 4', result.message);
     return result;
   }
 
   if (!token) {
     const result = { ok: false, step: 'token', message: 'Token kosong dari native API' };
     console.warn('[Push]', result);
-    Alert.alert('Push DEBUG — Step 4', result.message);
+    if (debug) Alert.alert('Push DEBUG — Step 4', result.message);
     return result;
   }
 
@@ -218,14 +218,14 @@ export async function registerDeviceWithBackend(): Promise<{
     await SecureStore.setItemAsync(STORAGE_KEY_DEVICE_TOKEN, token);
     const result = { ok: true, step: 'done', message: `Register sukses (${platform} / ${deviceName})`, tokenPreview };
     console.warn('[Push]', result);
-    Alert.alert('Push DEBUG — OK ✓', `${result.message}\n\nToken: ${tokenPreview}`);
+    if (debug) Alert.alert('Push DEBUG — OK ✓', `${result.message}\n\nToken: ${tokenPreview}`);
     return result;
   } catch (e: any) {
     const errMsg = e.response?.data?.message ?? e.message ?? 'unknown';
     const status = e.response?.status ?? '?';
     const result = { ok: false, step: 'api', message: `POST /device/register gagal (${status}): ${errMsg}`, tokenPreview };
     console.error('[Push]', result);
-    Alert.alert('Push DEBUG — Step 5', `${result.message}\n\nToken: ${tokenPreview}`);
+    if (debug) Alert.alert('Push DEBUG — Step 5', `${result.message}\n\nToken: ${tokenPreview}`);
     return result;
   }
 }

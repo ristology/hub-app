@@ -28,7 +28,25 @@ function resolveTarget(data: NotifData): { tab: string; screen?: string; params?
 
   // 1) Explicit dari payload (cara utama — backend sudah kirim tipe+model_id)
   if (tipe && modelId) {
-    if (tipe === 'komentar_feed' || tipe === 'feed_post' || tipe === 'feed_tag' || tipe === 'komentar_balas') {
+    // komentar_balas bisa berasal dari Feed/Prospek/ErrorLog/ClientRequest —
+    // tujuan ditentukan oleh model_type, bukan default ke Feed.
+    if (tipe === 'komentar_balas') {
+      if (modelType.endsWith('\\Prospek')) {
+        return { tab: 'Prospek', screen: 'ProspekDetail', params: { id: modelId, highlightKomentarId: komId } };
+      }
+      if (modelType.endsWith('\\ErrorLog')) {
+        return { tab: 'ErrorLog', screen: 'ErrorLogDetail', params: { id: modelId, highlightKomentarId: komId } };
+      }
+      if (modelType.endsWith('\\ClientRequest')) {
+        return {
+          tab: 'MainTabs',
+          screen: 'Request',
+          params: { screen: 'RequestDetail', params: { id: modelId, highlightKomentarId: komId } },
+        };
+      }
+      return { tab: 'Feed', screen: 'FeedDetail', params: { id: modelId, highlightKomentarId: komId } };
+    }
+    if (tipe === 'komentar_feed' || tipe === 'feed_post' || tipe === 'feed_tag') {
       return { tab: 'Feed', screen: 'FeedDetail', params: { id: modelId, highlightKomentarId: komId } };
     }
     if (tipe === 'komentar_prospek' || tipe.startsWith('prospek_')) {
