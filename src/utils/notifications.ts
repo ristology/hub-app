@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import * as SecureStore from 'expo-secure-store';
@@ -6,6 +6,23 @@ import Constants from 'expo-constants';
 import { deviceApi } from '../api/device';
 
 const STORAGE_KEY_DEVICE_TOKEN = 'fcm_device_token';
+
+// Diagnostic mode: tampilkan Alert visible saat register fail / sukses utk
+// karyawan dengan flag debug. Diaktifkan via SecureStore key 'push_debug'.
+// TEMPORARY — hapus setelah Android push fix verified working di semua HP.
+const STORAGE_KEY_PUSH_DEBUG = 'push_debug';
+
+async function isDebugMode(): Promise<boolean> {
+  try {
+    return (await SecureStore.getItemAsync(STORAGE_KEY_PUSH_DEBUG)) === '1';
+  } catch { return false; }
+}
+
+/** Toggle debug mode dari profile screen / dev tool. */
+export async function setPushDebug(enabled: boolean): Promise<void> {
+  if (enabled) await SecureStore.setItemAsync(STORAGE_KEY_PUSH_DEBUG, '1');
+  else await SecureStore.deleteItemAsync(STORAGE_KEY_PUSH_DEBUG);
+}
 
 // NOTE: setNotificationHandler dipanggil terpusat di App.tsx — JANGAN dipanggil
 // di sini (modul-level side effect dengan property deprecated `shouldShowAlert`
@@ -113,28 +130,103 @@ export async function getNativePushToken(): Promise<string | null> {
  * SELALU hit API (updateOrCreate di backend, idempotent) — supaya:
  *  - Cache stale tidak block register saat backend kehilangan row (cleanup, switch env)
  *  - last_seen ter-update tiap session → bisa cleanup token lama
+ *
+ * Return object { ok, message, tokenPreview } untuk caller bisa show feedback.
  */
-export async function registerDeviceWithBackend(): Promise<void> {
+export async function registerDeviceWithBackend(): Promise<{
+  ok: boolean;
+  message: string;
+  tokenPreview?: string;
+  step?: string;
+}> {
+  const debug = await isDebugMode();
+  const platform = Platform.OS === 'ios' ? 'ios' : 'android';
   console.warn('[Push] registerDeviceWithBackend start');
-  await setupAndroidChannel();
 
-  const token = await getNativePushToken();
-  console.warn('[Push] token result:', token ? token.substring(0, 30) + '...' : 'NULL');
-  if (!token) {
-    console.warn('[Push] Token null — skip register');
-    return;
+  // Step 1: setup channels
+  try {
+    await setupAndroidChannel();
+  } catch (e: any) {
+    const result = { ok: false, step: 'channel', message: `Setup channel gagal: ${e.message}` };
+    console.error('[Push]', result);
+    Alert.alert('Push DEBUG — Step 1', result.message);
+    return result;
   }
 
-  const platform   = Platform.OS === 'ios' ? 'ios' : 'android';
-  const deviceName = `${Device.brand ?? Platform.OS}-${Device.modelName ?? 'unknown'}`;
-  console.warn('[Push] POST /device/register | platform=' + platform);
+  // Step 2: cek physical device
+  if (!Device.isDevice) {
+    const result = { ok: false, step: 'device', message: 'Bukan physical device — simulator/emulator tidak support push' };
+    console.warn('[Push]', result);
+    Alert.alert('Push DEBUG — Step 2', result.message);
+    return result;
+  }
 
+  // Step 3: permission
+  try {
+    const { status: existing } = await Notifications.getPermissionsAsync();
+    let finalStatus = existing;
+    if (existing !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') {
+      const result = { ok: false, step: 'permission', message: `Permission ${finalStatus} — buka Settings → Apps → Afresto HUB → Notifications` };
+      console.warn('[Push]', result);
+      Alert.alert('Push DEBUG — Step 3', result.message);
+      return result;
+    }
+  } catch (e: any) {
+    const result = { ok: false, step: 'permission', message: `Permission check gagal: ${e.message}` };
+    console.error('[Push]', result);
+    Alert.alert('Push DEBUG — Step 3', result.message);
+    return result;
+  }
+
+  // Step 4: ambil native push token
+  let token: string | null = null;
+  try {
+    if (Platform.OS === 'ios') {
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId
+                     ?? (Constants as any).easConfig?.projectId;
+      const r = await Notifications.getExpoPushTokenAsync({ projectId });
+      token = r.data;
+    } else {
+      const r = await Notifications.getDevicePushTokenAsync();
+      token = r.data;
+    }
+  } catch (e: any) {
+    const result = { ok: false, step: 'token', message: `getDevicePushTokenAsync gagal: ${e.message ?? e}. FCM/google-services issue?` };
+    console.error('[Push]', result);
+    Alert.alert('Push DEBUG — Step 4', result.message);
+    return result;
+  }
+
+  if (!token) {
+    const result = { ok: false, step: 'token', message: 'Token kosong dari native API' };
+    console.warn('[Push]', result);
+    Alert.alert('Push DEBUG — Step 4', result.message);
+    return result;
+  }
+
+  const tokenPreview = token.substring(0, 30) + '...';
+  console.warn('[Push] token:', tokenPreview);
+
+  // Step 5: POST ke backend
+  const deviceName = `${Device.brand ?? Platform.OS}-${Device.modelName ?? 'unknown'}`;
   try {
     await deviceApi.register(token, platform, deviceName);
     await SecureStore.setItemAsync(STORAGE_KEY_DEVICE_TOKEN, token);
-    console.warn('[Push] Register sukses');
+    const result = { ok: true, step: 'done', message: `Register sukses (${platform} / ${deviceName})`, tokenPreview };
+    console.warn('[Push]', result);
+    Alert.alert('Push DEBUG — OK ✓', `${result.message}\n\nToken: ${tokenPreview}`);
+    return result;
   } catch (e: any) {
-    console.error('[Push] Gagal register:', e.message, e.response?.data);
+    const errMsg = e.response?.data?.message ?? e.message ?? 'unknown';
+    const status = e.response?.status ?? '?';
+    const result = { ok: false, step: 'api', message: `POST /device/register gagal (${status}): ${errMsg}`, tokenPreview };
+    console.error('[Push]', result);
+    Alert.alert('Push DEBUG — Step 5', `${result.message}\n\nToken: ${tokenPreview}`);
+    return result;
   }
 }
 
