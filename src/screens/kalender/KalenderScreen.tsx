@@ -78,11 +78,6 @@ export default function KalenderScreen() {
     queryFn:  () => kalenderApi.list({ start: toIso(start), end: toIso(end) }),
   });
 
-  const { data: stats } = useQuery({
-    queryKey: ['kalender-stats'],
-    queryFn:  kalenderApi.stats,
-  });
-
   const { data: googleStatus } = useQuery({
     queryKey: ['kalender-google-status'],
     queryFn:  kalenderApi.googleStatus,
@@ -116,29 +111,47 @@ export default function KalenderScreen() {
     return map;
   }, [data]);
 
+  // Range key untuk filter quick — dipakai bersama oleh stat box & groups
+  // supaya angka di chip = jumlah event di list. Tanpa ini, stat box pakai
+  // angka global dari API stats, list pakai data bulan aktif → mismatch.
+  const filterRange = useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const toKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const todayKey = toKey(today);
+    // Senin minggu ini (ISO week)
+    const dow = today.getDay() === 0 ? 6 : today.getDay() - 1;
+    const monday = new Date(today); monday.setDate(today.getDate() - dow);
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+    return { todayKey, mondayKey: toKey(monday), sundayKey: toKey(sunday) };
+  }, []);
+
+  // Hitung stat dari data bulan aktif (sama sumber dgn list) — guaranteed
+  // chip number = list count untuk filter yang sama.
+  const localStats = useMemo(() => {
+    let hariIni = 0, mingguIni = 0, mendatang = 0;
+    for (const [k, list] of eventsByDate.entries()) {
+      if (k === filterRange.todayKey)                                       hariIni   += list.length;
+      if (k >= filterRange.mondayKey && k <= filterRange.sundayKey)         mingguIni += list.length;
+      if (k > filterRange.todayKey)                                         mendatang += list.length;
+    }
+    return { hari_ini: hariIni, minggu_ini: mingguIni, mendatang };
+  }, [eventsByDate, filterRange]);
+
   const groups = useMemo(() => {
     const all = Array.from(eventsByDate.entries()).sort(([a], [b]) => a.localeCompare(b));
     if (selectedDate) return all.filter(([k]) => k === selectedDate);
 
     if (quickFilter) {
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      const todayKey = today.toISOString().slice(0, 10);
-      // Senin minggu ini (ISO week)
-      const dow = today.getDay() === 0 ? 6 : today.getDay() - 1;
-      const monday = new Date(today); monday.setDate(today.getDate() - dow);
-      const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
-      const mondayKey = monday.toISOString().slice(0, 10);
-      const sundayKey = sunday.toISOString().slice(0, 10);
-
       return all.filter(([k]) => {
-        if (quickFilter === 'hari_ini')   return k === todayKey;
-        if (quickFilter === 'minggu_ini') return k >= mondayKey && k <= sundayKey;
-        if (quickFilter === 'mendatang')  return k > todayKey;
+        if (quickFilter === 'hari_ini')   return k === filterRange.todayKey;
+        if (quickFilter === 'minggu_ini') return k >= filterRange.mondayKey && k <= filterRange.sundayKey;
+        if (quickFilter === 'mendatang')  return k > filterRange.todayKey;
         return true;
       });
     }
     return all;
-  }, [eventsByDate, selectedDate, quickFilter]);
+  }, [eventsByDate, selectedDate, quickFilter, filterRange]);
 
   const handleTapStat = useCallback((qf: QuickFilter) => {
     setQuickFilter((prev) => prev === qf ? null : qf);
@@ -248,11 +261,11 @@ export default function KalenderScreen() {
         />
       )}
 
-      {stats && !showCalendar && (
+      {!showCalendar && (
         <View style={[styles.statsWrap, styles.statsContent]}>
-          <StatBox label="Hari ini"   value={stats.hari_ini}   color="#3b82f6" active={quickFilter === 'hari_ini'}   onPress={() => handleTapStat('hari_ini')} />
-          <StatBox label="Minggu ini" value={stats.minggu_ini} color="#22c55e" active={quickFilter === 'minggu_ini'} onPress={() => handleTapStat('minggu_ini')} />
-          <StatBox label="Mendatang"  value={stats.mendatang}  color="#f59e0b" active={quickFilter === 'mendatang'}  onPress={() => handleTapStat('mendatang')} />
+          <StatBox label="Hari ini"   value={localStats.hari_ini}   color="#3b82f6" active={quickFilter === 'hari_ini'}   onPress={() => handleTapStat('hari_ini')} />
+          <StatBox label="Minggu ini" value={localStats.minggu_ini} color="#22c55e" active={quickFilter === 'minggu_ini'} onPress={() => handleTapStat('minggu_ini')} />
+          <StatBox label="Mendatang"  value={localStats.mendatang}  color="#f59e0b" active={quickFilter === 'mendatang'}  onPress={() => handleTapStat('mendatang')} />
         </View>
       )}
 
