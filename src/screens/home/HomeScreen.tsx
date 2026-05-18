@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl, Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
@@ -27,6 +27,7 @@ function greetingByHour(): string {
 export default function HomeScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
@@ -61,7 +62,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 90 }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />
         }
@@ -244,7 +245,10 @@ function QuickAction({ icon, label, color, onPress }: {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0d1421' },
-  content:   { padding: 16, paddingBottom: 32 },
+  // paddingBottom diset inline pakai insets.bottom + 90 di JSX —
+  // perlu dinamis utk akomodir tinggi bottom tab bar + sistem nav bar
+  // Android yang berbeda per merk (3-tombol vs gesture pill).
+  content:   { padding: 16 },
 
   header: {
     flexDirection: 'row', alignItems: 'center',
