@@ -116,7 +116,7 @@ export default function NewChatScreen() {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListEmptyComponent={
             <Text style={styles.empty}>
-              {search ? 'Tidak ada karyawan ditemukan.' : 'Mulai ketik untuk mencari.'}
+              {search ? 'Tidak ada karyawan ditemukan.' : 'Memuat daftar karyawan...'}
             </Text>
           }
         />

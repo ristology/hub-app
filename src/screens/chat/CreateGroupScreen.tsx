@@ -68,6 +68,28 @@ export default function CreateGroupScreen() {
     setSelected((prev) => prev.filter((x) => x.user_id !== userId));
   }, []);
 
+  // "Pilih Semua" — toggle select/unselect seluruh karyawan yg sedang tampil
+  // di list (respect filter search). Pattern sama dgn KaryawanPicker kalender.
+  const allDisplayedSelected = results.length > 0
+    && results.every((u) => selected.some((s) => s.user_id === u.user_id));
+
+  const toggleSelectAll = useCallback(() => {
+    if (allDisplayedSelected) {
+      // Deselect yg sedang tampil — pertahankan selected lain (jaga-jaga
+      // kalau user pernah select dari hasil search berbeda)
+      setSelected((prev) =>
+        prev.filter((s) => !results.some((r) => r.user_id === s.user_id))
+      );
+    } else {
+      // Merge: pertahankan selected lama, tambah results yg belum ada
+      setSelected((prev) => {
+        const map = new Map(prev.map((s) => [s.user_id, s]));
+        for (const r of results) map.set(r.user_id, r);
+        return Array.from(map.values());
+      });
+    }
+  }, [allDisplayedSelected, results]);
+
   const pickFoto = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
@@ -234,9 +256,25 @@ export default function CreateGroupScreen() {
             { paddingBottom: kbHeight > 0 ? kbHeight - insets.bottom + 20 : 20 },
           ]}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ListHeaderComponent={
+            results.length > 0 ? (
+              <TouchableOpacity
+                onPress={toggleSelectAll}
+                style={styles.selectAllRow}
+                activeOpacity={0.6}
+              >
+                <View style={[styles.checkbox, allDisplayedSelected && styles.checkboxOn]}>
+                  {allDisplayedSelected && <Ionicons name="checkmark" size={16} color="#fff" />}
+                </View>
+                <Text style={styles.selectAllText}>
+                  {allDisplayedSelected ? 'Batal pilih semua' : 'Pilih semua'} ({results.length})
+                </Text>
+              </TouchableOpacity>
+            ) : null
+          }
           ListEmptyComponent={
             <Text style={styles.empty}>
-              {search ? 'Tidak ada karyawan ditemukan.' : 'Mulai ketik untuk mencari.'}
+              {search ? 'Tidak ada karyawan ditemukan.' : 'Memuat daftar karyawan...'}
             </Text>
           }
           keyboardShouldPersistTaps="handled"
@@ -307,6 +345,13 @@ const styles = StyleSheet.create({
 
   list:      { paddingHorizontal: 16 },
   separator: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginLeft: 60 },
+  selectAllRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
+    marginBottom: 4,
+  },
+  selectAllText: { color: '#fff', fontSize: 14, fontWeight: '600', flex: 1 },
   userItem:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
   avatar:    { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1c2333' },
   avatarFb:  { alignItems: 'center', justifyContent: 'center' },
