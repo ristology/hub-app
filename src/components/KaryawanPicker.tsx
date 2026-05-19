@@ -98,6 +98,27 @@ export default function KaryawanPicker({
     );
   };
 
+  // "Pilih Semua" — toggle select/unselect untuk seluruh karyawan yg sedang
+  // tampil di list (results). selectedIds prop adalah snapshot saat render,
+  // jadi cek per-item bisa pakai itu walau ada multiple setState calls
+  // berurutan — parent (togglePeserta) pakai functional setState yg accumulate.
+  const allDisplayedSelected = results.length > 0
+    && results.every(k => selectedIds.includes(k.id));
+
+  const toggleSelectAll = () => {
+    if (allDisplayedSelected) {
+      // Deselect semua yg sedang tampil
+      results.forEach(k => {
+        if (selectedIds.includes(k.id)) onPick(k);
+      });
+    } else {
+      // Select semua yg belum dipilih
+      results.forEach(k => {
+        if (!selectedIds.includes(k.id)) onPick(k);
+      });
+    }
+  };
+
   // Android: kbHeight dari `keyboardDidShow` TIDAK include IME suggestion/toolbar
   // (Samsung Honeyboard punya bar ~60px di atas keys dengan icon clipboard/emoji/dst).
   // iOS: kbHeight sudah akurat. Tambah safety margin Android-only.
@@ -153,9 +174,27 @@ export default function KaryawanPicker({
               keyExtractor={(item) => String(item.id)}
               renderItem={renderItem}
               keyboardShouldPersistTaps="handled"
+              ListHeaderComponent={
+                mode === 'multiple' && results.length > 0 ? (
+                  <TouchableOpacity
+                    onPress={toggleSelectAll}
+                    style={styles.selectAllRow}
+                    activeOpacity={0.6}
+                  >
+                    <Ionicons
+                      name={allDisplayedSelected ? 'checkbox' : 'square-outline'}
+                      size={22}
+                      color={allDisplayedSelected ? '#3b82f6' : '#8a94a6'}
+                    />
+                    <Text style={styles.selectAllText}>
+                      {allDisplayedSelected ? 'Batal pilih semua' : 'Pilih semua'} ({results.length})
+                    </Text>
+                  </TouchableOpacity>
+                ) : null
+              }
               ListEmptyComponent={
                 <Text style={styles.empty}>
-                  {search ? 'Tidak ada karyawan ditemukan.' : 'Mulai ketik untuk mencari.'}
+                  {search ? 'Tidak ada karyawan ditemukan.' : 'Memuat daftar karyawan...'}
                 </Text>
               }
               contentContainerStyle={{ paddingBottom: 12 }}
@@ -195,6 +234,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, marginBottom: 12,
   },
   searchInput: { flex: 1, color: '#fff', paddingVertical: 10, fontSize: 14 },
+  selectAllRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 10, paddingHorizontal: 8,
+    marginBottom: 4,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  selectAllText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   item: {
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: 10, paddingHorizontal: 8, borderRadius: 8,
