@@ -78,7 +78,19 @@ async function scheduleOne(event: Kegiatan): Promise<void> {
     content: {
       title: `🔔 ${event.judul}`,
       body:  `Mulai ${offsetText} lagi${lokasi}`,
-      data:  { kind: 'kalender-reminder', kegiatan_id: event.id },
+      // Payload data:
+      //  - `kind` dipakai clearAllReminders utk filter local reminder vs notif lain
+      //  - `tipe` + `model_id` dibaca oleh deepLink.ts utk route ke KegiatanDetail
+      //    saat user tap notifikasi. Pattern tipe.startsWith('kalender_') sudah
+      //    ditangani di resolveTarget.
+      //  - `url` fallback kalau ada parsing path-based di handler lain
+      data:  {
+        kind:        'kalender-reminder',
+        kegiatan_id: event.id,
+        tipe:        'kalender_reminder',
+        model_id:    String(event.id),
+        url:         `/kalender/${event.id}`,
+      },
       sound: 'afresto_reminder.wav',
       priority: Notifications.AndroidNotificationPriority.MAX,
       sticky: false,
