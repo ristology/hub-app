@@ -19,7 +19,13 @@ import { pickAndCompressVideo, type PickedVideo, formatDuration } from '../../ut
 import { openDocumentExternal } from '../../utils/openDocument';
 import ForwardSheet from './ForwardSheet';
 
-type RouteParams = { roomId: number; nama: string; foto: string | null };
+type RouteParams = {
+  roomId: number;
+  nama: string;
+  foto: string | null;
+  /** id pesan yg harus di-scroll + highlight (dari tap push notif chat) */
+  highlightMessageId?: number | null;
+};
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -45,7 +51,7 @@ export default function ChatRoomScreen() {
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
-  const { roomId, nama, foto } = route.params;
+  const { roomId, nama, foto, highlightMessageId } = route.params;
   const [pesan, setPesan] = useState('');
   const [pendingImage, setPendingImage] = useState<{ uri: string; name: string; type: string } | null>(null);
   const [pendingVideo, setPendingVideo] = useState<PickedVideo | null>(null);
@@ -256,6 +262,22 @@ export default function ChatRoomScreen() {
     // Final safety: animated scroll lagi setelah list settle
     setTimeout(() => attempt(true), 400);
   };
+
+  // Deep link dari tap push notif chat — scroll + highlight ke pesan yg
+  // di-notif. highlightMessageId dibawa via route param (= model_id pesan).
+  // Pesan dari push biasanya pesan terbaru → pasti ada di 50 pesan terakhir
+  // yang ter-load. Ref di-key by id supaya notif baru (id beda) tetap
+  // ter-highlight walau screen sudah pernah handle notif sebelumnya.
+  const lastHighlightedRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!highlightMessageId) return;
+    if (lastHighlightedRef.current === highlightMessageId) return;
+    const msgs = data?.messages.data ?? [];
+    if (!msgs.some((m) => m.id === highlightMessageId)) return;
+    lastHighlightedRef.current = highlightMessageId;
+    // delay supaya FlatList selesai render item dulu sebelum scroll
+    setTimeout(() => scrollToMessage(highlightMessageId), 450);
+  }, [data, highlightMessageId]);
 
   // Download media (gambar/video) — unduh ke cache lalu buka share sheet OS
   // (user pilih "Simpan ke Galeri/Foto" dari menu share).

@@ -73,14 +73,21 @@ function resolveTarget(data: NotifData): { tab: string; screen?: string; params?
     if (tipe.startsWith('task_')) {
       return { tab: 'Task', screen: 'TaskDetail', params: { id: modelId } };
     }
-    // Chat: model_id = message_id, tapi navigasi butuh room_id dari URL
+    // Chat: model_id = message_id, navigasi butuh room_id dari URL.
+    // highlightMessageId dibawa supaya ChatRoomScreen bisa scroll + highlight
+    // ke pesan yang di-notif.
     if (tipe === 'chat_message') {
       const roomMatch = url.match(/\/chat\/(\d+)/);
       if (roomMatch) {
         return {
           tab: 'Pesan',
           screen: 'ChatRoom',
-          params: { roomId: Number(roomMatch[1]), nama: 'Pesan', foto: null },
+          params: {
+            roomId: Number(roomMatch[1]),
+            nama: 'Pesan',
+            foto: null,
+            highlightMessageId: modelId,
+          },
         };
       }
       return { tab: 'Pesan' };
