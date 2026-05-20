@@ -60,9 +60,30 @@ export async function clearAllReminders(): Promise<void> {
   }
 }
 
+/**
+ * Tentukan apakah user PERLU reminder alarm utk event ini.
+ *
+ * Aturan (Opsi A + fix reminder publik):
+ *  - Pembuat jadwal (`milikku`) → SELALU dapat reminder
+ *  - Peserta → dapat reminder KECUALI sudah konfirmasi 'Tidak Hadir' (status
+ *    `ditolak`). Status `menunggu`/`diterima` → tetap dapat reminder.
+ *  - Bukan pembuat & bukan peserta (mis. event publik yang cuma "numpang
+ *    lewat" di kalender semua karyawan) → TIDAK dapat reminder. Supaya event
+ *    publik tidak membombardir alarm ke seluruh karyawan PT.
+ */
+function shouldReceiveReminder(event: Kegiatan): boolean {
+  if (event.milikku) return true;
+  const me = event.peserta?.find((p) => p.is_me);
+  if (me) return me.status !== 'ditolak';
+  return false;
+}
+
 /** Schedule satu reminder utk event. Skip kalau tanggal sudah lewat. */
 async function scheduleOne(event: Kegiatan): Promise<void> {
   if (!event.reminder_offset_minutes || event.reminder_offset_minutes < 0) return;
+  // Skip kalau user tidak berhak reminder (peserta yg menolak / event publik
+  // yg bukan miliknya & bukan peserta).
+  if (!shouldReceiveReminder(event)) return;
 
   const triggerTime = new Date(event.mulai_at);
   triggerTime.setMinutes(triggerTime.getMinutes() - event.reminder_offset_minutes);
