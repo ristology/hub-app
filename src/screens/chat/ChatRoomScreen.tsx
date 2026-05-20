@@ -16,6 +16,8 @@ import ImageViewerModal from '../../components/ImageViewerModal';
 import VideoPlayerModal from '../../components/VideoPlayerModal';
 import VideoThumbnail   from '../../components/VideoThumbnail';
 import { pickAndCompressVideo, type PickedVideo, formatDuration } from '../../utils/videoPicker';
+import { openDocumentExternal } from '../../utils/openDocument';
+import ForwardSheet from './ForwardSheet';
 
 type RouteParams = { roomId: number; nama: string; foto: string | null };
 
@@ -53,6 +55,8 @@ export default function ChatRoomScreen() {
   const [highlightedMsgId, setHighlightedMsgId] = useState<number | null>(null);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);
+  // id pesan yang sedang diteruskan — buka ForwardSheet kalau non-null
+  const [forwardMsgId, setForwardMsgId] = useState<number | null>(null);
   // Pesan yang gagal kirim — disimpan local, tampil sebagai ghost bubble dgn icon error
   const [failedMessages, setFailedMessages] = useState<{ tempId: string; pesan: string; replyToId?: number }[]>([]);
   const flatListRef = useRef<FlatList>(null);
@@ -253,16 +257,37 @@ export default function ChatRoomScreen() {
     setTimeout(() => attempt(true), 400);
   };
 
+  // Download media (gambar/video) — unduh ke cache lalu buka share sheet OS
+  // (user pilih "Simpan ke Galeri/Foto" dari menu share).
+  const handleDownloadMedia = async (msg: ChatMessage) => {
+    const isVideo = msg.tipe === 'video';
+    const url     = isVideo ? msg.video_url : msg.foto_url;
+    if (!url) return;
+    const urlExt = url.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
+    const ext    = isVideo
+      ? 'mp4'
+      : (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(urlExt) ? urlExt : 'jpg');
+    const filename = `afresto-chat-${msg.id}.${ext}`;
+    // image: biarkan guessMime handle; video: mp4 tidak ada di MIME_MAP → set manual
+    await openDocumentExternal(url, filename, isVideo ? 'video/mp4' : undefined);
+  };
+
   const handleLongPressMessage = (msg: ChatMessage) => {
     if (msg.dihapus_at) return; // Pesan deleted — no actions
 
-    const isMine = msg.user_id === user?.id;
+    const isMine  = msg.user_id === user?.id;
+    const isMedia = msg.tipe === 'image' || msg.tipe === 'video';
 
-    // Build action buttons: Balas (semua), Hapus (hanya milik sendiri)
+    // Build action buttons: Balas (semua), Download + Teruskan (media),
+    // Hapus (hanya milik sendiri)
     const buttons: any[] = [
       { text: 'Batal', style: 'cancel' },
       { text: 'Balas', onPress: () => setReplyTo(msg) },
     ];
+    if (isMedia) {
+      buttons.push({ text: 'Download', onPress: () => handleDownloadMedia(msg) });
+      buttons.push({ text: 'Teruskan', onPress: () => setForwardMsgId(msg.id) });
+    }
     if (isMine) {
       buttons.push({
         text: 'Hapus',
@@ -279,11 +304,7 @@ export default function ChatRoomScreen() {
       });
     }
 
-    Alert.alert(
-      'Pilih aksi',
-      isMine ? 'Apa yang ingin dilakukan dgn pesan ini?' : `Balas pesan dari ${msg.user.nama}?`,
-      buttons,
-    );
+    Alert.alert('Pilih aksi', 'Apa yang ingin dilakukan dgn pesan ini?', buttons);
   };
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
@@ -666,6 +687,13 @@ export default function ChatRoomScreen() {
         visible={!!videoPlayerUri}
         videoUri={videoPlayerUri}
         onClose={() => setVideoPlayerUri(null)}
+      />
+
+      {/* Sheet pilih room tujuan saat meneruskan gambar/video */}
+      <ForwardSheet
+        visible={forwardMsgId !== null}
+        messageId={forwardMsgId}
+        onClose={() => setForwardMsgId(null)}
       />
     </SafeAreaView>
   );

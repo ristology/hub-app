@@ -150,6 +150,11 @@ export const chatApi = {
     await apiClient.delete(`/chat/rooms/${roomId}/messages/${messageId}`);
   },
 
+  /** Teruskan pesan (gambar/video) ke satu atau beberapa room lain */
+  forwardMessage: async (messageId: number, roomIds: number[]): Promise<void> => {
+    await apiClient.post(`/chat/messages/${messageId}/forward`, { room_ids: roomIds });
+  },
+
   /** Tandai semua pesan sebagai dibaca */
   markRead: async (roomId: number): Promise<void> => {
     await apiClient.post(`/chat/rooms/${roomId}/read`);
