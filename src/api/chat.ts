@@ -6,6 +6,8 @@ export type ChatRoom = {
   nama: string;
   foto: string | null;
   unread: number;
+  /** user_id lawan bicara — hanya terisi utk private chat, null utk grup */
+  other_user_id: number | null;
   last_message: {
     id: number;
     pesan: string | null;
@@ -46,6 +48,44 @@ export type ChatUser = {
   nama: string;
   foto: string | null;
   jabatan: string | null;
+};
+
+export type GroupMember = {
+  user_id: number;
+  nama: string;
+  foto: string | null;
+  jabatan: string | null;
+  is_admin: boolean;
+  is_creator: boolean;
+};
+
+export type GroupInfo = {
+  id: number;
+  nama: string;
+  foto: string | null;
+  deskripsi: string | null;
+  dibuat_oleh: number;
+  is_admin: boolean;
+  members: GroupMember[];
+};
+
+export type UserActivity = {
+  id: number;
+  tipe: string;
+  judul: string;
+  label_tipe: string;
+  warna: string;
+  created_at: string;
+};
+
+export type UserProfile = {
+  user_id: number;
+  nama: string;
+  foto: string | null;
+  jabatan: string | null;
+  departemen: string | null;
+  bio: string | null;
+  aktivitas: UserActivity[];
 };
 
 export const chatApi = {
@@ -151,6 +191,42 @@ export const chatApi = {
   /** Search user untuk start new chat */
   searchUsers: async (q: string = ''): Promise<{ data: ChatUser[] }> => {
     const { data } = await apiClient.get('/chat/users/search', { params: { q } });
+    return data;
+  },
+
+  /** Hapus chat dari list user (keluar room). Private: lawan tetap punya
+   *  history. Group: keluar dari grup. */
+  deleteRoom: async (roomId: number): Promise<void> => {
+    await apiClient.delete(`/chat/rooms/${roomId}`);
+  },
+
+  /** Detail grup — nama, deskripsi, anggota + flag admin/creator */
+  groupInfo: async (roomId: number): Promise<GroupInfo> => {
+    const { data } = await apiClient.get(`/chat/rooms/${roomId}/group-info`);
+    return data;
+  },
+
+  /** Update nama/deskripsi grup (admin only) */
+  updateGroup: async (
+    roomId: number,
+    payload: { nama?: string; deskripsi?: string | null },
+  ): Promise<void> => {
+    await apiClient.patch(`/chat/rooms/${roomId}`, payload);
+  },
+
+  /** Tambah anggota grup (admin only) */
+  addMembers: async (roomId: number, userIds: number[]): Promise<void> => {
+    await apiClient.post(`/chat/rooms/${roomId}/members`, { user_ids: userIds });
+  },
+
+  /** Keluarkan anggota grup (admin only) */
+  removeMember: async (roomId: number, userId: number): Promise<void> => {
+    await apiClient.delete(`/chat/rooms/${roomId}/members/${userId}`);
+  },
+
+  /** Profil ringkas karyawan + aktivitas terakhir (saat tap nama di chat) */
+  userProfile: async (userId: number): Promise<UserProfile> => {
+    const { data } = await apiClient.get(`/chat/users/${userId}/profile`);
     return data;
   },
 };

@@ -205,6 +205,15 @@ export default function ChatRoomScreen() {
 
   const messages = (data?.messages.data ?? []) as ChatMessage[];
 
+  // Tipe room + nama/foto dinamis dari query — supaya kalau admin edit nama
+  // grup di GroupInfoScreen, top bar ikut update saat balik (bukan stale
+  // route param). Fallback ke route param sebelum query selesai.
+  const isGroup     = data?.room.data.type === 'group';
+  const displayNama = data?.room.data.nama ?? nama;
+  const displayFoto = data?.room.data.foto ?? foto;
+  // user_id lawan bicara (private chat) — utk buka profil saat tap nama
+  const otherUserId = data?.room.data.other_user_id ?? null;
+
   // Read status: max last_read dari user lain (bukan diri sendiri)
   const otherMaxRead = (data?.reads ?? [])
     .filter((r) => r.user_id !== user?.id)
@@ -301,7 +310,14 @@ export default function ChatRoomScreen() {
             isHapus && styles.bubbleDeleted,
             highlightedMsgId === item.id && styles.bubbleHighlight]}
         >
-          {!isMine && <Text style={styles.bubbleSender}>{item.user.nama}</Text>}
+          {!isMine && (
+            <TouchableOpacity
+              activeOpacity={0.6}
+              onPress={() => (navigation as any).navigate('UserProfile', { userId: item.user_id })}
+            >
+              <Text style={styles.bubbleSender}>{item.user.nama}</Text>
+            </TouchableOpacity>
+          )}
 
           {/* Quoted reply preview di atas pesan utama — tap untuk scroll ke pesan asli */}
           {item.reply_to && !isHapus && (
@@ -383,16 +399,38 @@ export default function ChatRoomScreen() {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
-          {foto ? (
-            <TouchableOpacity activeOpacity={0.85} onPress={() => setViewerUri(foto)}>
-              <Image source={{ uri: foto }} style={styles.topAvatar} />
+          {displayFoto ? (
+            <TouchableOpacity activeOpacity={0.85} onPress={() => setViewerUri(displayFoto)}>
+              <Image source={{ uri: displayFoto }} style={styles.topAvatar} />
             </TouchableOpacity>
           ) : (
             <View style={[styles.topAvatar, styles.bubbleAvatarFallback]}>
-              <Text style={styles.bubbleAvatarText}>{nama.charAt(0).toUpperCase()}</Text>
+              <Text style={styles.bubbleAvatarText}>{displayNama.charAt(0).toUpperCase()}</Text>
             </View>
           )}
-          <Text style={styles.topName} numberOfLines={1}>{nama}</Text>
+          {isGroup ? (
+            // Grup: nama tappable → buka GroupInfoScreen (anggota + deskripsi)
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={0.7}
+              onPress={() => (navigation as any).navigate('GroupInfo', { roomId })}
+            >
+              <Text style={styles.topName} numberOfLines={1}>{displayNama}</Text>
+              <Text style={styles.topSubtitle}>Tap untuk info grup</Text>
+            </TouchableOpacity>
+          ) : otherUserId ? (
+            // Private: nama tappable → buka profil lawan bicara
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={0.7}
+              onPress={() => (navigation as any).navigate('UserProfile', { userId: otherUserId })}
+            >
+              <Text style={styles.topName} numberOfLines={1}>{displayNama}</Text>
+              <Text style={styles.topSubtitle}>Tap untuk lihat profil</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.topName} numberOfLines={1}>{displayNama}</Text>
+          )}
         </View>
 
         {/* Messages */}
@@ -644,6 +682,7 @@ const styles = StyleSheet.create({
   backBtn: { padding: 4 },
   topAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#1c2333' },
   topName: { color: '#fff', fontSize: 16, fontWeight: '600', flex: 1 },
+  topSubtitle: { color: '#8a94a6', fontSize: 11, marginTop: 1 },
 
   list: { padding: 12, gap: 8 },
 

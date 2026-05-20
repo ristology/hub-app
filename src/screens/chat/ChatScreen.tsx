@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
-  TouchableOpacity, Image, Platform, TextInput,
+  TouchableOpacity, Image, Platform, TextInput, Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
@@ -61,12 +61,40 @@ export default function ChatScreen() {
     return rooms.filter((r) => r.nama.toLowerCase().includes(q));
   }, [data, search]);
 
+  // Long-press room → opsi hapus chat dari list
+  const handleLongPressRoom = useCallback((room: ChatRoom) => {
+    const isGroup = room.type === 'group';
+    Alert.alert(
+      isGroup ? 'Keluar Grup' : 'Hapus Chat',
+      isGroup
+        ? `Keluar dari grup "${room.nama}"? Chat ini akan hilang dari daftar kamu.`
+        : `Hapus chat dengan "${room.nama}" dari daftar? Riwayat pesan tidak akan tampil lagi di perangkatmu.`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: isGroup ? 'Keluar' : 'Hapus',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await chatApi.deleteRoom(room.id);
+              refetch();
+            } catch (e: any) {
+              Alert.alert('Error', e.response?.data?.message ?? 'Gagal menghapus chat.');
+            }
+          },
+        },
+      ],
+    );
+  }, [refetch]);
+
   const renderItem = ({ item }: { item: ChatRoom }) => (
     <TouchableOpacity
       style={styles.roomItem}
       onPress={() => navigation.navigate('ChatRoom', {
         roomId: item.id, nama: item.nama, foto: item.foto,
       })}
+      onLongPress={() => handleLongPressRoom(item)}
+      delayLongPress={350}
       activeOpacity={0.7}
     >
       {item.foto ? (
