@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -61,6 +61,7 @@ export default function CreateKegiatanScreen() {
   const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const editId = route.params?.id;
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
 
   const [judul, setJudul]           = useState('');
   const [deskripsi, setDeskripsi]   = useState('');
@@ -172,7 +173,7 @@ export default function CreateKegiatanScreen() {
           <SaveButton onPress={submit} loading={saveMut.isPending} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 90 }]}>
           <Text style={styles.label}>Judul <Text style={styles.req}>*</Text></Text>
           <TextInput
             style={styles.input}
@@ -348,7 +349,9 @@ const styles = StyleSheet.create({
   topTitle: { color: '#fff', fontSize: 16, fontWeight: '600', flex: 1, marginLeft: 4 },
   saveBtn:  { paddingHorizontal: 12, paddingVertical: 8 },
   saveText: { color: '#3b82f6', fontWeight: '700', fontSize: 14 },
-  scroll:   { padding: 16, paddingBottom: 32 },
+  // paddingBottom diset inline pakai insets.bottom + 90 — section Peserta
+  // (paling bawah form) sebelumnya ketutup bottom tab bar di Android.
+  scroll:   { padding: 16 },
 
   label: {
     color: '#8a94a6', fontSize: 12, fontWeight: '600',
