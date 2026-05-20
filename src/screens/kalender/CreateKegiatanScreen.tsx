@@ -110,10 +110,27 @@ export default function CreateKegiatanScreen() {
       navigation.goBack();
     },
     onError: (e: any) => {
-      const msg = e.response?.data?.message
-        ?? Object.values(e.response?.data?.errors ?? {}).flat().join('\n')
-        ?? 'Gagal simpan jadwal.';
-      Alert.alert('Error', msg);
+      // Timeout / koneksi putus → request mungkin SUDAH sampai server &
+      // berhasil. JANGAN suruh user submit ulang (penyebab double-post).
+      const isTimeout = e.code === 'ECONNABORTED'
+        || /timeout/i.test(e.message ?? '')
+        || (!e.response && /network/i.test(e.message ?? ''));
+      if (isTimeout && !editId) {
+        queryClient.invalidateQueries({ queryKey: ['kalender'] });
+        Alert.alert(
+          'Koneksi Lambat',
+          'Jadwal kemungkinan SUDAH tersimpan, tapi konfirmasi server lambat. '
+          + 'JANGAN simpan ulang — cek dulu di daftar kalender. '
+          + 'Kalau jadwal belum muncul, baru buat lagi.',
+          [{ text: 'Mengerti', onPress: () => navigation.goBack() }],
+        );
+        return;
+      }
+      // Error lain — pakai || (bukan ??) supaya string kosong dari join()
+      // ikut jatuh ke fallback.
+      const errMsgs = Object.values(e.response?.data?.errors ?? {}).flat().join('\n');
+      const msg = e.response?.data?.message || errMsgs || 'Gagal simpan jadwal.';
+      Alert.alert('Gagal', msg);
     },
   });
 
