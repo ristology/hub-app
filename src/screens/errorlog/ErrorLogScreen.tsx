@@ -11,10 +11,8 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { errorLogApi, type ErrorLog, type ErrorLogStatus } from '../../api/errorLog';
-import type { KaryawanRingkas } from '../../api/feed';
 import ErrorLogCard from './components/ErrorLogCard';
 import SwipeableCard, { type SwipeAction } from '../../components/SwipeableCard';
-import KaryawanPicker from '../../components/KaryawanPicker';
 import PickerSheet, { type PickerOption } from '../../components/PickerSheet';
 
 type ErrorLogStackParamList = {
@@ -72,7 +70,6 @@ export default function ErrorLogScreen() {
   // Filter sheet state
   const [filterOpen, setFilterOpen] = useState(false);
   const [draft, setDraft]           = useState<Filters>({});
-  const [karyawanNama, setKaryawanNama] = useState('');
   const [pickerOpen, setPickerOpen] = useState<'status' | 'kategori' | 'klien' | 'handler' | 'bulan' | null>(null);
 
   const openFilterSheet = () => {
@@ -91,6 +88,11 @@ export default function ErrorLogScreen() {
     queryFn:  errorLogApi.klien,
     enabled:  filterOpen || pickerOpen === 'klien',
   });
+  const { data: handlerData } = useQuery({
+    queryKey: ['error-log-handlers'],
+    queryFn:  errorLogApi.handlers,
+    enabled:  filterOpen || pickerOpen === 'handler',
+  });
 
   const kategoriOptions: PickerOption[] = useMemo(() => {
     const list: PickerOption[] = [{ id: null, label: 'Semua kategori' }];
@@ -103,6 +105,12 @@ export default function ErrorLogScreen() {
     (klienData?.data ?? []).forEach((k) => list.push({ id: k.id, label: k.nama }));
     return list;
   }, [klienData]);
+
+  const handlerOptions: PickerOption[] = useMemo(() => {
+    const list: PickerOption[] = [{ id: null, label: 'Semua handler' }];
+    (handlerData?.data ?? []).forEach((k) => list.push({ id: k.id, label: k.nama }));
+    return list;
+  }, [handlerData]);
 
   const bulanOptions: PickerOption[] = useMemo(() => {
     const list: PickerOption[] = [{ id: null, label: 'Semua bulan' }];
@@ -125,7 +133,7 @@ export default function ErrorLogScreen() {
   }, []);
   const handlePickKategori = (opt: PickerOption) => { setDraft((d) => ({ ...d, kategori:   opt.id == null ? null : Number(opt.id) })); setPickerOpen(null); };
   const handlePickKlien    = (opt: PickerOption) => { setDraft((d) => ({ ...d, klien:      opt.id == null ? null : Number(opt.id) })); setPickerOpen(null); };
-  const handlePickHandler  = (k: KaryawanRingkas) => { setDraft((d) => ({ ...d, handler_id: k.id })); setKaryawanNama(k.nama); setPickerOpen(null); };
+  const handlePickHandler  = (opt: PickerOption) => { setDraft((d) => ({ ...d, handler_id: opt.id == null ? null : Number(opt.id) })); setPickerOpen(null); };
   const handlePickBulan    = (opt: PickerOption) => { setDraft((d) => ({ ...d, bulan:      opt.id == null ? undefined : String(opt.id) })); setPickerOpen(null); };
 
   const handleApply = (next: Filters) => { setFilters(next); setFilterOpen(false); };
@@ -270,13 +278,13 @@ export default function ErrorLogScreen() {
       <FilterSheet
         visible={filterOpen}
         draft={draft}
-        karyawanNama={karyawanNama}
         statusLabel={STATUS_OPTIONS.find((o) => o.id === draft.status)?.label}
         kategoriLabel={kategoriOptions.find((o) => o.id === draft.kategori)?.label}
         klienLabel={klienOptions.find((o) => o.id === draft.klien)?.label}
+        handlerLabel={handlerOptions.find((o) => o.id === draft.handler_id)?.label}
         bulanLabel={bulanOptions.find((o) => o.id === draft.bulan)?.label}
         onDraftChange={setDraft}
-        onClearHandler={() => { setDraft((d) => ({ ...d, handler_id: null })); setKaryawanNama(''); }}
+        onClearHandler={() => setDraft((d) => ({ ...d, handler_id: null }))}
         onOpenStatus={() => setPickerOpen('status')}
         onOpenKategori={() => setPickerOpen('kategori')}
         onOpenKlien={() => setPickerOpen('klien')}
@@ -284,7 +292,7 @@ export default function ErrorLogScreen() {
         onOpenBulan={() => setPickerOpen('bulan')}
         onClose={() => setFilterOpen(false)}
         onApply={handleApply}
-        onReset={() => { setDraft({}); setKaryawanNama(''); }}
+        onReset={() => setDraft({})}
       />
 
       {/* Pickers root level */}
@@ -322,12 +330,14 @@ export default function ErrorLogScreen() {
         onPick={handlePickBulan}
         onClose={() => setPickerOpen(null)}
       />
-      <KaryawanPicker
+      <PickerSheet
         visible={pickerOpen === 'handler'}
-        mode="single"
         title="Pilih Handler"
+        options={handlerOptions}
+        selectedId={draft.handler_id ?? null}
         onPick={handlePickHandler}
         onClose={() => setPickerOpen(null)}
+        searchable
       />
     </SafeAreaView>
   );
@@ -362,10 +372,10 @@ function StatBox({ label, value, color, active, onPress }: {
 type FilterSheetProps = {
   visible: boolean;
   draft: Filters;
-  karyawanNama: string;
   statusLabel?: string;
   kategoriLabel?: string;
   klienLabel?: string;
+  handlerLabel?: string;
   bulanLabel?: string;
   onDraftChange: (d: Filters) => void;
   onClearHandler: () => void;
@@ -380,8 +390,8 @@ type FilterSheetProps = {
 };
 
 function FilterSheet({
-  visible, draft, karyawanNama,
-  statusLabel, kategoriLabel, klienLabel, bulanLabel,
+  visible, draft,
+  statusLabel, kategoriLabel, klienLabel, handlerLabel, bulanLabel,
   onDraftChange, onClearHandler,
   onOpenStatus, onOpenKategori, onOpenKlien, onOpenHandler, onOpenBulan,
   onClose, onApply, onReset,
@@ -483,7 +493,7 @@ function FilterSheet({
 
           <Label>Handler</Label>
           <Field
-            value={draft.handler_id ? (karyawanNama || 'Karyawan terpilih') : 'Semua handler'}
+            value={handlerLabel ?? 'Semua handler'}
             empty={!draft.handler_id}
             onPress={onOpenHandler}
             onClear={draft.handler_id ? onClearHandler : undefined}

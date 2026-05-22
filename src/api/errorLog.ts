@@ -53,6 +53,7 @@ export type ErrorLogStats = {
 
 export type KategoriError = { id: number; nama: string };
 export type KlienOption   = { id: number; nama: string };
+export type HandlerOption = { id: number; nama: string };
 
 export type CreateErrorLogPayload = {
   klien_id?: number;
@@ -110,6 +111,12 @@ export const errorLogApi = {
 
   klien: async (): Promise<{ data: KlienOption[] }> => {
     const { data } = await apiClient.get('/error-log/klien');
+    return data;
+  },
+
+  /** Daftar handler yang dipakai di error log — untuk dropdown filter */
+  handlers: async (): Promise<{ data: HandlerOption[] }> => {
+    const { data } = await apiClient.get('/error-log/handlers');
     return data;
   },
 
