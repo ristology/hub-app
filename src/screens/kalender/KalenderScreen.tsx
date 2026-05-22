@@ -38,6 +38,25 @@ function dateKey(s: string): string {
   return s.slice(0, 10);
 }
 
+// Semua tanggal (YYYY-MM-DD) yang dilewati event, dari tanggal mulai s/d
+// tanggal selesai INKLUSIF — supaya jadwal multi-hari muncul di tiap harinya
+// (mirip Google Calendar). Guard 370 mencegah loop liar dari data rusak.
+function eachDateKey(startIso: string, endIso: string): string[] {
+  const startKey = dateKey(startIso);
+  const endKey   = dateKey(endIso);
+  if (endKey <= startKey) return [startKey];
+  const keys: string[] = [];
+  const d = new Date(startKey + 'T00:00:00');
+  for (let guard = 0; guard < 370; guard++) {
+    const key =
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    keys.push(key);
+    if (key >= endKey) break;
+    d.setDate(d.getDate() + 1);
+  }
+  return keys;
+}
+
 function formatGroupHeader(key: string): string {
   const d = new Date(key + 'T00:00:00');
   const today = new Date();
@@ -99,14 +118,38 @@ export default function KalenderScreen() {
     setRefreshing(false);
   }, [refetch]);
 
+  // Per tanggal MULAI, dibatasi ke bulan yang sedang dilihat — dipakai untuk
+  // daftar agenda default & stat box. Filter bulan perlu karena API kini
+  // mengirim juga event lintas-bulan (overlap); tanpa filter, agenda default
+  // akan memunculkan grup tanggal bulan lain. Grid kalender & tap-tanggal
+  // tetap pakai eventsActiveByDate (lihat di bawah) yg memuat semua hari.
   const eventsByDate = useMemo(() => {
     const list = data?.data ?? [];
+    const monthPrefix =
+      `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
     const map = new Map<string, Kegiatan[]>();
     for (const k of list) {
       const key = dateKey(k.mulai_at);
+      if (key.slice(0, 7) !== monthPrefix) continue;
       const arr = map.get(key) ?? [];
       arr.push(k);
       map.set(key, arr);
+    }
+    return map;
+  }, [data, cursor]);
+
+  // Event dipetakan ke SETIAP hari yang dilewatinya (multi-hari) — dipakai
+  // untuk titik di grid kalender & filter saat tanggal di-tap, supaya jadwal
+  // jangka panjang tetap muncul di tiap hari rentangnya.
+  const eventsActiveByDate = useMemo(() => {
+    const list = data?.data ?? [];
+    const map = new Map<string, Kegiatan[]>();
+    for (const k of list) {
+      for (const key of eachDateKey(k.mulai_at, k.selesai_at)) {
+        const arr = map.get(key) ?? [];
+        arr.push(k);
+        map.set(key, arr);
+      }
     }
     return map;
   }, [data]);
@@ -138,10 +181,15 @@ export default function KalenderScreen() {
     return { hari_ini: hariIni, minggu_ini: mingguIni, mendatang };
   }, [eventsByDate, filterRange]);
 
-  const groups = useMemo(() => {
-    const all = Array.from(eventsByDate.entries()).sort(([a], [b]) => a.localeCompare(b));
-    if (selectedDate) return all.filter(([k]) => k === selectedDate);
+  const groups = useMemo<[string, Kegiatan[]][]>(() => {
+    // Tanggal di-tap → tampilkan semua event yang AKTIF di tanggal itu,
+    // termasuk jadwal multi-hari yang rentangnya melewati tanggal tsb.
+    if (selectedDate) {
+      const list = eventsActiveByDate.get(selectedDate) ?? [];
+      return list.length ? [[selectedDate, list]] : [];
+    }
 
+    const all = Array.from(eventsByDate.entries()).sort(([a], [b]) => a.localeCompare(b));
     if (quickFilter) {
       return all.filter(([k]) => {
         if (quickFilter === 'hari_ini')   return k === filterRange.todayKey;
@@ -151,7 +199,7 @@ export default function KalenderScreen() {
       });
     }
     return all;
-  }, [eventsByDate, selectedDate, quickFilter, filterRange]);
+  }, [eventsByDate, eventsActiveByDate, selectedDate, quickFilter, filterRange]);
 
   const handleTapStat = useCallback((qf: QuickFilter) => {
     setQuickFilter((prev) => prev === qf ? null : qf);
@@ -255,7 +303,7 @@ export default function KalenderScreen() {
       {showCalendar && (
         <MonthGrid
           cursor={cursor}
-          eventsByDate={eventsByDate}
+          activeByDate={eventsActiveByDate}
           selectedDate={selectedDate}
           onSelectDate={handleDateTap}
         />
@@ -325,9 +373,10 @@ function StatBox({ label, value, color, active, onPress }: {
   );
 }
 
-function MonthGrid({ cursor, eventsByDate, selectedDate, onSelectDate }: {
+function MonthGrid({ cursor, activeByDate, selectedDate, onSelectDate }: {
   cursor: Date;
-  eventsByDate: Map<string, Kegiatan[]>;
+  /** Map tanggal → event aktif (sudah termasuk hari-hari jadwal multi-hari) */
+  activeByDate: Map<string, Kegiatan[]>;
   selectedDate: string | null;
   onSelectDate: (key: string) => void;
 }) {
@@ -370,7 +419,7 @@ function MonthGrid({ cursor, eventsByDate, selectedDate, onSelectDate }: {
           {row.map((d, ci) => {
             if (d === null) return <View key={ci} style={styles.calCell} />;
             const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            const hasEvent = eventsByDate.has(key);
+            const hasEvent = activeByDate.has(key);
             const isToday    = key === todayKey;
             const isSelected = key === selectedDate;
             return (
