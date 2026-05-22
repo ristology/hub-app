@@ -17,7 +17,7 @@ const CARD_WIDTH       = 88;   // inner glass card (visible width)
 const CARD_GAP_LEFT    = 8;    // gap card → edge layar
 const HANDLE_TOUCH_W   = 14;   // tap area — sengaja dibatasi 14px supaya tidak overlap
                                //  dengan FlatList paddingHorizontal:16 (cek SwipeableCard di Request).
-const HANDLE_BAR_W     = 5;    // bar visual
+const HANDLE_BAR_W     = 10;   // bar visual (fin merah) — 2x lebar dari sebelumnya (5)
 const HANDLE_BAR_H     = 90;
 const HANDLE_AREA_H    = HANDLE_BAR_H + 20;     // tinggi container handleArea (bar di-center di dalam)
 const HANDLE_TOP       = SCREEN_H * 0.40;
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
   handleDot: {
     position: 'absolute',
     top: HANDLE_BAR_H / 2 - 4,
-    left: -3,
+    left: (HANDLE_BAR_W - 8) / 2,  // center dot di fin yg lebih lebar
     width: 8, height: 8, borderRadius: 4,
     backgroundColor: '#fff',
     shadowColor:   '#fff',
