@@ -6,7 +6,10 @@ export type ErrorLog = {
   id: number;
   milikku: boolean;
   can_edit: boolean;
+  /** Handler/admin — boleh ubah status penanganan (in_progress/resolved) */
   can_update_status: boolean;
+  /** Pelapor/admin — boleh tutup kasus (closed) & buka kembali (open/reopen) */
+  can_close: boolean;
   has_unread_notif: boolean;
   url: string | null;
   username: string | null;

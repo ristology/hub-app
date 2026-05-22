@@ -30,6 +30,10 @@ const STATUS_OPTIONS: { key: ErrorLogStatus; label: string; color: string }[] = 
   { key: 'closed',      label: 'Closed',   color: '#8a94a6' },
 ];
 
+// Status yang boleh diubah handler. closed & open (reopen) adalah hak pelapor
+// — ditangani lewat tombol "Tindakan pelapor" terpisah.
+const HANDLER_KEYS: ErrorLogStatus[] = ['in_progress', 'resolved'];
+
 function formatDate(s: string | null): string {
   if (!s) return '—';
   const d = new Date(s);
@@ -102,6 +106,7 @@ export default function ErrorLogDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['error-log', id] });
       queryClient.invalidateQueries({ queryKey: ['error-log'] });
       queryClient.invalidateQueries({ queryKey: ['error-log-stats'] });
+      toast.success('Status diperbarui.');
     },
     onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal ubah status.'),
   });
@@ -133,6 +138,25 @@ export default function ErrorLogDetailScreen() {
       { text: 'Batal' },
       { text: 'Hapus', style: 'destructive', onPress: () => destroyMut.mutate() },
     ]);
+  };
+
+  // Konfirmasi aksi pelapor — tutup kasus / buka kembali laporan
+  const confirmStatus = (status: ErrorLogStatus) => {
+    const isClose = status === 'closed';
+    Alert.alert(
+      isClose ? 'Tutup Laporan?' : 'Buka Kembali Laporan?',
+      isClose
+        ? 'Laporan error ini akan ditandai selesai (Closed).'
+        : 'Laporan akan dibuka kembali ke status Open agar dapat ditangani ulang.',
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: isClose ? 'Tutup' : 'Buka Kembali',
+          style: isClose ? 'default' : 'destructive',
+          onPress: () => statusMutation.mutate(status),
+        },
+      ],
+    );
   };
 
   if (isLoading || !data) {
@@ -234,39 +258,80 @@ export default function ErrorLogDetailScreen() {
             </>
           )}
 
-          {/* Status switcher */}
+          {/* Status */}
           <Text style={styles.sectionLabel}>STATUS</Text>
-          {log.can_update_status ? (
-            <View style={styles.statusGroup}>
-              {STATUS_OPTIONS.map((s) => (
-                <TouchableOpacity
-                  key={s.key}
-                  onPress={() => statusMutation.mutate(s.key)}
-                  disabled={statusMutation.isPending || log.status === s.key}
-                  style={[
-                    styles.statusBtn,
-                    log.status === s.key && { backgroundColor: s.color + '30', borderColor: s.color },
-                  ]}
-                >
-                  <Text style={[
-                    styles.statusBtnText,
-                    log.status === s.key && { color: s.color, fontWeight: '700' },
-                  ]}>
-                    {s.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+
+          {/* Status saat ini — selalu tampil */}
+          {(() => {
+            const cur = STATUS_OPTIONS.find((s) => s.key === log.status);
+            return cur ? (
+              <View style={[styles.statusBadge,
+                { backgroundColor: cur.color + '30', borderColor: cur.color }]}>
+                <View style={[styles.statusDot, { backgroundColor: cur.color }]} />
+                <Text style={[styles.statusBadgeText, { color: cur.color }]}>{cur.label}</Text>
+              </View>
+            ) : null;
+          })()}
+
+          {/* Aksi handler — ubah status penanganan (in_progress / resolved) */}
+          {log.can_update_status && log.status !== 'closed' && (
+            <View style={styles.statusActionWrap}>
+              <Text style={styles.statusHint}>Ubah status penanganan</Text>
+              <View style={styles.statusGroup}>
+                {HANDLER_KEYS.map((key) => {
+                  const s = STATUS_OPTIONS.find((o) => o.key === key)!;
+                  const isCurrent = log.status === key;
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      onPress={() => statusMutation.mutate(key)}
+                      disabled={statusMutation.isPending || isCurrent}
+                      style={[
+                        styles.statusBtn,
+                        isCurrent && { backgroundColor: s.color + '30', borderColor: s.color },
+                      ]}
+                    >
+                      <Text style={[
+                        styles.statusBtnText,
+                        isCurrent && { color: s.color, fontWeight: '700' },
+                      ]}>
+                        {s.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
-          ) : (
-            (() => {
-              const cur = STATUS_OPTIONS.find((s) => s.key === log.status);
-              return cur ? (
-                <View style={[styles.statusBtn, { alignSelf: 'flex-start',
-                  backgroundColor: cur.color + '30', borderColor: cur.color }]}>
-                  <Text style={[styles.statusBtnText, { color: cur.color, fontWeight: '700' }]}>{cur.label}</Text>
-                </View>
-              ) : null;
-            })()
+          )}
+
+          {/* Aksi pelapor — tutup kasus / buka kembali laporan */}
+          {log.can_close && (
+            <View style={styles.statusActionWrap}>
+              <Text style={styles.statusHint}>Tindakan pelapor</Text>
+              <View style={styles.statusGroup}>
+                {log.status !== 'closed' && (
+                  <TouchableOpacity
+                    onPress={() => confirmStatus('closed')}
+                    disabled={statusMutation.isPending}
+                    style={[styles.statusBtn, styles.statusActionBtn]}
+                  >
+                    <Ionicons name="lock-closed" size={14} color="#8a94a6" />
+                    <Text style={styles.statusBtnText}>Closed</Text>
+                  </TouchableOpacity>
+                )}
+                {(log.status === 'resolved' || log.status === 'closed') && (
+                  <TouchableOpacity
+                    onPress={() => confirmStatus('open')}
+                    disabled={statusMutation.isPending}
+                    style={[styles.statusBtn, styles.statusActionBtn,
+                      { borderColor: 'rgba(239,68,68,0.40)' }]}
+                  >
+                    <Ionicons name="refresh" size={14} color="#ef4444" />
+                    <Text style={[styles.statusBtnText, { color: '#ef4444' }]}>Open</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
           )}
 
           {/* Pelapor + handler */}
@@ -515,6 +580,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statusBtnText: { color: '#8a94a6', fontSize: 12 },
+  statusBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start',
+    paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1,
+  },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusBadgeText: { fontSize: 13, fontWeight: '700' },
+  statusActionWrap: { marginTop: 12 },
+  statusHint: { color: '#6b7280', fontSize: 11, marginBottom: 6 },
+  statusActionBtn: { flexDirection: 'row', gap: 6, justifyContent: 'center' },
   catatanBox: {
     backgroundColor: 'rgba(34,197,94,0.06)',
     borderWidth: 1, borderColor: 'rgba(34,197,94,0.20)',
