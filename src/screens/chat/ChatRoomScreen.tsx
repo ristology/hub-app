@@ -245,6 +245,23 @@ export default function ChatRoomScreen() {
     setCaption('');
   };
 
+  // Single "+" attach menu — buka native Alert dgn 3 pilihan (gambar/video/
+  // dokumen). Lebih ringkas dari 3 ikon di input bar; tap +1 langkah tapi
+  // hemat ruang horizontal di layar kecil. Picker individual tidak diubah.
+  const openAttachMenu = () => {
+    if (sendMutation.isPending || videoCompressing || pickingDoc) return;
+    Alert.alert(
+      'Lampirkan',
+      undefined,
+      [
+        { text: '🖼️  Gambar',  onPress: pickImage },
+        { text: '🎬  Video',   onPress: pickVideo },
+        { text: '📎  Dokumen', onPress: pickDocument },
+        { text: 'Batal', style: 'cancel' },
+      ],
+    );
+  };
+
   // Pilih & langsung kirim dokumen (PDF/DOCX/XLSX/PPTX). Tanpa preview modal
   // — file di-cache oleh DocumentPicker, kita kirim FormData ke /chat/.../messages.
   // Backend validate mimes + mimetypes whitelist + max 20MB. Nama asli dipakai
@@ -644,26 +661,16 @@ export default function ChatRoomScreen() {
 
         {/* Input bar */}
         <View style={styles.inputBar}>
-          <TouchableOpacity onPress={pickImage} style={styles.iconBtn} disabled={sendMutation.isPending}>
-            <Ionicons name="image-outline" size={22} color="#3b82f6" />
-          </TouchableOpacity>
+          {/* Satu tombol "+" — tap → Alert pilih gambar/video/dokumen.
+              Lebih hemat ruang horizontal dibanding 3 ikon terpisah. */}
           <TouchableOpacity
-            onPress={pickVideo}
+            onPress={openAttachMenu}
             style={styles.iconBtn}
-            disabled={sendMutation.isPending || videoCompressing}
+            disabled={sendMutation.isPending || videoCompressing || pickingDoc}
           >
-            {videoCompressing
-              ? <ActivityIndicator size="small" color="#a855f7" />
-              : <Ionicons name="videocam-outline" size={22} color="#a855f7" />}
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={pickDocument}
-            style={styles.iconBtn}
-            disabled={sendMutation.isPending || pickingDoc}
-          >
-            {pickingDoc
-              ? <ActivityIndicator size="small" color="#22c55e" />
-              : <Ionicons name="attach" size={22} color="#22c55e" />}
+            {(videoCompressing || pickingDoc)
+              ? <ActivityIndicator size="small" color="#3b82f6" />
+              : <Ionicons name="add-circle" size={28} color="#3b82f6" />}
           </TouchableOpacity>
           <TextInput
             style={styles.input}
