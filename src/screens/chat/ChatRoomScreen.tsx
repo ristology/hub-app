@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, useFocusEffect, type RouteProp } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { Image as ExpoImage } from 'expo-image';
 
 import { chatApi, type ChatMessage } from '../../api/chat';
@@ -16,8 +17,37 @@ import ImageViewerModal from '../../components/ImageViewerModal';
 import VideoPlayerModal from '../../components/VideoPlayerModal';
 import VideoThumbnail   from '../../components/VideoThumbnail';
 import { pickAndCompressVideo, type PickedVideo, formatDuration } from '../../utils/videoPicker';
-import { openDocumentExternal } from '../../utils/openDocument';
+import { openDocumentExternal, openDocumentSmart } from '../../utils/openDocument';
 import ForwardSheet from './ForwardSheet';
+
+// ── Helper dokumen (icon + size formatter) ──────────────
+const DOC_EXTS_ALLOWED = ['pdf', 'docx', 'xlsx', 'pptx'] as const;
+function fmtFileSize(bytes: number | null | undefined): string {
+  if (!bytes) return '';
+  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+  if (bytes >= 1024)    return (bytes / 1024).toFixed(1) + ' KB';
+  return bytes + ' B';
+}
+function docIconName(nama: string | null | undefined): keyof typeof Ionicons.glyphMap {
+  const ext = String(nama ?? '').toLowerCase().split('.').pop();
+  switch (ext) {
+    case 'pdf':                return 'document-text';
+    case 'doc': case 'docx':   return 'document-text';
+    case 'xls': case 'xlsx':   return 'grid';
+    case 'ppt': case 'pptx':   return 'easel';
+    default:                   return 'document';
+  }
+}
+function docIconColor(nama: string | null | undefined): string {
+  const ext = String(nama ?? '').toLowerCase().split('.').pop();
+  switch (ext) {
+    case 'pdf':                return '#ef4444'; // merah
+    case 'doc': case 'docx':   return '#3b82f6'; // biru
+    case 'xls': case 'xlsx':   return '#22c55e'; // hijau
+    case 'ppt': case 'pptx':   return '#f59e0b'; // oranye
+    default:                   return '#8a94a6';
+  }
+}
 
 type RouteParams = {
   roomId: number;
@@ -56,6 +86,7 @@ export default function ChatRoomScreen() {
   const [pendingImage, setPendingImage] = useState<{ uri: string; name: string; type: string } | null>(null);
   const [pendingVideo, setPendingVideo] = useState<PickedVideo | null>(null);
   const [videoCompressing, setVideoCompressing] = useState(false);
+  const [pickingDoc, setPickingDoc] = useState(false);
   const [caption, setCaption] = useState('');
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [highlightedMsgId, setHighlightedMsgId] = useState<number | null>(null);
@@ -93,6 +124,7 @@ export default function ChatRoomScreen() {
       video?: any;
       video_thumbnail?: any;
       video_duration_sec?: number;
+      dokumen?: any;
       replyToId?: number;
       tempId?: string;
     }) =>
@@ -213,6 +245,53 @@ export default function ChatRoomScreen() {
     setCaption('');
   };
 
+  // Pilih & langsung kirim dokumen (PDF/DOCX/XLSX/PPTX). Tanpa preview modal
+  // — file di-cache oleh DocumentPicker, kita kirim FormData ke /chat/.../messages.
+  // Backend validate mimes + mimetypes whitelist + max 20MB. Nama asli dipakai
+  // untuk display & download client-side.
+  const pickDocument = async () => {
+    if (sendMutation.isPending || pickingDoc) return;
+    setPickingDoc(true);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'application/pdf',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.canceled || !result.assets || !result.assets[0]) return;
+
+      const a = result.assets[0];
+      // Validasi ekstensi (defensive, sesuai backend whitelist)
+      const ext = (a.name ?? '').toLowerCase().split('.').pop() ?? '';
+      if (!DOC_EXTS_ALLOWED.includes(ext as any)) {
+        Alert.alert('Format tidak didukung', 'Hanya PDF, DOCX, XLSX, PPTX yang bisa dikirim.');
+        return;
+      }
+      if (a.size && a.size > 20 * 1024 * 1024) {
+        Alert.alert('Terlalu besar', 'Ukuran dokumen maksimal 20 MB.');
+        return;
+      }
+
+      sendMutation.mutate({
+        dokumen: {
+          uri:  a.uri,
+          name: a.name ?? `dokumen.${ext}`,
+          type: a.mimeType ?? 'application/octet-stream',
+        },
+        replyToId: replyTo?.id,
+      });
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Gagal pilih dokumen.');
+    } finally {
+      setPickingDoc(false);
+    }
+  };
+
   const messages = (data?.messages.data ?? []) as ChatMessage[];
 
   // Tipe room + nama/foto dinamis dari query — supaya kalau admin edit nama
@@ -299,15 +378,18 @@ export default function ChatRoomScreen() {
 
     const isMine  = msg.user_id === user?.id;
     const isMedia = msg.tipe === 'image' || msg.tipe === 'video';
+    const isFile  = msg.tipe === 'file';
 
-    // Build action buttons: Balas (semua), Download + Teruskan (media),
-    // Hapus (hanya milik sendiri)
+    // Build action buttons: Balas (semua), Download + Teruskan (media), Teruskan
+    // (file — tap-bubble sudah handle open), Hapus (hanya milik sendiri)
     const buttons: any[] = [
       { text: 'Batal', style: 'cancel' },
       { text: 'Balas', onPress: () => setReplyTo(msg) },
     ];
     if (isMedia) {
       buttons.push({ text: 'Download', onPress: () => handleDownloadMedia(msg) });
+      buttons.push({ text: 'Teruskan', onPress: () => setForwardMsgId(msg.id) });
+    } else if (isFile) {
       buttons.push({ text: 'Teruskan', onPress: () => setForwardMsgId(msg.id) });
     }
     if (isMine) {
@@ -406,6 +488,28 @@ export default function ChatRoomScreen() {
                     borderRadius={10}
                   />
                 </View>
+              )}
+              {/* Dokumen (PDF/DOCX/XLSX/PPTX) — tap → openDocumentSmart
+                  (PDF → browser native, Office → MS Online Viewer, fallback share) */}
+              {item.tipe === 'file' && item.dokumen_url && (
+                <TouchableOpacity
+                  style={styles.docCard}
+                  onPress={() => openDocumentSmart(item.dokumen_url!, item.dokumen_nama ?? 'dokumen')}
+                  onLongPress={() => handleLongPressMessage(item)}
+                  delayLongPress={350}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={docIconName(item.dokumen_nama)}
+                    size={26}
+                    color={docIconColor(item.dokumen_nama)}
+                  />
+                  <View style={{ flex: 1, marginLeft: 10, minWidth: 0 }}>
+                    <Text style={styles.docName} numberOfLines={2}>{item.dokumen_nama}</Text>
+                    <Text style={styles.docMeta}>{fmtFileSize(item.dokumen_size)}</Text>
+                  </View>
+                  <Ionicons name="download-outline" size={18} color="#8a94a6" />
+                </TouchableOpacity>
               )}
               {item.pesan && (
                 <Text style={styles.bubbleText}>{item.pesan}</Text>
@@ -551,6 +655,15 @@ export default function ChatRoomScreen() {
             {videoCompressing
               ? <ActivityIndicator size="small" color="#a855f7" />
               : <Ionicons name="videocam-outline" size={22} color="#a855f7" />}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={pickDocument}
+            style={styles.iconBtn}
+            disabled={sendMutation.isPending || pickingDoc}
+          >
+            {pickingDoc
+              ? <ActivityIndicator size="small" color="#22c55e" />
+              : <Ionicons name="attach" size={22} color="#22c55e" />}
           </TouchableOpacity>
           <TextInput
             style={styles.input}
@@ -800,6 +913,13 @@ const styles = StyleSheet.create({
   failedText:   { color: '#fff', fontSize: 13, flex: 1 },
   failedAction: { color: '#3b82f6', fontSize: 12, fontWeight: '700' },
   bubbleImage:  { width: 200, height: 200, borderRadius: 8, marginBottom: 4 },
+  docCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingVertical: 6, paddingHorizontal: 4,
+    minWidth: 200, maxWidth: 260, marginBottom: 4,
+  },
+  docName: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  docMeta: { color: '#8a94a6', fontSize: 11, marginTop: 1 },
 
   inputBar: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 6,
