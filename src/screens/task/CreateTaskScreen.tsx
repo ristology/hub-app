@@ -14,6 +14,7 @@ import KaryawanPicker from '../../components/KaryawanPicker';
 import DatePickerInput from '../../components/DatePickerInput';
 import SaveButton from '../../components/SaveButton';
 import { useToast } from '../../components/Toast';
+import { useAuth } from '../../store/auth';
 
 const PRIORITAS_OPTIONS: { key: TugasPrioritas; label: string; color: string }[] = [
   { key: 'rendah', label: 'Rendah', color: '#6b7280' },
@@ -40,8 +41,14 @@ export default function CreateTaskScreen() {
   const route      = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { user } = useAuth();
   const editId = route.params?.id;
   const isEdit = !!editId;
+
+  // Hanya Administrator & Direktur yang boleh menugaskan ke karyawan lain.
+  // Karyawan biasa & HR: assignee dipaksa ke diri sendiri (UI di-lock,
+  // backend juga silent override sebagai safety net).
+  const canAssignOthers = user?.role === 'admin' || user?.role === 'direktur';
 
   const [judul, setJudul]           = useState('');
   const [deskripsi, setDeskripsi]   = useState('');
@@ -82,7 +89,9 @@ export default function CreateTaskScreen() {
       prioritas, status,
       tanggal_mulai:   tglMulai   || undefined,
       tanggal_selesai: tglSelesai || undefined,
-      karyawan_id: assignee?.id,
+      // Karyawan biasa & HR tidak boleh assign ke orang lain — kirim undefined
+      // supaya backend default ke diri sendiri (create) / preserve (update).
+      karyawan_id: canAssignOthers ? assignee?.id : undefined,
       tags: tags.length > 0 ? tags.map((t) => t.id) : undefined,
     }),
     onSuccess: () => {
@@ -100,7 +109,9 @@ export default function CreateTaskScreen() {
       prioritas, status,
       tanggal_mulai:   tglMulai   || undefined,
       tanggal_selesai: tglSelesai || undefined,
-      karyawan_id: assignee?.id,
+      // Karyawan biasa & HR tidak boleh assign ke orang lain — kirim undefined
+      // supaya backend default ke diri sendiri (create) / preserve (update).
+      karyawan_id: canAssignOthers ? assignee?.id : undefined,
       tags: tags.map((t) => t.id),
     }),
     onSuccess: () => {
@@ -191,32 +202,47 @@ export default function CreateTaskScreen() {
             </View>
           </Field>
 
-          <Field label="Ditugaskan ke (opsional)">
-            <TouchableOpacity onPress={() => setAssigneePickerOpen(true)} style={styles.pickerBtn}>
-              {assignee ? (
-                <>
-                  {assignee.foto ? (
-                    <Image source={{ uri: assignee.foto }} style={styles.assigneeAvatar} />
-                  ) : (
-                    <View style={[styles.assigneeAvatar, styles.avatarFallback]}>
-                      <Text style={styles.avatarText}>{assignee.nama.charAt(0).toUpperCase()}</Text>
+          <Field label={canAssignOthers ? 'Ditugaskan ke (opsional)' : 'Ditugaskan ke'}>
+            {canAssignOthers ? (
+              <TouchableOpacity onPress={() => setAssigneePickerOpen(true)} style={styles.pickerBtn}>
+                {assignee ? (
+                  <>
+                    {assignee.foto ? (
+                      <Image source={{ uri: assignee.foto }} style={styles.assigneeAvatar} />
+                    ) : (
+                      <View style={[styles.assigneeAvatar, styles.avatarFallback]}>
+                        <Text style={styles.avatarText}>{assignee.nama.charAt(0).toUpperCase()}</Text>
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pickerValue}>{assignee.nama}</Text>
+                      {assignee.jabatan && <Text style={styles.pickerSub}>{assignee.jabatan}</Text>}
                     </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.pickerValue}>{assignee.nama}</Text>
-                    {assignee.jabatan && <Text style={styles.pickerSub}>{assignee.jabatan}</Text>}
-                  </View>
-                  <TouchableOpacity onPress={() => setAssignee(null)}>
-                    <Ionicons name="close-circle" size={20} color="#8a94a6" />
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <>
-                  <Ionicons name="person-add-outline" size={18} color="#3b82f6" />
-                  <Text style={styles.pickerPlaceholder}>Pilih karyawan</Text>
-                </>
-              )}
-            </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setAssignee(null)}>
+                      <Ionicons name="close-circle" size={20} color="#8a94a6" />
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="person-add-outline" size={18} color="#3b82f6" />
+                    <Text style={styles.pickerPlaceholder}>Pilih karyawan</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : (
+              <>
+                <View style={[styles.pickerBtn, { opacity: 0.7 }]}>
+                  <Ionicons name="lock-closed" size={16} color="#6b7280" />
+                  <Text style={styles.pickerValue}>
+                    {assignee?.nama ?? user?.name ?? 'Diri sendiri'}
+                  </Text>
+                </View>
+                <Text style={{ color: '#6b7280', fontSize: 11, marginTop: 6 }}>
+                  <Ionicons name="information-circle-outline" size={11} color="#6b7280" />
+                  {' '}Hanya Administrator & Direktur yang dapat menugaskan ke karyawan lain.
+                </Text>
+              </>
+            )}
           </Field>
 
           <View style={styles.dateRow}>
