@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, ScrollView, Image, TextInput, TouchableOpacity, StyleSheet,
   ActivityIndicator, Platform, Keyboard, Alert,
@@ -16,6 +16,7 @@ import VideoThumbnail   from '../../components/VideoThumbnail';
 import VideoPlayerModal from '../../components/VideoPlayerModal';
 import ImageViewerModal from '../../components/ImageViewerModal';
 import KaryawanPicker from '../../components/KaryawanPicker';
+import PickerSheet, { type PickerOption } from '../../components/PickerSheet';
 import MentionText    from '../../components/MentionText';
 import LinkText       from '../../components/LinkText';
 import { useKomentarHighlight } from '../../hooks/useKomentarHighlight';
@@ -24,15 +25,16 @@ import type { KaryawanRingkas } from '../../api/feed';
 type RouteParams = { id: number; highlightKomentarId?: number | null };
 
 const STATUS_OPTIONS: { key: ErrorLogStatus; label: string; color: string }[] = [
-  { key: 'open',        label: 'Open',     color: '#ef4444' },
-  { key: 'in_progress', label: 'Proses',   color: '#f59e0b' },
-  { key: 'resolved',    label: 'Resolved', color: '#22c55e' },
-  { key: 'closed',      label: 'Closed',   color: '#8a94a6' },
+  { key: 'open',        label: 'Open',       color: '#ef4444' },
+  { key: 'in_progress', label: 'Proses',     color: '#f59e0b' },
+  { key: 'resolved',    label: 'Resolved',   color: '#22c55e' },
+  { key: 'unresolved',  label: 'Unresolved', color: '#a78bfa' },
+  { key: 'closed',      label: 'Closed',     color: '#8a94a6' },
 ];
 
 // Status yang boleh diubah handler. closed & open (reopen) adalah hak pelapor
 // — ditangani lewat tombol "Tindakan pelapor" terpisah.
-const HANDLER_KEYS: ErrorLogStatus[] = ['in_progress', 'resolved'];
+const HANDLER_KEYS: ErrorLogStatus[] = ['in_progress', 'resolved', 'unresolved'];
 
 function formatDate(s: string | null): string {
   if (!s) return '—';
@@ -69,6 +71,7 @@ export default function ErrorLogDetailScreen() {
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
   const [replyTo,     setReplyTo]     = useState<{ id: number; nama: string } | null>(null);
   const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);
+  const [reassignOpen,   setReassignOpen]   = useState(false);
   const [photoViewerUri, setPhotoViewerUri] = useState<string | null>(null);
 
   const handleKomentarChange = (next: string) => {
@@ -133,11 +136,51 @@ export default function ErrorLogDetailScreen() {
     onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal hapus.'),
   });
 
+  // Daftar PIC alternatif utk reassign — fetch lazily saat picker dibuka.
+  const { data: handlerData } = useQuery({
+    queryKey: ['error-log-handlers'],
+    queryFn:  errorLogApi.handlers,
+    enabled:  reassignOpen,
+  });
+
+  const handlerOptions: PickerOption[] = useMemo(() => {
+    const currentHandlerId = data?.data?.handler?.id;
+    return (handlerData?.data ?? [])
+      .filter((k) => k.id !== currentHandlerId)
+      .map((k) => ({ id: k.id, label: k.nama }));
+  }, [handlerData, data]);
+
+  const reassignMutation = useMutation({
+    mutationFn: (picKaryawanId: number) => errorLogApi.reassign(id, picKaryawanId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['error-log', id] });
+      queryClient.invalidateQueries({ queryKey: ['error-log'] });
+      toast.success('Handler dialihkan ke PIC lain.');
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal alihkan handler.'),
+  });
+
   const confirmDelete = () => {
     Alert.alert('Hapus Error Log?', 'Laporan ini akan dihapus permanen.', [
       { text: 'Batal' },
       { text: 'Hapus', style: 'destructive', onPress: () => destroyMut.mutate() },
     ]);
+  };
+
+  // Konfirmasi pilihan PIC saat reassign
+  const handlePickPic = (opt: PickerOption) => {
+    setReassignOpen(false);
+    if (opt.id == null) return;
+    const picId   = Number(opt.id);
+    const picNama = opt.label;
+    Alert.alert(
+      'Alihkan Handler?',
+      `Alihkan tugas error log ini ke ${picNama}? PIC baru & pelapor akan diberitahu.`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        { text: 'Alihkan', onPress: () => reassignMutation.mutate(picId) },
+      ],
+    );
   };
 
   // Konfirmasi aksi pelapor — tutup kasus / buka kembali laporan
@@ -304,6 +347,24 @@ export default function ErrorLogDetailScreen() {
             </View>
           )}
 
+          {/* Aksi handler — alihkan handler ke PIC lain (overhandle) */}
+          {log.can_reassign && log.status !== 'closed' && (
+            <View style={styles.statusActionWrap}>
+              <Text style={styles.statusHint}>Alihkan handler ke PIC lain</Text>
+              <TouchableOpacity
+                onPress={() => setReassignOpen(true)}
+                disabled={reassignMutation.isPending}
+                style={[styles.statusBtn, styles.statusActionBtn,
+                  { borderColor: 'rgba(245,158,11,0.40)', alignSelf: 'stretch' }]}
+              >
+                <Ionicons name="swap-horizontal" size={14} color="#f59e0b" />
+                <Text style={[styles.statusBtnText, { color: '#f59e0b', fontWeight: '600' }]}>
+                  Alihkan ke PIC Lain
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Aksi pelapor — tutup kasus / buka kembali laporan */}
           {log.can_close && (
             <View style={styles.statusActionWrap}>
@@ -319,7 +380,7 @@ export default function ErrorLogDetailScreen() {
                     <Text style={styles.statusBtnText}>Closed</Text>
                   </TouchableOpacity>
                 )}
-                {(log.status === 'resolved' || log.status === 'closed') && (
+                {(log.status === 'resolved' || log.status === 'unresolved' || log.status === 'closed') && (
                   <TouchableOpacity
                     onPress={() => confirmStatus('open')}
                     disabled={statusMutation.isPending}
@@ -455,6 +516,16 @@ export default function ErrorLogDetailScreen() {
       <ImageViewerModal
         uri={photoViewerUri}
         onClose={() => setPhotoViewerUri(null)}
+      />
+
+      <PickerSheet
+        visible={reassignOpen}
+        title="Pilih PIC Baru"
+        options={handlerOptions}
+        selectedId={null}
+        onPick={handlePickPic}
+        onClose={() => setReassignOpen(false)}
+        searchable
       />
     </SafeAreaView>
   );

@@ -1,6 +1,6 @@
 import { apiClient } from './client';
 
-export type ErrorLogStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+export type ErrorLogStatus = 'open' | 'in_progress' | 'resolved' | 'unresolved' | 'closed';
 
 export type ErrorLog = {
   id: number;
@@ -10,6 +10,8 @@ export type ErrorLog = {
   can_update_status: boolean;
   /** Pelapor/admin — boleh tutup kasus (closed) & buka kembali (open/reopen) */
   can_close: boolean;
+  /** Handler/admin — boleh alihkan handler ke PIC lain (overhandle) */
+  can_reassign: boolean;
   has_unread_notif: boolean;
   url: string | null;
   username: string | null;
@@ -190,6 +192,19 @@ export const errorLogApi = {
     const { data } = await apiClient.patch(`/error-log/${id}/status`, {
       status,
       catatan_penanganan: catatan,
+    });
+    return data;
+  },
+
+  /** Alihkan handler ke PIC lain (overhandle). picKaryawanId = karyawan.id PIC baru. */
+  reassign: async (
+    id: number,
+    picKaryawanId: number,
+    catatan?: string,
+  ): Promise<{ data: ErrorLog }> => {
+    const { data } = await apiClient.post(`/error-log/${id}/reassign`, {
+      pic_karyawan_id:    picKaryawanId,
+      catatan_pengalihan: catatan,
     });
     return data;
   },

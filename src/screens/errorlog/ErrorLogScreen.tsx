@@ -28,6 +28,7 @@ const STATUS_OPTIONS: PickerOption[] = [
   { id: 'open',         label: 'Open' },
   { id: 'in_progress',  label: 'Proses' },
   { id: 'resolved',     label: 'Resolved' },
+  { id: 'unresolved',   label: 'Unresolved' },
   { id: 'closed',       label: 'Closed' },
 ];
 

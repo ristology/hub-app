@@ -12,6 +12,7 @@ const STATUS_STYLE = {
   open:        { bg: 'rgba(239,68,68,0.15)',  color: '#ef4444', label: 'Open' },
   in_progress: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', label: 'Proses' },
   resolved:    { bg: 'rgba(34,197,94,0.15)',  color: '#22c55e', label: 'Resolved' },
+  unresolved:  { bg: 'rgba(167,139,250,0.15)',color: '#a78bfa', label: 'Unresolved' },
   closed:      { bg: 'rgba(107,114,128,0.15)',color: '#8a94a6', label: 'Closed' },
 } as const;
 
