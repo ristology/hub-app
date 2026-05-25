@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
-  View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
+  View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet, useWindowDimensions,
   TouchableOpacity, LayoutAnimation, Platform, UIManager,
   type NativeSyntheticEvent, type NativeScrollEvent,
 } from 'react-native';
@@ -380,6 +380,13 @@ function MonthGrid({ cursor, activeByDate, selectedDate, onSelectDate }: {
   selectedDate: string | null;
   onSelectDate: (key: string) => void;
 }) {
+  // Cap tinggi cell — di tablet (lebar ≥800px), aspectRatio 1.1 bikin cell
+  // raksasa (>180px tinggi) sehingga MonthGrid menutupi seluruh layar dan
+  // FlatList event di bawahnya jadi 0px (tidak bisa scroll). Pakai
+  // useWindowDimensions supaya responsive thd rotation.
+  const { width: screenW } = useWindowDimensions();
+  const cellH = Math.max(44, Math.min(64, (screenW - 24) / 7));
+
   const year   = cursor.getFullYear();
   const month  = cursor.getMonth();
   const first  = new Date(year, month, 1);
@@ -429,6 +436,7 @@ function MonthGrid({ cursor, activeByDate, selectedDate, onSelectDate }: {
                 activeOpacity={0.7}
                 style={[
                   styles.calCell,
+                  { height: cellH },
                   isSelected && styles.calCellSelected,
                   isToday && !isSelected && styles.calCellToday,
                 ]}
@@ -508,7 +516,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   calCell: {
-    flex: 1, aspectRatio: 1.1,
+    // height di-set inline dari MonthGrid (responsive thd width device).
+    // JANGAN tambah aspectRatio di sini — bikin cell raksasa di tablet.
+    flex: 1,
     alignItems: 'center', justifyContent: 'center',
     margin: 1, borderRadius: 8,
     position: 'relative',
