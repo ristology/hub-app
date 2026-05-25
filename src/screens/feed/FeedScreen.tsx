@@ -35,6 +35,7 @@ function countActiveFilters(f: FeedFilters): number {
   if (f.kategori_id)    n++;
   if (f.tanggal)        n++;
   if (f.bulan)          n++;
+  if (f.milikku)        n++;
   return n;
 }
 
@@ -221,6 +222,17 @@ export default function FeedScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Feed</Text>
           <TouchableOpacity
+            onPress={() => setFilters((f) => ({ ...f, milikku: !f.milikku }))}
+            style={[styles.searchBtn, filters.milikku && styles.searchBtnActive]}
+            hitSlop={8}
+          >
+            <Ionicons
+              name={filters.milikku ? 'person' : 'person-outline'}
+              size={20}
+              color={filters.milikku ? '#3b82f6' : '#fff'}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={openFilterSheet}
             style={[styles.searchBtn, activeCount > 0 && styles.searchBtnActive]}
             hitSlop={8}
@@ -247,6 +259,9 @@ export default function FeedScreen() {
             )}
             {filters.bulan && (
               <FilterChip label={formatBulan(filters.bulan)} onClear={() => setFilters({ ...filters, bulan: undefined })} />
+            )}
+            {filters.milikku && (
+              <FilterChip label="Milikku" onClear={() => setFilters({ ...filters, milikku: false })} />
             )}
             {filters.tanggal && (
               <FilterChip label={formatTanggal(filters.tanggal)} onClear={() => setFilters({ ...filters, tanggal: undefined })} />
@@ -481,6 +496,25 @@ function FeedFilterSheet({
           </View>
 
           <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+            {/* Checkbox 'Milikku' — sync dengan tombol cepat di header */}
+            <TouchableOpacity
+              onPress={() => onDraftChange({ ...draft, milikku: !draft.milikku })}
+              activeOpacity={0.7}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 10,
+                paddingVertical: 10, paddingHorizontal: 4, marginBottom: 4,
+              }}
+            >
+              <Ionicons
+                name={draft.milikku ? 'checkbox' : 'square-outline'}
+                size={22}
+                color={draft.milikku ? '#3b82f6' : '#8a94a6'}
+              />
+              <Text style={{ color: '#fff', fontSize: 14 }}>
+                Hanya yang saya input
+              </Text>
+            </TouchableOpacity>
+
             <Text style={styles.fsLabel}>Cari teks</Text>
             <View style={styles.fsSearchBox}>
               <Ionicons name="search" size={16} color="#6b7280" />

@@ -86,6 +86,7 @@ export type FeedFilters = {
   bulan?:       string;   // YYYY-MM
   kategori_id?: number | null;
   karyawan_id?: number | null;
+  milikku?:     boolean;
 };
 
 export const feedApi = {
@@ -96,6 +97,7 @@ export const feedApi = {
     if (filters.bulan)            params.bulan       = filters.bulan;
     if (filters.kategori_id)      params.kategori_id = filters.kategori_id;
     if (filters.karyawan_id)      params.karyawan_id = filters.karyawan_id;
+    if (filters.milikku)          params.milikku     = 1;
     const { data } = await apiClient.get('/feed', { params });
     return data;
   },

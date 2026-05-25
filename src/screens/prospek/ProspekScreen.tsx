@@ -41,6 +41,7 @@ type Filters = {
   kota?:   string | null;
   bulan?:  string;
   quick_filter?: QuickFilter;
+  milikku?: boolean;
 };
 
 function countActive(f: Filters): number {
@@ -50,6 +51,7 @@ function countActive(f: Filters): number {
   if (f.kota)           n++;
   if (f.bulan)          n++;
   if (f.quick_filter)   n++;
+  if (f.milikku)        n++;
   return n;
 }
 
@@ -105,6 +107,7 @@ export default function ProspekScreen() {
     ...(filters.kota         && { kota:         filters.kota }),
     ...(filters.bulan        && { bulan:        filters.bulan }),
     ...(filters.quick_filter && { quick_filter: filters.quick_filter }),
+    ...(filters.milikku      && { milikku: 1 }),
     ...(filters.search?.trim() && { search: filters.search.trim() }),
   }), [filters]);
 
@@ -152,6 +155,17 @@ export default function ProspekScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Prospek</Text>
         <TouchableOpacity
+          onPress={() => setFilters((f) => ({ ...f, milikku: !f.milikku }))}
+          style={[styles.searchBtn, filters.milikku && styles.searchBtnActive]}
+          hitSlop={8}
+        >
+          <Ionicons
+            name={filters.milikku ? 'person' : 'person-outline'}
+            size={20}
+            color={filters.milikku ? '#3b82f6' : '#fff'}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
           onPress={openFilterSheet}
           style={[styles.searchBtn, activeCount > 0 && styles.searchBtnActive]}
           hitSlop={8}
@@ -169,6 +183,7 @@ export default function ProspekScreen() {
           {filters.status && <Chip label={statusLabel ?? filters.status} onClear={() => setFilters({ ...filters, status: null })} />}
           {filters.kota   && <Chip label={filters.kota}                  onClear={() => setFilters({ ...filters, kota: null })} />}
           {filters.bulan  && <Chip label={formatBulan(filters.bulan)}    onClear={() => setFilters({ ...filters, bulan: undefined })} />}
+          {filters.milikku && <Chip label="Milikku"                       onClear={() => setFilters({ ...filters, milikku: false })} />}
           <TouchableOpacity onPress={() => setFilters({})} style={styles.clearAll}>
             <Text style={styles.clearAllText}>Reset</Text>
           </TouchableOpacity>
@@ -358,6 +373,25 @@ function FilterSheet({
         </View>
 
         <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+          {/* Checkbox 'Milikku' — sync dengan tombol cepat di header */}
+          <TouchableOpacity
+            onPress={() => onDraftChange({ ...draft, milikku: !draft.milikku })}
+            activeOpacity={0.7}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 10,
+              paddingVertical: 10, paddingHorizontal: 4, marginBottom: 4,
+            }}
+          >
+            <Ionicons
+              name={draft.milikku ? 'checkbox' : 'square-outline'}
+              size={22}
+              color={draft.milikku ? '#3b82f6' : '#8a94a6'}
+            />
+            <Text style={{ color: '#fff', fontSize: 14 }}>
+              Hanya yang saya input
+            </Text>
+          </TouchableOpacity>
+
           <Text style={fsStyles.label}>Cari teks</Text>
           <View style={fsStyles.searchBox}>
             <Ionicons name="search" size={16} color="#6b7280" />
