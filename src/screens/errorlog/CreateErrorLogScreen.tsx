@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, ScrollView, TouchableOpacity, Image,
-  StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
+  StyleSheet, Alert, ActivityIndicator, Keyboard, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -25,8 +25,29 @@ export default function CreateErrorLogScreen() {
   const route       = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const queryClient = useQueryClient();
   const toast       = useToast();
+  const insets      = useSafeAreaInsets();
   const editId      = route.params?.id;
   const isEdit      = !!editId;
+
+  // Manual keyboard tracking — KeyboardAvoidingView buggy di Android
+  // (behavior=undefined = no-op). Pakai listener + paddingBottom dinamis
+  // di ScrollView supaya field username/password (di bawah) bisa di-scroll
+  // di atas keyboard. Lihat [[feedback_mobile_keyboard_patterns]].
+  const [kbHeight, setKbHeight] = useState(0);
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvt, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
+
+  // Android `keyboardDidShow` height tidak include suggestion bar (~60px).
+  // Tambah safety supaya focused input tidak nyaris ketutup toolbar IME.
+  const ANDROID_IME_SAFETY = 60;
+  const effectiveKb = kbHeight > 0
+    ? kbHeight + (Platform.OS === 'android' ? ANDROID_IME_SAFETY : 0)
+    : 0;
 
   const [klienId, setKlienId]       = useState<number | null>(null);
   const [kategoriId, setKategoriId] = useState<number | null>(null);
@@ -191,21 +212,30 @@ export default function CreateErrorLogScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="close" size={24} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.topTitle}>{isEdit ? 'Edit Laporan Error' : 'Laporan Error'}</Text>
-          <SaveButton
-            onPress={handleSubmit}
-            loading={isPending}
-            disabled={!keterangan.trim() || !kategoriId}
-            label={isEdit ? 'Simpan' : 'Kirim'}
-          />
-        </View>
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="close" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.topTitle}>{isEdit ? 'Edit Laporan Error' : 'Laporan Error'}</Text>
+        <SaveButton
+          onPress={handleSubmit}
+          loading={isPending}
+          disabled={!keterangan.trim() || !kategoriId}
+          label={isEdit ? 'Simpan' : 'Kirim'}
+        />
+      </View>
 
-        <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          // paddingBottom dinamis — saat keyboard buka: kbHeight + safety
+          // supaya field username/password (di bawah) bisa di-scroll naik
+          // di atas keyboard. Saat tertutup: insets.bottom + 24 untuk
+          // bernapas di home indicator.
+          { paddingBottom: effectiveKb > 0 ? effectiveKb + 24 : insets.bottom + 24 },
+        ]}
+        keyboardShouldPersistTaps="handled"
+      >
           {/* Klien + Kategori */}
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1 }}>
@@ -379,8 +409,7 @@ export default function CreateErrorLogScreen() {
               </Field>
             </View>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </ScrollView>
 
       <PickerSheet
         visible={klienOpen}
