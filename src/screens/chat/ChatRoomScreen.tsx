@@ -19,6 +19,7 @@ import VideoThumbnail   from '../../components/VideoThumbnail';
 import { pickAndCompressVideo, type PickedVideo, formatDuration } from '../../utils/videoPicker';
 import { openDocumentExternal, openDocumentSmart } from '../../utils/openDocument';
 import ForwardSheet from './ForwardSheet';
+import LinkText from '../../components/LinkText';
 
 // ── Helper dokumen (icon + size formatter) ──────────────
 const DOC_EXTS_ALLOWED = ['pdf', 'docx', 'xlsx', 'pptx'] as const;
@@ -529,7 +530,11 @@ export default function ChatRoomScreen() {
                 </TouchableOpacity>
               )}
               {item.pesan && (
-                <Text style={styles.bubbleText}>{item.pesan}</Text>
+                <LinkText
+                  text={item.pesan}
+                  style={styles.bubbleText}
+                  linkColor={isMine ? '#bfdbfe' : '#7dd3fc'}
+                />
               )}
             </>
           )}
