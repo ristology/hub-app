@@ -9,10 +9,12 @@ import { useRoute, useNavigation, useFocusEffect, type RouteProp } from '@react-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Clipboard from 'expo-clipboard';
 import { Image as ExpoImage } from 'expo-image';
 
 import { chatApi, type ChatMessage } from '../../api/chat';
 import { useAuth } from '../../store/auth';
+import { useToast } from '../../components/Toast';
 import ImageViewerModal from '../../components/ImageViewerModal';
 import VideoPlayerModal from '../../components/VideoPlayerModal';
 import VideoThumbnail   from '../../components/VideoThumbnail';
@@ -20,6 +22,72 @@ import { pickAndCompressVideo, type PickedVideo, formatDuration } from '../../ut
 import { openDocumentExternal, openDocumentSmart } from '../../utils/openDocument';
 import ForwardSheet from './ForwardSheet';
 import LinkText from '../../components/LinkText';
+
+// Bottom sheet action menu — gantikan Alert.alert yg Android-nya stuck saat
+// >3 button atau Modal-conflict. Backdrop tap & hardware back close otomatis
+// (onRequestClose). Tap item: close dulu, baru execute (mencegah race antara
+// modal unmount & action navigation/Modal lain seperti picker).
+type ActionItem = {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  destructive?: boolean;
+  onPress: () => void;
+};
+function ChatActionSheet({
+  visible, title, items, onClose,
+}: { visible: boolean; title?: string; items: ActionItem[]; onClose: () => void }) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <TouchableOpacity
+        style={styles.sheetBackdrop}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <View style={styles.sheetContainer} onStartShouldSetResponder={() => true}>
+          {title && <Text style={styles.sheetTitle}>{title}</Text>}
+          {items.map((it, i) => (
+            <TouchableOpacity
+              key={i}
+              style={styles.sheetItem}
+              activeOpacity={0.7}
+              onPress={() => {
+                onClose();
+                // Delay supaya Modal unmount dulu sebelum action (mis. buka picker)
+                // — race condition antara 2 Modal di Android bisa bikin stuck.
+                setTimeout(it.onPress, 120);
+              }}
+            >
+              <Ionicons
+                name={it.icon}
+                size={20}
+                color={it.destructive ? '#ef4444' : '#cbd5e1'}
+                style={{ width: 28 }}
+              />
+              <Text style={[styles.sheetItemText, it.destructive && { color: '#ef4444' }]}>
+                {it.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity
+            style={[styles.sheetItem, styles.sheetCancel]}
+            activeOpacity={0.7}
+            onPress={onClose}
+          >
+            <Text style={[styles.sheetItemText, { color: '#8a94a6', fontWeight: '600' }]}>
+              Batal
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
 
 // ── Helper dokumen (icon + size formatter) ──────────────
 const DOC_EXTS_ALLOWED = ['pdf', 'docx', 'xlsx', 'pptx'] as const;
@@ -95,6 +163,9 @@ export default function ChatRoomScreen() {
   const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);
   // id pesan yang sedang diteruskan — buka ForwardSheet kalau non-null
   const [forwardMsgId, setForwardMsgId] = useState<number | null>(null);
+  const [attachSheetOpen, setAttachSheetOpen] = useState(false);
+  const [actionSheetMsg, setActionSheetMsg] = useState<ChatMessage | null>(null);
+  const toast = useToast();
   // Pesan yang gagal kirim — disimpan local, tampil sebagai ghost bubble dgn icon error
   const [failedMessages, setFailedMessages] = useState<{ tempId: string; pesan: string; replyToId?: number }[]>([]);
   const flatListRef = useRef<FlatList>(null);
@@ -246,21 +317,13 @@ export default function ChatRoomScreen() {
     setCaption('');
   };
 
-  // Single "+" attach menu — buka native Alert dgn 3 pilihan (gambar/video/
-  // dokumen). Lebih ringkas dari 3 ikon di input bar; tap +1 langkah tapi
-  // hemat ruang horizontal di layar kecil. Picker individual tidak diubah.
+  // Single "+" attach menu — buka custom bottom sheet (BUKAN Alert.alert).
+  // Alert.alert di Android cuma support 3 button native; 4+ bikin stuck atau
+  // tidak bisa di-close/back. Custom Modal bottom sheet handle Android back
+  // (onRequestClose) + tap backdrop = consistent dgn iOS.
   const openAttachMenu = () => {
     if (sendMutation.isPending || videoCompressing || pickingDoc) return;
-    Alert.alert(
-      'Lampirkan',
-      undefined,
-      [
-        { text: '🖼️  Gambar',  onPress: pickImage },
-        { text: '🎬  Video',   onPress: pickVideo },
-        { text: '📎  Dokumen', onPress: pickDocument },
-        { text: 'Batal', style: 'cancel' },
-      ],
-    );
+    setAttachSheetOpen(true);
   };
 
   // Pilih & langsung kirim dokumen (PDF/DOCX/XLSX/PPTX). Tanpa preview modal
@@ -391,29 +454,52 @@ export default function ChatRoomScreen() {
     await openDocumentExternal(url, filename, isVideo ? 'video/mp4' : undefined);
   };
 
+  // Long-press bubble pesan → buka custom bottom sheet (gantikan Alert.alert
+  // yg di Android stuck saat 5 button: Balas/Salin/Download/Teruskan/Hapus).
+  // Sheet sebenarnya di-render di JSX bawah berdasarkan actionSheetMsg.
   const handleLongPressMessage = (msg: ChatMessage) => {
-    if (msg.dihapus_at) return; // Pesan deleted — no actions
+    if (msg.dihapus_at) return;
+    setActionSheetMsg(msg);
+  };
 
+  // Build items utk message action sheet — dipanggil saat render Modal.
+  const buildMessageActions = (msg: ChatMessage): ActionItem[] => {
     const isMine  = msg.user_id === user?.id;
     const isMedia = msg.tipe === 'image' || msg.tipe === 'video';
     const isFile  = msg.tipe === 'file';
+    const hasText = !!msg.pesan && msg.pesan.trim().length > 0;
 
-    // Build action buttons: Balas (semua), Download + Teruskan (media), Teruskan
-    // (file — tap-bubble sudah handle open), Hapus (hanya milik sendiri)
-    const buttons: any[] = [
-      { text: 'Batal', style: 'cancel' },
-      { text: 'Balas', onPress: () => setReplyTo(msg) },
+    const items: ActionItem[] = [
+      { label: 'Balas',    icon: 'arrow-undo-outline', onPress: () => setReplyTo(msg) },
     ];
+    if (hasText) {
+      items.push({
+        label: 'Salin teks',
+        icon: 'copy-outline',
+        onPress: async () => {
+          try {
+            await Clipboard.setStringAsync(msg.pesan!);
+            toast.success('Teks pesan disalin');
+          } catch {
+            toast.error('Gagal salin teks');
+          }
+        },
+      });
+    }
     if (isMedia) {
-      buttons.push({ text: 'Download', onPress: () => handleDownloadMedia(msg) });
-      buttons.push({ text: 'Teruskan', onPress: () => setForwardMsgId(msg.id) });
+      items.push({ label: 'Download', icon: 'download-outline', onPress: () => handleDownloadMedia(msg) });
+      items.push({ label: 'Teruskan', icon: 'arrow-redo-outline', onPress: () => setForwardMsgId(msg.id) });
     } else if (isFile) {
-      buttons.push({ text: 'Teruskan', onPress: () => setForwardMsgId(msg.id) });
+      items.push({ label: 'Teruskan', icon: 'arrow-redo-outline', onPress: () => setForwardMsgId(msg.id) });
+    } else {
+      // Text-only: tetap bisa teruskan
+      items.push({ label: 'Teruskan', icon: 'arrow-redo-outline', onPress: () => setForwardMsgId(msg.id) });
     }
     if (isMine) {
-      buttons.push({
-        text: 'Hapus',
-        style: 'destructive',
+      items.push({
+        label: 'Hapus pesan',
+        icon: 'trash-outline',
+        destructive: true,
         onPress: async () => {
           try {
             await chatApi.deleteMessage(roomId, msg.id);
@@ -425,8 +511,7 @@ export default function ChatRoomScreen() {
         },
       });
     }
-
-    Alert.alert('Pilih aksi', 'Apa yang ingin dilakukan dgn pesan ini?', buttons);
+    return items;
   };
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
@@ -842,6 +927,28 @@ export default function ChatRoomScreen() {
         messageId={forwardMsgId}
         onClose={() => setForwardMsgId(null)}
       />
+
+      {/* Bottom sheet "+" attach (Gambar/Video/Dokumen) — gantikan Alert.alert
+          yg di Android stuck saat 4 button. */}
+      <ChatActionSheet
+        visible={attachSheetOpen}
+        title="Lampirkan"
+        onClose={() => setAttachSheetOpen(false)}
+        items={[
+          { label: 'Gambar',  icon: 'image-outline',           onPress: pickImage },
+          { label: 'Video',   icon: 'videocam-outline',        onPress: pickVideo },
+          { label: 'Dokumen', icon: 'document-attach-outline', onPress: pickDocument },
+        ]}
+      />
+
+      {/* Bottom sheet aksi pesan (Balas/Salin/Download/Teruskan/Hapus) —
+          dibangun dinamis berdasarkan tipe pesan & ownership. */}
+      <ChatActionSheet
+        visible={actionSheetMsg !== null}
+        title="Pilih aksi"
+        onClose={() => setActionSheetMsg(null)}
+        items={actionSheetMsg ? buildMessageActions(actionSheetMsg) : []}
+      />
     </SafeAreaView>
   );
 }
@@ -951,6 +1058,35 @@ const styles = StyleSheet.create({
   sendBtn: {
     width: 38, height: 38, borderRadius: 19, backgroundColor: '#3b82f6',
     alignItems: 'center', justifyContent: 'center',
+  },
+
+  // ── Bottom sheet action menu ─────────────────────────────────
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  sheetContainer: {
+    backgroundColor: '#0d1421',
+    borderTopLeftRadius: 16, borderTopRightRadius: 16,
+    paddingTop: 10, paddingBottom: 30, paddingHorizontal: 8,
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  sheetTitle: {
+    color: '#8a94a6', fontSize: 13, fontWeight: '600',
+    textAlign: 'center', paddingVertical: 10, marginBottom: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  sheetItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+    borderRadius: 10,
+  },
+  sheetItemText: { color: '#e2e8f0', fontSize: 15 },
+  sheetCancel: {
+    marginTop: 6,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
   },
 });
 
