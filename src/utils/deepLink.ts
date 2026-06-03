@@ -122,17 +122,50 @@ function dispatchNavigation(target: ReturnType<typeof resolveTarget>) {
 
   const { tab, screen, params } = target;
 
-  if (screen) {
-    // initial: false → tetap mount list screen sebagai initial route, push detail di atasnya.
-    // Tanpa ini, back dari detail langsung lompat ke Beranda krn stack hanya berisi detail.
-    // 3-level (MainTabs > Kalender > KegiatanDetail): inner params juga butuh initial: false.
-    const innerParams = params && typeof params === 'object' && (params as any).screen
-      ? { ...(params as any), initial: false }
-      : params;
-    navigationRef.navigate(tab, { screen, initial: false, params: innerParams });
-  } else {
-    navigationRef.navigate(tab, params);
+  // No nested screen → langsung ke tab
+  if (!screen) {
+    navigationRef.navigate(tab as never, params as never);
+    return;
   }
+
+  // EXPLICIT TWO-STEP navigation (lihat [[feedback_rn_nested_navigation]]).
+  //
+  // Sebelumnya pakai nested navigate dgn `initial: false` — work utk warm
+  // start (notif tap saat app foreground/background) tapi GAGAL utk cold
+  // start (Universal Link tap dari email saat app killed). Cold start =
+  // navigator state fresh, `initial: false` interpretasi RN tidak reliable
+  // → target screen tidak ter-push, user landing di Beranda.
+  //
+  // Solusi: pisah ke 2 step eksplisit
+  //   STEP 1: navigate ke tab tujuan → mount stack dgn list screen sbg
+  //           initial route (default behavior, no quirks)
+  //   STEP 2 (delay 150ms): navigate ke target screen by unique route name
+  //           → RN lookup di tree, push di atas list screen
+  //
+  // Hasil: stack `[ListScreen, TargetScreen]`. goBack pop target → land
+  // di list. Tidak bubble ke tab navigator, tidak switch tab keliru.
+
+  // Unwrap 3-level target (mis. MainTabs > Kalender > KegiatanDetail).
+  // tab='MainTabs' & screen='Kalender' & params={ screen: 'KegiatanDetail', params: {...}}
+  // → actualTab='Kalender', actualScreen='KegiatanDetail', actualParams={...}
+  let actualTab    = tab;
+  let actualScreen = screen;
+  let actualParams = params;
+
+  if (tab === 'MainTabs' && params && typeof params === 'object' && (params as any).screen) {
+    actualTab    = screen;
+    actualScreen = (params as any).screen;
+    actualParams = (params as any).params;
+  }
+
+  // STEP 1: switch tab (mount stack dgn list screen sbg initial)
+  navigationRef.navigate(actualTab as never);
+
+  // STEP 2: push target screen ke stack tujuan (delay supaya mount settle)
+  setTimeout(() => {
+    if (!navigationRef.isReady()) return;
+    navigationRef.navigate(actualScreen as never, actualParams as never);
+  }, 150);
 }
 
 /**
