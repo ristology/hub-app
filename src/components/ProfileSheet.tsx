@@ -22,6 +22,7 @@ import { useAuth } from '../store/auth';
 import { useToast } from './Toast';
 import SaveButton from './SaveButton';
 import ImageViewerModal from './ImageViewerModal';
+import { transcodeHeicIfNeeded } from '../utils/transcodeHeicIfNeeded';
 
 type Props = {
   visible: boolean;
@@ -118,12 +119,13 @@ export default function ProfileSheet({ visible, onClose }: Props) {
 
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
-    const ext   = asset.uri.split('.').pop() ?? 'jpg';
-    fotoMut.mutate({
+    // Transcode HEIC → JPEG di iPhone sebelum upload (libheif server issue)
+    const transcoded = await transcodeHeicIfNeeded({
       uri:  asset.uri,
-      name: `foto.${ext}`,
-      type: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+      name: asset.fileName ?? `foto-${Date.now()}.jpg`,
+      type: asset.mimeType ?? 'image/jpeg',
     });
+    fotoMut.mutate(transcoded);
   };
 
   const confirmLogout = () => {

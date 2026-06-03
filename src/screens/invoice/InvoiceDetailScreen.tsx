@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 
 import { invoiceApi } from '../../api/invoice';
+import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
 
 type RouteParams = { id: number };
 
@@ -75,13 +76,15 @@ export default function InvoiceDetailScreen() {
 
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
-
-    setUploading(true);
-    toggleMut.mutate({
+    // Transcode HEIC → JPEG di iPhone sebelum upload
+    const transcoded = await transcodeHeicIfNeeded({
       uri:  asset.uri,
       name: asset.fileName ?? `bukti_${Date.now()}.jpg`,
       type: asset.mimeType ?? 'image/jpeg',
     });
+
+    setUploading(true);
+    toggleMut.mutate(transcoded);
   };
 
   const promptTandaiLunas = () => {

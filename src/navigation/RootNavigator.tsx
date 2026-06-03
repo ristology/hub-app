@@ -2,10 +2,12 @@ import React, { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useShareIntentContext } from 'expo-share-intent';
 import { useAuth } from '../store/auth';
 import LoginScreen        from '../screens/auth/LoginScreen';
 import BottomTabNavigator from './BottomTabNavigator';
 import AppDrawer          from './AppDrawer';
+import ShareToHubScreen   from '../screens/share/ShareToHubScreen';
 import { AppDrawerProvider } from '../context/AppDrawerContext';
 import { navigationRef, setupDeepLinkHandler } from '../utils/deepLink';
 
@@ -13,6 +15,7 @@ const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
   const { token, isInitializing, bootstrap } = useAuth();
+  const { hasShareIntent } = useShareIntentContext();
 
   useEffect(() => {
     bootstrap();
@@ -23,6 +26,17 @@ export default function RootNavigator() {
     if (!token) return;
     return setupDeepLinkHandler();
   }, [token]);
+
+  // Share Intent listener — kalau OS share content ke Afresto HUB,
+  // navigate ke chooser screen (Feed / Chat / Error Log).
+  useEffect(() => {
+    if (!token || !hasShareIntent) return;
+    // Delay sedikit supaya navigationRef ready
+    const t = setTimeout(() => {
+      navigationRef.current?.navigate('ShareToHub' as never);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [hasShareIntent, token]);
 
   if (isInitializing) {
     return (
@@ -57,6 +71,11 @@ export default function RootNavigator() {
               ? <Stack.Screen name="MainTabs" component={BottomTabNavigator} />
               : <Stack.Screen name="Login"    component={LoginScreen} />
             }
+            <Stack.Screen
+              name="ShareToHub"
+              component={ShareToHubScreen}
+              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+            />
           </Stack.Navigator>
 
           {/* Side drawer — hanya aktif saat sudah login */}

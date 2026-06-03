@@ -12,6 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { invoiceApi, type Invoice, type StatusBayar } from '../../api/invoice';
 import SwipeableInvoiceCard from './components/SwipeableInvoiceCard';
+import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
 
 type ParamList = {
   InvoiceList: undefined;
@@ -91,14 +92,16 @@ export default function InvoiceScreen() {
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
+    // Transcode HEIC → JPEG di iPhone sebelum upload
+    const transcoded = await transcodeHeicIfNeeded({
+      uri:  asset.uri,
+      name: asset.fileName ?? `bukti_${Date.now()}.jpg`,
+      type: asset.mimeType ?? 'image/jpeg',
+    });
     setPendingId(id);
     toggleMut.mutate({
       id,
-      bukti: {
-        uri:  asset.uri,
-        name: asset.fileName ?? `bukti_${Date.now()}.jpg`,
-        type: asset.mimeType ?? 'image/jpeg',
-      },
+      bukti: transcoded,
     });
   };
 

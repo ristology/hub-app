@@ -17,6 +17,7 @@ import {
 } from '../../api/clientRequest';
 import DatePickerInput from '../../components/DatePickerInput';
 import SaveButton from '../../components/SaveButton';
+import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
 
 const MAX_GAMBAR  = 10;
 const MAX_DOKUMEN = 5;
@@ -136,11 +137,16 @@ export default function CreateRequestScreen() {
       quality: 0.8,
     });
     if (!result.canceled) {
-      const added: FileAsset[] = result.assets.map((a) => ({
-        uri:  a.uri,
-        name: a.fileName ?? `request-${Date.now()}.jpg`,
-        type: a.mimeType ?? 'image/jpeg',
-      }));
+      // Transcode HEIC → JPEG di iPhone sebelum upload (libheif server issue)
+      const added: FileAsset[] = await Promise.all(
+        result.assets.map((a) =>
+          transcodeHeicIfNeeded({
+            uri: a.uri,
+            name: a.fileName ?? `request-${Date.now()}.jpg`,
+            type: a.mimeType ?? 'image/jpeg',
+          })
+        )
+      );
       setNewGambar((prev) => [...prev, ...added].slice(0, MAX_GAMBAR - activeExistingGambar));
     }
   };
@@ -152,9 +158,12 @@ export default function CreateRequestScreen() {
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
     if (!result.canceled && result.assets[0]) {
       const a = result.assets[0];
-      setNewGambar((p) => [...p, {
-        uri: a.uri, name: a.fileName ?? `cam-${Date.now()}.jpg`, type: a.mimeType ?? 'image/jpeg',
-      }]);
+      const transcoded = await transcodeHeicIfNeeded({
+        uri: a.uri,
+        name: a.fileName ?? `cam-${Date.now()}.jpg`,
+        type: a.mimeType ?? 'image/jpeg',
+      });
+      setNewGambar((p) => [...p, transcoded]);
     }
   };
 

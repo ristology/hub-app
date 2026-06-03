@@ -12,13 +12,18 @@
       "resizeMode": "contain",
       "backgroundColor": "#0a1628"
     },
+    "scheme": "afrestohub",
     "ios": {
       "bundleIdentifier": "id.afresto.hub",
       "supportsTablet": false,
       "googleServicesFile": "./GoogleService-Info.plist",
+      "associatedDomains": [
+        "applinks:hub.afresto.id"
+      ],
       "infoPlist": {
         "NSCameraUsageDescription": "Afresto HUB butuh akses kamera untuk mengambil foto/video yang akan diposting di Feed, dilampirkan di pesan Chat, dan dokumentasi laporan Error sistem klien.",
         "NSPhotoLibraryUsageDescription": "Afresto HUB butuh akses galeri untuk memilih foto/video yang akan diposting di Feed, dilampirkan di pesan Chat, atau diupload sebagai dokumen perusahaan. Foto/video Anda tidak dibagikan ke pihak ketiga, hanya disimpan di server perusahaan untuk komunikasi internal antar karyawan.",
+        "NSPhotoLibraryAddUsageDescription": "Afresto HUB perlu izin untuk menyimpan foto/video chat yang Anda download dari rekan kerja ke galeri Foto iPhone Anda.",
         "NSLocationWhenInUseUsageDescription": "Afresto HUB butuh akses lokasi untuk menandai lokasi posting Feed (opsional - hanya saat Anda memilih untuk menambahkan geo-tag). Lokasi tidak di-track di background, hanya saat aktif posting.",
         "NSMicrophoneUsageDescription": "Afresto HUB butuh akses mikrofon untuk merekam audio pada video yang dilampirkan di Feed dan Chat.",
         "ITSAppUsesNonExemptEncryption": false
@@ -33,10 +38,27 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "hub.afresto.id"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO"
       ]
     },
     "web": {
@@ -61,7 +83,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/notification-icon.png",
           "color": "#3b82f6",
           "defaultChannel": "default",
           "sounds": [
@@ -71,6 +93,16 @@
         }
       ],
       "@react-native-community/datetimepicker",
+      [
+        "expo-share-intent",
+        {
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsImageWithMaxCount": 6,
+            "NSExtensionActivationSupportsText": true
+          },
+          "androidIntentFilters": ["image/*", "text/*"]
+        }
+      ],
       [
         "./plugins/with-adi-registration.js",
         { "token": "DNDCYAW7MPKX4AAAAAAAAAAAAA" }

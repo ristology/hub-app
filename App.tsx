@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
+import { ShareIntentProvider } from 'expo-share-intent';
 import RootNavigator from './src/navigation/RootNavigator';
 import { ToastProvider } from './src/components/Toast';
 import { setupReminderChannel } from './src/utils/calendarReminders';
@@ -42,17 +43,19 @@ export default function App() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <SafeAreaProvider>
-        <ToastProvider>
-          <StatusBar style="light" />
-          {/* RootNavigator selalu render di bawah; overlay menutupinya sampai animasi selesai */}
-          <RootNavigator />
-          {!splashDone && (
-            <AnimatedSplashScreen onFinish={() => setSplashDone(true)} />
-          )}
-        </ToastProvider>
-      </SafeAreaProvider>
-    </QueryClientProvider>
+    <ShareIntentProvider>
+      <QueryClientProvider client={queryClient}>
+        <SafeAreaProvider>
+          <ToastProvider>
+            <StatusBar style="light" />
+            {/* RootNavigator selalu render di bawah; overlay menutupinya sampai animasi selesai */}
+            <RootNavigator />
+            {!splashDone && (
+              <AnimatedSplashScreen onFinish={() => setSplashDone(true)} />
+            )}
+          </ToastProvider>
+        </SafeAreaProvider>
+      </QueryClientProvider>
+    </ShareIntentProvider>
   );
 }

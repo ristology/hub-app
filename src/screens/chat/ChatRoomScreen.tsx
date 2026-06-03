@@ -10,6 +10,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Clipboard from 'expo-clipboard';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Image as ExpoImage } from 'expo-image';
 
 import { chatApi, type ChatMessage } from '../../api/chat';
@@ -20,6 +22,7 @@ import VideoPlayerModal from '../../components/VideoPlayerModal';
 import VideoThumbnail   from '../../components/VideoThumbnail';
 import { pickAndCompressVideo, type PickedVideo, formatDuration } from '../../utils/videoPicker';
 import { openDocumentExternal, openDocumentSmart } from '../../utils/openDocument';
+import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
 import ForwardSheet from './ForwardSheet';
 import LinkText from '../../components/LinkText';
 
@@ -262,11 +265,14 @@ export default function ChatRoomScreen() {
       const isGif = (a.mimeType?.includes('gif')) || a.uri.toLowerCase().endsWith('.gif');
       const ext   = isGif ? 'gif' : 'jpg';
       const mime  = a.mimeType ?? (isGif ? 'image/gif' : 'image/jpeg');
-      setPendingImage({
+      // Transcode HEIC → JPEG (skip kalau GIF supaya animation tetap)
+      const initial = {
         uri: a.uri,
         name: a.fileName ?? `chat-${Date.now()}.${ext}`,
         type: mime,
-      });
+      };
+      const finalAsset = isGif ? initial : await transcodeHeicIfNeeded(initial);
+      setPendingImage(finalAsset);
       setCaption('');
     }
   };
@@ -439,8 +445,9 @@ export default function ChatRoomScreen() {
     setTimeout(() => scrollToMessage(highlightMessageId), 450);
   }, [data, highlightMessageId]);
 
-  // Download media (gambar/video) — unduh ke cache lalu buka share sheet OS
-  // (user pilih "Simpan ke Galeri/Foto" dari menu share).
+  // Download media (gambar/video) — direct save ke Galeri/Foto via
+  // expo-media-library. Fallback ke share sheet OS kalau user tolak izin
+  // (mereka tetap bisa pilih "Simpan ke Galeri" dari menu share).
   const handleDownloadMedia = async (msg: ChatMessage) => {
     const isVideo = msg.tipe === 'video';
     const url     = isVideo ? msg.video_url : msg.foto_url;
@@ -450,8 +457,40 @@ export default function ChatRoomScreen() {
       ? 'mp4'
       : (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(urlExt) ? urlExt : 'jpg');
     const filename = `afresto-chat-${msg.id}.${ext}`;
-    // image: biarkan guessMime handle; video: mp4 tidak ada di MIME_MAP → set manual
-    await openDocumentExternal(url, filename, isVideo ? 'video/mp4' : undefined);
+    const cacheUri = (FileSystem.cacheDirectory ?? '') + filename;
+
+    try {
+      // Cek izin Media Library (Photos di iOS, External Storage di Android).
+      // requestPermissionsAsync minta izin kalau belum, atau cek kalau sudah.
+      const perm = await MediaLibrary.requestPermissionsAsync(false, ['photo']);
+      if (!perm.granted) {
+        // User tolak izin → fallback ke share sheet (pola lama, masih jalan)
+        await openDocumentExternal(url, filename, isVideo ? 'video/mp4' : undefined);
+        return;
+      }
+
+      // Download file ke cache dulu (expo-media-library butuh local file URI)
+      const dl = await FileSystem.downloadAsync(url, cacheUri);
+      if (dl.status !== 200) {
+        toast.error('Gagal download media.');
+        return;
+      }
+
+      // Save ke galeri / foto. saveToLibraryAsync auto-pick album default
+      // (Camera Roll di iOS, Pictures/Movies di Android).
+      await MediaLibrary.saveToLibraryAsync(dl.uri);
+      toast.success(isVideo ? 'Video tersimpan ke galeri' : 'Foto tersimpan ke galeri');
+
+      // Cleanup cache file (optional — sistem akan auto-purge anyway)
+      FileSystem.deleteAsync(dl.uri, { idempotent: true }).catch(() => {});
+    } catch (e: any) {
+      // Error apapun → fallback share sheet supaya user tetap bisa save manual
+      try {
+        await openDocumentExternal(url, filename, isVideo ? 'video/mp4' : undefined);
+      } catch {
+        toast.error(e?.message ?? 'Gagal simpan media ke galeri.');
+      }
+    }
   };
 
   // Long-press bubble pesan → buka custom bottom sheet (gantikan Alert.alert

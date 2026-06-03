@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 
 import { dokumenApi } from '../../api/dokumen';
+import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
 
 type RouteParams = { folderId?: number | null };
 type Picked = { uri: string; name: string; type: string; size: number };
@@ -96,10 +97,14 @@ export default function UploadDokumenScreen() {
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
-    const picked: Picked = {
+    // Transcode HEIC → JPEG di iPhone sebelum upload
+    const transcoded = await transcodeHeicIfNeeded({
       uri:  asset.uri,
       name: asset.fileName ?? `foto_${Date.now()}.jpg`,
       type: asset.mimeType ?? 'image/jpeg',
+    });
+    const picked: Picked = {
+      ...transcoded,
       size: asset.fileSize ?? 0,
     };
     setFile(picked);

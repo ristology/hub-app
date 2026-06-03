@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import * as Linking from 'expo-linking';
 import { createNavigationContainerRef, type NavigationContainerRefWithCurrent } from '@react-navigation/native';
 
 /**
@@ -144,23 +145,39 @@ function dispatchNavigation(target: ReturnType<typeof resolveTarget>) {
  *  - Cold start: app dibuka dari notif saat sebelumnya killed
  */
 export function setupDeepLinkHandler(): () => void {
-  // Cold start: cek notif terakhir yang membuka app
+  // Cold start (NOTIF): cek notif terakhir yang membuka app
   Notifications.getLastNotificationResponseAsync().then((response) => {
     if (response) {
       const data = response.notification.request.content.data as NotifData;
       const target = resolveTarget(data);
-      // Tunggu navigator ready dulu — kalau belum, retry tiap 100ms (max 30x)
       tryDispatchWhenReady(target);
     }
   });
 
-  // Background/foreground tap
-  const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+  // Cold start (UNIVERSAL/APP LINK): cek URL yang membuka app dari luar
+  // (mis. tap link https://hub.afresto.id/kalender/123 dari email).
+  Linking.getInitialURL().then((url) => {
+    if (url) {
+      const target = resolveTarget({ url });
+      tryDispatchWhenReady(target);
+    }
+  });
+
+  // Background/foreground tap notif
+  const subNotif = Notifications.addNotificationResponseReceivedListener((response) => {
     const data = response.notification.request.content.data as NotifData;
     dispatchNavigation(resolveTarget(data));
   });
 
-  return () => sub.remove();
+  // Background/foreground universal link / app link masuk
+  const subLink = Linking.addEventListener('url', ({ url }) => {
+    dispatchNavigation(resolveTarget({ url }));
+  });
+
+  return () => {
+    subNotif.remove();
+    subLink.remove();
+  };
 }
 
 /** Retry dispatch sampai navigationRef ready (cold start case). */

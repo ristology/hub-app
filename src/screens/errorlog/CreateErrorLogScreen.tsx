@@ -14,6 +14,7 @@ import { useToast } from '../../components/Toast';
 import PickerSheet, { type PickerOption } from '../../components/PickerSheet';
 import SaveButton from '../../components/SaveButton';
 import { pickAndCompressVideo, type PickedVideo, formatDuration } from '../../utils/videoPicker';
+import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
 
 const MAX_PHOTOS = 6;
 type NewFoto      = { uri: string; name: string; type: string };
@@ -160,11 +161,16 @@ export default function CreateErrorLogScreen() {
       quality: 0.8,
     });
     if (!result.canceled) {
-      const added: NewFoto[] = result.assets.map((a) => ({
-        uri:  a.uri,
-        name: a.fileName ?? `error-${Date.now()}.jpg`,
-        type: a.mimeType ?? 'image/jpeg',
-      }));
+      // Transcode HEIC → JPEG di iPhone sebelum upload (libheif server issue)
+      const added: NewFoto[] = await Promise.all(
+        result.assets.map((a) =>
+          transcodeHeicIfNeeded({
+            uri: a.uri,
+            name: a.fileName ?? `error-${Date.now()}.jpg`,
+            type: a.mimeType ?? 'image/jpeg',
+          })
+        )
+      );
       setNewFotos((prev) => [...prev, ...added].slice(0, MAX_PHOTOS - activeExisting));
     }
   };
@@ -176,7 +182,12 @@ export default function CreateErrorLogScreen() {
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
     if (!result.canceled && result.assets[0]) {
       const a = result.assets[0];
-      setNewFotos((p) => [...p, { uri: a.uri, name: a.fileName ?? `cam-${Date.now()}.jpg`, type: a.mimeType ?? 'image/jpeg' }]);
+      const transcoded = await transcodeHeicIfNeeded({
+        uri: a.uri,
+        name: a.fileName ?? `cam-${Date.now()}.jpg`,
+        type: a.mimeType ?? 'image/jpeg',
+      });
+      setNewFotos((p) => [...p, transcoded]);
     }
   };
 

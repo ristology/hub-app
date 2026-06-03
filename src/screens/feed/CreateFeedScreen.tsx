@@ -15,6 +15,7 @@ import VideoThumbnail from '../../components/VideoThumbnail';
 import { useToast } from '../../components/Toast';
 import SaveButton from '../../components/SaveButton';
 import { pickAndCompressVideo, type PickedVideo, formatDuration } from '../../utils/videoPicker';
+import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
 
 const MAX_PHOTOS = 6;
 type NewFoto     = { uri: string; name: string; type: string };
@@ -151,11 +152,17 @@ export default function CreateFeedScreen() {
       quality: 0.8,
     });
     if (!result.canceled) {
-      const added: NewFoto[] = result.assets.map((asset) => ({
-        uri:  asset.uri,
-        name: asset.fileName ?? `feed-${Date.now()}.jpg`,
-        type: asset.mimeType ?? 'image/jpeg',
-      }));
+      // Transcode HEIC → JPEG di iPhone sebelum upload supaya backend tidak
+      // kena libheif 1.12.0 auxiliary refs limit issue. Non-HEIC return as-is.
+      const added: NewFoto[] = await Promise.all(
+        result.assets.map((asset) =>
+          transcodeHeicIfNeeded({
+            uri: asset.uri,
+            name: asset.fileName ?? `feed-${Date.now()}.jpg`,
+            type: asset.mimeType ?? 'image/jpeg',
+          })
+        )
+      );
       setNewFotos((prev) => [...prev, ...added].slice(0, MAX_PHOTOS - activeExisting));
     }
   };
@@ -167,7 +174,12 @@ export default function CreateFeedScreen() {
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
     if (!result.canceled && result.assets[0]) {
       const a = result.assets[0];
-      setNewFotos((prev) => [...prev, { uri: a.uri, name: a.fileName ?? `cam-${Date.now()}.jpg`, type: a.mimeType ?? 'image/jpeg' }]);
+      const transcoded = await transcodeHeicIfNeeded({
+        uri: a.uri,
+        name: a.fileName ?? `cam-${Date.now()}.jpg`,
+        type: a.mimeType ?? 'image/jpeg',
+      });
+      setNewFotos((prev) => [...prev, transcoded]);
     }
   };
 

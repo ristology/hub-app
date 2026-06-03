@@ -10,6 +10,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { chatApi, type ChatUser } from '../../api/chat';
+import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
 
 type ChatStackParamList = {
   ChatList: undefined;
@@ -104,11 +105,13 @@ export default function CreateGroupScreen() {
     });
     if (!result.canceled && result.assets[0]) {
       const a = result.assets[0];
-      setFoto({
+      // Transcode HEIC → JPEG di iPhone sebelum upload (libheif server issue)
+      const transcoded = await transcodeHeicIfNeeded({
         uri:  a.uri,
         name: a.fileName ?? `group-${Date.now()}.jpg`,
         type: a.mimeType ?? 'image/jpeg',
       });
+      setFoto(transcoded);
     }
   };
 
