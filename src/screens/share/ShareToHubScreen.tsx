@@ -18,6 +18,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useShareIntentContext } from 'expo-share-intent';
+import { navigationRef } from '../../utils/deepLink';
 
 type ShareTarget = {
   key: 'feed' | 'chat' | 'errorlog';
@@ -76,35 +77,47 @@ export default function ShareToHubScreen() {
       sharedText:  text || url,
     };
 
-    // Routing ke tab/stack tujuan via MainTabs > <Tab> > <Screen>.
-    // NOTE: navigate dgn nested params supaya React Navigation tahu masuk
-    // tab dulu, baru screen di dalam stack-nya.
+    // STEP 1: Dismiss ShareToHub modal DULU (slide-down animation).
     //
-    // Target screens BELUM consume sharedFiles param di iteration ini —
-    // PR berikutnya tambah handling. Untuk sekarang: user navigate ke
-    // screen tujuan, lalu PILIH foto manual via picker existing (tidak
-    // ideal, tapi tidak block flow share).
-    if (target.key === 'feed') {
-      navigation.navigate('MainTabs', {
-        screen: 'Feed',
-        params: { screen: 'CreateFeed', params: sharedPayload },
-      });
-    } else if (target.key === 'errorlog') {
-      navigation.navigate('MainTabs', {
-        screen: 'ErrorLog',
-        params: { screen: 'CreateErrorLog', params: sharedPayload },
-      });
-    } else if (target.key === 'chat') {
-      navigation.navigate('MainTabs', {
-        screen: 'Pesan',
-        params: { screen: 'ChatList', params: { shareMode: true, ...sharedPayload } },
-      });
-    }
+    // Critical: tanpa goBack lebih dulu, modal tetap di root stack di atas
+    // MainTabs. CreateFeed/CreateErrorLog/ChatRoom visible BEHIND modal
+    // (transparansi sebagian), tapi:
+    //  - Toast "Posting berhasil" rendered BEHIND modal, cuma kelihatan
+    //    strip di pinggir atas
+    //  - goBack di target screen confused context → bisa kembali ke Beranda
+    //    bukan ke list screen-nya
+    //  - Tab tap mengaktifkan layer di belakang modal → CreateFeed masih
+    //    di stack history, terlihat lagi
+    navigation.goBack();
 
-    // Reset SETELAH navigate, beri delay supaya target screen mount dulu
-    // (kalau reset duluan, state berubah → re-render ShareToHub → keburu
-    // tampil "Tidak ada konten" sebelum navigate selesai).
-    setTimeout(() => resetShareIntent(), 600);
+    // STEP 2: Navigate ke target via navigationRef (global). Pakai delay
+    // sedikit supaya modal pop animation selesai dulu. navigationRef perlu
+    // dipakai karena ShareToHub sudah unmount → local `navigation` ref
+    // tidak valid lagi setelah goBack.
+    setTimeout(() => {
+      const nav = navigationRef.current;
+      if (!nav?.isReady()) return;
+
+      if (target.key === 'feed') {
+        nav.navigate('MainTabs' as never, {
+          screen: 'Feed',
+          params: { screen: 'CreateFeed', params: sharedPayload },
+        } as never);
+      } else if (target.key === 'errorlog') {
+        nav.navigate('MainTabs' as never, {
+          screen: 'ErrorLog',
+          params: { screen: 'CreateErrorLog', params: sharedPayload },
+        } as never);
+      } else if (target.key === 'chat') {
+        nav.navigate('MainTabs' as never, {
+          screen: 'Pesan',
+          params: { screen: 'ChatList', params: { shareMode: true, ...sharedPayload } },
+        } as never);
+      }
+
+      // Reset share intent setelah navigate trigger
+      resetShareIntent();
+    }, 350);
   };
 
   const handleCancel = () => {
