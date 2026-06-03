@@ -9,7 +9,7 @@
  *   4. Navigate ke create screen tujuan dengan content sebagai initial state
  */
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ActivityIndicator,
   Image, ScrollView,
@@ -17,7 +17,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { useShareIntent } from 'expo-share-intent';
+import { useShareIntentContext } from 'expo-share-intent';
 
 type ShareTarget = {
   key: 'feed' | 'chat' | 'errorlog';
@@ -54,14 +54,14 @@ const TARGETS: ShareTarget[] = [
 export default function ShareToHubScreen() {
   const navigation = useNavigation<any>();
   const insets     = useSafeAreaInsets();
-  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
-  const [previewUri, setPreviewUri] = useState<string | null>(null);
+  // Pakai useShareIntentContext (bukan useShareIntent) karena App.tsx wrap
+  // dengan ShareIntentProvider. useShareIntent = standalone hook yg init
+  // state sendiri → conflict dgn provider, hasShareIntent stuck false.
+  const { isReady, hasShareIntent, shareIntent, resetShareIntent, error } =
+    useShareIntentContext();
 
-  useEffect(() => {
-    if (hasShareIntent && shareIntent?.files?.[0]?.path) {
-      setPreviewUri(shareIntent.files[0].path);
-    }
-  }, [hasShareIntent, shareIntent]);
+  // Derive preview URI langsung dari shareIntent — no separate state.
+  const previewUri = shareIntent?.files?.[0]?.path ?? null;
 
   const handlePick = (target: ShareTarget) => {
     if (!shareIntent) {
@@ -133,10 +133,28 @@ export default function ShareToHubScreen() {
           </View>
         )}
 
-        {!hasShareIntent && (
+        {/* Loading state: provider belum siap atau intent belum delivered */}
+        {!isReady && (
           <View style={styles.emptyState}>
             <ActivityIndicator color="#8a94a6" />
-            <Text style={styles.emptyText}>Menunggu konten share...</Text>
+            <Text style={styles.emptyText}>Menyiapkan konten share...</Text>
+          </View>
+        )}
+
+        {/* Error state */}
+        {isReady && error && (
+          <View style={styles.emptyState}>
+            <Ionicons name="alert-circle-outline" size={36} color="#ef4444" />
+            <Text style={styles.emptyText}>Gagal baca konten share: {error}</Text>
+          </View>
+        )}
+
+        {/* Ready tapi tidak ada konten — biasanya muncul kalau share extension
+            launch tapi konten tidak ter-transfer (mis. App Groups misconfig) */}
+        {isReady && !hasShareIntent && !error && (
+          <View style={styles.emptyState}>
+            <Ionicons name="cloud-offline-outline" size={36} color="#8a94a6" />
+            <Text style={styles.emptyText}>Tidak ada konten share yang terdeteksi.</Text>
           </View>
         )}
 
@@ -148,7 +166,7 @@ export default function ShareToHubScreen() {
             style={styles.targetCard}
             activeOpacity={0.7}
             onPress={() => handlePick(target)}
-            disabled={!hasShareIntent}
+            disabled={!isReady || !hasShareIntent}
           >
             <View style={[styles.targetIcon, { backgroundColor: target.color + '22' }]}>
               <Ionicons name={target.icon} size={26} color={target.color} />
