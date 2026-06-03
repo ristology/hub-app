@@ -94,6 +94,27 @@ export default function ShareToHubScreen() {
     // sedikit supaya modal pop animation selesai dulu. navigationRef perlu
     // dipakai karena ShareToHub sudah unmount → local `navigation` ref
     // tidak valid lagi setelah goBack.
+    //
+    // PENTING — initial: false di NESTED params:
+    //
+    // Tanpa initial: false, React Navigation MERESET stack tujuan jadi
+    // cuma berisi target screen (mis. FeedStack jadi [CreateFeed] tanpa
+    // FeedScreen di bawahnya). Akibatnya saat CreateFeed.goBack() setelah
+    // posting sukses:
+    //   1. CreateFeed di-pop → FeedStack kosong
+    //   2. Bubble ke parent (BottomTabNavigator) → tab pindah ke tab
+    //      sebelumnya yg aktif (Beranda krn cold-start dari share extension)
+    //   3. User landing di Beranda, BUKAN Feed list
+    //   4. State FeedStack tidak ter-clear → re-tap Feed tab muncul lagi
+    //      CreateFeed dgn params lama
+    //
+    // initial: false memberitahu React Navigation: PERTAHANKAN initial
+    // route (FeedScreen) di bawah, push CreateFeed di atasnya. Sehingga
+    // goBack dari CreateFeed pop ke FeedScreen list normal.
+    //
+    // Pattern ini sama dgn yg sudah ada di utils/deepLink.ts untuk handle
+    // notif tap navigation. Saya alpa terapkan di ShareToHub di iterasi
+    // sebelumnya — root cause bug yg user laporkan berulang.
     setTimeout(() => {
       const nav = navigationRef.current;
       if (!nav?.isReady()) return;
@@ -101,17 +122,29 @@ export default function ShareToHubScreen() {
       if (target.key === 'feed') {
         nav.navigate('MainTabs' as never, {
           screen: 'Feed',
-          params: { screen: 'CreateFeed', params: sharedPayload },
+          params: {
+            screen: 'CreateFeed',
+            initial: false,
+            params: sharedPayload,
+          },
         } as never);
       } else if (target.key === 'errorlog') {
         nav.navigate('MainTabs' as never, {
           screen: 'ErrorLog',
-          params: { screen: 'CreateErrorLog', params: sharedPayload },
+          params: {
+            screen: 'CreateErrorLog',
+            initial: false,
+            params: sharedPayload,
+          },
         } as never);
       } else if (target.key === 'chat') {
         nav.navigate('MainTabs' as never, {
           screen: 'Pesan',
-          params: { screen: 'ChatList', params: { shareMode: true, ...sharedPayload } },
+          params: {
+            screen: 'ChatList',
+            initial: false,
+            params: { shareMode: true, ...sharedPayload },
+          },
         } as never);
       }
 
