@@ -119,32 +119,35 @@ export default function ShareToHubScreen() {
       const nav = navigationRef.current;
       if (!nav?.isReady()) return;
 
+      // PATTERN: navigate LANGSUNG ke nama tab (bukan via 'MainTabs' nested
+      // 3-level). Match EXACT pattern yg sudah ada di utils/deepLink.ts
+      // dispatchNavigation utk handle notif tap → list/detail screen.
+      //
+      // navigationRef.navigate('Feed', { screen, initial: false, params })
+      //   → switch ke Feed tab + push screen di atas FeedScreen list
+      //   → initial: false menjaga FeedScreen ada di stack history
+      //   → goBack dari pushed screen → land di FeedScreen list (BUKAN
+      //     bubble ke parent tab navigator → switch ke Beranda)
+      //
+      // Sebelumnya saya navigate('MainTabs', { screen: 'Feed', params: {...}})
+      // yg interpretasi RN beda di Tab vs Stack hierarchy → bug iteratif.
       if (target.key === 'feed') {
-        nav.navigate('MainTabs' as never, {
-          screen: 'Feed',
-          params: {
-            screen: 'CreateFeed',
-            initial: false,
-            params: sharedPayload,
-          },
+        nav.navigate('Feed' as never, {
+          screen: 'CreateFeed',
+          initial: false,
+          params: sharedPayload,
         } as never);
       } else if (target.key === 'errorlog') {
-        nav.navigate('MainTabs' as never, {
-          screen: 'ErrorLog',
-          params: {
-            screen: 'CreateErrorLog',
-            initial: false,
-            params: sharedPayload,
-          },
+        nav.navigate('ErrorLog' as never, {
+          screen: 'CreateErrorLog',
+          initial: false,
+          params: sharedPayload,
         } as never);
       } else if (target.key === 'chat') {
-        nav.navigate('MainTabs' as never, {
-          screen: 'Pesan',
-          params: {
-            screen: 'ChatList',
-            initial: false,
-            params: { shareMode: true, ...sharedPayload },
-          },
+        nav.navigate('Pesan' as never, {
+          screen: 'ChatList',
+          initial: false,
+          params: { shareMode: true, ...sharedPayload },
         } as never);
       }
 
