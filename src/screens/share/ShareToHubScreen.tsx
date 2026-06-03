@@ -71,29 +71,40 @@ export default function ShareToHubScreen() {
     const files = shareIntent.files ?? [];
     const text  = shareIntent.text ?? '';
     const url   = shareIntent.webUrl ?? '';
+    const sharedPayload = {
+      sharedFiles: files,
+      sharedText:  text || url,
+    };
 
-    // Reset share intent supaya tidak diproses dua kali
-    resetShareIntent();
-
-    // Routing ke create screen sesuai target dengan params content
+    // Routing ke tab/stack tujuan via MainTabs > <Tab> > <Screen>.
+    // NOTE: navigate dgn nested params supaya React Navigation tahu masuk
+    // tab dulu, baru screen di dalam stack-nya.
+    //
+    // Target screens BELUM consume sharedFiles param di iteration ini —
+    // PR berikutnya tambah handling. Untuk sekarang: user navigate ke
+    // screen tujuan, lalu PILIH foto manual via picker existing (tidak
+    // ideal, tapi tidak block flow share).
     if (target.key === 'feed') {
-      navigation.navigate('CreateFeed', {
-        sharedFiles: files,
-        sharedText:  text || url,
+      navigation.navigate('MainTabs', {
+        screen: 'Feed',
+        params: { screen: 'CreateFeed', params: sharedPayload },
       });
     } else if (target.key === 'errorlog') {
-      navigation.navigate('CreateErrorLog', {
-        sharedFiles: files,
-        sharedText:  text || url,
+      navigation.navigate('MainTabs', {
+        screen: 'ErrorLog',
+        params: { screen: 'CreateErrorLog', params: sharedPayload },
       });
     } else if (target.key === 'chat') {
-      // Chat: navigate ke daftar room dulu (user pilih tujuan)
-      navigation.navigate('ChatList', {
-        shareMode:   true,
-        sharedFiles: files,
-        sharedText:  text || url,
+      navigation.navigate('MainTabs', {
+        screen: 'Pesan',
+        params: { screen: 'ChatList', params: { shareMode: true, ...sharedPayload } },
       });
     }
+
+    // Reset SETELAH navigate, beri delay supaya target screen mount dulu
+    // (kalau reset duluan, state berubah → re-render ShareToHub → keburu
+    // tampil "Tidak ada konten" sebelum navigate selesai).
+    setTimeout(() => resetShareIntent(), 600);
   };
 
   const handleCancel = () => {
