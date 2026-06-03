@@ -43,7 +43,17 @@ export default function App() {
   }, []);
 
   return (
-    <ShareIntentProvider>
+    <ShareIntentProvider
+      options={{
+        // Default resetOnBackground=true bikin share intent ter-reset saat
+        // app foreground (yg terjadi saat share extension launch main app).
+        // Set false supaya state persist sampai screen explicit consume.
+        resetOnBackground: false,
+        // Logs internal share-intent events ke Metro/Xcode console — bantu
+        // diagnose kalau masih ada issue dgn data delivery.
+        debug: __DEV__,
+      }}
+    >
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
           <ToastProvider>
