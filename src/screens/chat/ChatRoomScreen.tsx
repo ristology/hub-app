@@ -174,7 +174,10 @@ export default function ChatRoomScreen() {
   const [sharedConsumed, setSharedConsumed] = useState(false);
 
   // Share-to-HUB: auto-set pendingImage dari shared file + pre-fill caption.
-  // Guard sharedConsumed supaya tidak duplikat di re-render.
+  // Guard sharedConsumed supaya tidak duplikat di re-render. CLEAR params
+  // setelah consume supaya re-mount (back ke ChatList lalu re-open same room)
+  // tidak konsumsi ulang konten yg sama — React Navigation cache params
+  // per route key.
   useEffect(() => {
     if (sharedConsumed) return;
     if (!sharedFiles?.length && !sharedText) return;
@@ -198,8 +201,11 @@ export default function ChatRoomScreen() {
         }
       }
       setSharedConsumed(true);
+      // Clear params supaya next mount (re-open same room dari list) tidak
+      // re-trigger consume effect dgn konten yg sama.
+      navigation.setParams({ sharedFiles: undefined, sharedText: undefined } as never);
     })();
-  }, [sharedFiles, sharedText, sharedConsumed]);
+  }, [sharedFiles, sharedText, sharedConsumed, navigation]);
   const [highlightedMsgId, setHighlightedMsgId] = useState<number | null>(null);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);

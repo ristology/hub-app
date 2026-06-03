@@ -115,12 +115,22 @@ export default function ChatScreen() {
   const renderItem = ({ item }: { item: ChatRoom }) => (
     <TouchableOpacity
       style={styles.roomItem}
-      onPress={() => navigation.navigate('ChatRoom', {
-        roomId: item.id, nama: item.nama, foto: item.foto,
-        // Kalau dari Share-to-HUB, forward konten ke ChatRoom (auto-set
-        // sebagai pendingImage / pre-fill caption)
-        ...(shareMode ? { sharedFiles, sharedText } : {}),
-      })}
+      onPress={() => {
+        navigation.navigate('ChatRoom', {
+          roomId: item.id, nama: item.nama, foto: item.foto,
+          // Kalau dari Share-to-HUB, forward konten ke ChatRoom (auto-set
+          // sebagai pendingImage / pre-fill caption)
+          ...(shareMode ? { sharedFiles, sharedText } : {}),
+        });
+        // Clear ChatList share params setelah pertama forward. Tanpa ini:
+        // user back dari ChatRoom → ChatList masih shareMode → re-tap
+        // any room akan forward konten share LAGI (bug yg dilaporkan).
+        if (shareMode) {
+          navigation.setParams({
+            shareMode: undefined, sharedFiles: undefined, sharedText: undefined,
+          } as never);
+        }
+      }}
       onLongPress={() => handleLongPressRoom(item)}
       delayLongPress={350}
       activeOpacity={0.7}

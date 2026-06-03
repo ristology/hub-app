@@ -109,8 +109,12 @@ export default function CreateFeedScreen() {
         }
       }
       setSharedConsumed(true);
+      // Clear params supaya re-mount (back lalu re-open Create Feed) tidak
+      // re-trigger consume effect dgn konten yg sama. React Navigation
+      // cache route params per key.
+      navigation.setParams({ sharedFiles: undefined, sharedText: undefined } as never);
     })();
-  }, [sharedFiles, sharedText, sharedConsumed, konten]);
+  }, [sharedFiles, sharedText, sharedConsumed, konten, navigation]);
 
   // Prefill form saat edit mode
   useEffect(() => {

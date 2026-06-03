@@ -123,8 +123,10 @@ export default function CreateErrorLogScreen() {
         }
       }
       setSharedConsumed(true);
+      // Clear params supaya re-mount tidak re-trigger consume dgn konten sama.
+      navigation.setParams({ sharedFiles: undefined, sharedText: undefined } as never);
     })();
-  }, [sharedFiles, sharedText, sharedConsumed, keterangan]);
+  }, [sharedFiles, sharedText, sharedConsumed, keterangan, navigation]);
 
   useEffect(() => {
     if (!isEdit || !existingData || initialized) return;
