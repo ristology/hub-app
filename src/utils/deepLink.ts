@@ -95,7 +95,27 @@ function resolveTarget(data: NotifData): { tab: string; screen?: string; params?
     }
   }
 
-  // 2) Fallback: parse URL string `/feed/123`, `/prospek/123`, dst.
+  // 2a) Special case: /kalender#kegiatan-{id}
+  // Email undangan kalender pakai pattern hash bukan path
+  // (backend route('kalender.index') . '#kegiatan-{id}'). ID di URL
+  // fragment, bukan di path. Regex umum `/kalender/(\d+)` tidak match
+  // krn URL aktual `/kalender#kegiatan-123`.
+  if (url.includes('/kalender')) {
+    const kegiatanMatch = url.match(/#kegiatan-(\d+)/);
+    if (kegiatanMatch) {
+      return {
+        tab: 'MainTabs',
+        screen: 'Kalender',
+        params: { screen: 'KegiatanDetail', params: { id: Number(kegiatanMatch[1]) } },
+      };
+    }
+    // URL cuma /kalender (no fragment) → land di list jadwal
+    if (url.match(/\/kalender(\?|#|$)/)) {
+      return { tab: 'MainTabs', screen: 'Kalender' };
+    }
+  }
+
+  // 2b) Fallback: parse URL string `/feed/123`, `/prospek/123`, dst.
   const m = url.match(/\/(feed|prospek|error-log|request|kalender)\/(\d+)/);
   if (m) {
     const segment = m[1];
