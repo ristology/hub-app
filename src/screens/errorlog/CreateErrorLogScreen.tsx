@@ -19,7 +19,18 @@ import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
 const MAX_PHOTOS = 6;
 type NewFoto      = { uri: string; name: string; type: string };
 type ExistingFoto = { id: number; url: string; markedForRemoval: boolean };
-type RouteParams  = { id?: number };
+type SharedFile = {
+  fileName?: string | null;
+  mimeType?: string | null;
+  path?: string | null;
+};
+type RouteParams  = {
+  id?: number;
+  // Share-to-HUB: dilewatkan dari ShareToHubScreen saat user share gambar
+  // dari app lain → pilih "Lapor Error".
+  sharedFiles?: SharedFile[];
+  sharedText?: string;
+};
 
 export default function CreateErrorLogScreen() {
   const navigation  = useNavigation();
@@ -27,8 +38,11 @@ export default function CreateErrorLogScreen() {
   const queryClient = useQueryClient();
   const toast       = useToast();
   const insets      = useSafeAreaInsets();
-  const editId      = route.params?.id;
-  const isEdit      = !!editId;
+  const editId       = route.params?.id;
+  const sharedFiles  = route.params?.sharedFiles;
+  const sharedText   = route.params?.sharedText;
+  const isEdit       = !!editId;
+  const [sharedConsumed, setSharedConsumed] = useState(false);
 
   // Manual keyboard tracking — KeyboardAvoidingView buggy di Android
   // (behavior=undefined = no-op). Pakai listener + paddingBottom dinamis
@@ -79,6 +93,38 @@ export default function CreateErrorLogScreen() {
     queryFn:  () => errorLogApi.detail(editId!),
     enabled:  isEdit,
   });
+
+  // Auto-consume shared content dari ShareToHubScreen (gambar dari Photos/
+  // browser/dll → user pilih "Lapor Error"). Map ShareIntentFile shape ke
+  // NewFoto + HEIC transcode.
+  useEffect(() => {
+    if (sharedConsumed) return;
+    if (!sharedFiles?.length && !sharedText) return;
+
+    (async () => {
+      if (sharedText && !keterangan) setKeterangan(sharedText);
+
+      if (sharedFiles?.length) {
+        try {
+          const added: NewFoto[] = await Promise.all(
+            sharedFiles.map(async (f) => {
+              const rawUri = f.path ?? '';
+              const uri    = rawUri.startsWith('file://') ? rawUri : `file://${rawUri}`;
+              return await transcodeHeicIfNeeded({
+                uri,
+                name: f.fileName ?? `shared-${Date.now()}.jpg`,
+                type: f.mimeType ?? 'image/jpeg',
+              });
+            })
+          );
+          setNewFotos((prev) => [...prev, ...added].slice(0, MAX_PHOTOS));
+        } catch (e) {
+          console.warn('[Share] consume sharedFiles gagal:', e);
+        }
+      }
+      setSharedConsumed(true);
+    })();
+  }, [sharedFiles, sharedText, sharedConsumed, keterangan]);
 
   useEffect(() => {
     if (!isEdit || !existingData || initialized) return;

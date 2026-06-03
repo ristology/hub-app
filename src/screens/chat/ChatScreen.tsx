@@ -6,14 +6,32 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { chatApi, type ChatRoom } from '../../api/chat';
 
+type SharedFile = {
+  fileName?: string | null;
+  mimeType?: string | null;
+  path?: string | null;
+};
+
 type ChatStackParamList = {
-  ChatList: undefined;
-  ChatRoom: { roomId: number; nama: string; foto: string | null };
+  // ChatList bisa terima shareMode dari ShareToHubScreen — saat tap room,
+  // params ke-forward ke ChatRoom yg auto-set sbg pendingImage.
+  ChatList: {
+    shareMode?: boolean;
+    sharedFiles?: SharedFile[];
+    sharedText?: string;
+  } | undefined;
+  ChatRoom: {
+    roomId: number;
+    nama: string;
+    foto: string | null;
+    sharedFiles?: SharedFile[];
+    sharedText?: string;
+  };
   NewChat: undefined;
 };
 
@@ -29,9 +47,16 @@ function formatTime(iso: string | null): string {
 
 export default function ChatScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ChatStackParamList>>();
+  const route      = useRoute<RouteProp<ChatStackParamList, 'ChatList'>>();
   const insets     = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch]         = useState('');
+
+  // Share-to-HUB: kalau dipanggil dari ShareToHubScreen, params include
+  // sharedFiles. Forward ke ChatRoom saat user pilih room.
+  const shareMode    = route.params?.shareMode ?? false;
+  const sharedFiles  = route.params?.sharedFiles;
+  const sharedText   = route.params?.sharedText;
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['chat-rooms'],
@@ -92,6 +117,9 @@ export default function ChatScreen() {
       style={styles.roomItem}
       onPress={() => navigation.navigate('ChatRoom', {
         roomId: item.id, nama: item.nama, foto: item.foto,
+        // Kalau dari Share-to-HUB, forward konten ke ChatRoom (auto-set
+        // sebagai pendingImage / pre-fill caption)
+        ...(shareMode ? { sharedFiles, sharedText } : {}),
       })}
       onLongPress={() => handleLongPressRoom(item)}
       delayLongPress={350}

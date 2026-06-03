@@ -20,15 +20,29 @@ import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
 const MAX_PHOTOS = 6;
 type NewFoto     = { uri: string; name: string; type: string };
 type ExistingFoto = { id: number; url: string; markedForRemoval: boolean };
-type RouteParams = { feedId?: number };
+type SharedFile = {
+  fileName?: string | null;
+  mimeType?: string | null;
+  path?: string | null;
+};
+type RouteParams = {
+  feedId?: number;
+  // Share-to-HUB: dilewatkan dari ShareToHubScreen saat user share screenshot/
+  // foto dari app lain → pilih "Posting ke Feed".
+  sharedFiles?: SharedFile[];
+  sharedText?: string;
+};
 
 export default function CreateFeedScreen() {
   const navigation  = useNavigation();
   const route       = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const queryClient = useQueryClient();
   const toast       = useToast();
-  const feedId      = route.params?.feedId;
-  const isEdit      = !!feedId;
+  const feedId       = route.params?.feedId;
+  const sharedFiles  = route.params?.sharedFiles;
+  const sharedText   = route.params?.sharedText;
+  const isEdit       = !!feedId;
+  const [sharedConsumed, setSharedConsumed] = useState(false);
 
   const [konten, setKonten]         = useState('');
   const [lokasi, setLokasi]         = useState('');
@@ -63,6 +77,40 @@ export default function CreateFeedScreen() {
     queryFn:  () => feedApi.detail(feedId!),
     enabled:  isEdit,
   });
+
+  // Auto-consume shared content dari ShareToHubScreen — convert
+  // ShareIntentFile shape ke NewFoto + run HEIC transcode kalau perlu.
+  // Hanya jalan SEKALI per mount (guard dgn sharedConsumed) supaya tidak
+  // duplikat tiap re-render.
+  useEffect(() => {
+    if (sharedConsumed) return;
+    if (!sharedFiles?.length && !sharedText) return;
+
+    (async () => {
+      if (sharedText && !konten) setKonten(sharedText);
+
+      if (sharedFiles?.length) {
+        try {
+          const added: NewFoto[] = await Promise.all(
+            sharedFiles.map(async (f) => {
+              // iOS path bisa "file:///..." atau "/var/..." — normalize ke file://
+              const rawUri = f.path ?? '';
+              const uri    = rawUri.startsWith('file://') ? rawUri : `file://${rawUri}`;
+              return await transcodeHeicIfNeeded({
+                uri,
+                name: f.fileName ?? `shared-${Date.now()}.jpg`,
+                type: f.mimeType ?? 'image/jpeg',
+              });
+            })
+          );
+          setNewFotos((prev) => [...prev, ...added].slice(0, MAX_PHOTOS));
+        } catch (e) {
+          console.warn('[Share] consume sharedFiles gagal:', e);
+        }
+      }
+      setSharedConsumed(true);
+    })();
+  }, [sharedFiles, sharedText, sharedConsumed, konten]);
 
   // Prefill form saat edit mode
   useEffect(() => {

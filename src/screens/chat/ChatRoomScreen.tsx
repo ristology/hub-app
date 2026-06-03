@@ -121,12 +121,22 @@ function docIconColor(nama: string | null | undefined): string {
   }
 }
 
+type SharedFile = {
+  fileName?: string | null;
+  mimeType?: string | null;
+  path?: string | null;
+};
+
 type RouteParams = {
   roomId: number;
   nama: string;
   foto: string | null;
   /** id pesan yg harus di-scroll + highlight (dari tap push notif chat) */
   highlightMessageId?: number | null;
+  // Share-to-HUB: forward dari ChatList saat user pilih room tujuan share.
+  // Auto-set sbg pendingImage / pre-fill caption.
+  sharedFiles?: SharedFile[];
+  sharedText?: string;
 };
 
 function formatTime(iso: string): string {
@@ -153,7 +163,7 @@ export default function ChatRoomScreen() {
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
-  const { roomId, nama, foto, highlightMessageId } = route.params;
+  const { roomId, nama, foto, highlightMessageId, sharedFiles, sharedText } = route.params;
   const [pesan, setPesan] = useState('');
   const [pendingImage, setPendingImage] = useState<{ uri: string; name: string; type: string } | null>(null);
   const [pendingVideo, setPendingVideo] = useState<PickedVideo | null>(null);
@@ -161,6 +171,35 @@ export default function ChatRoomScreen() {
   const [pickingDoc, setPickingDoc] = useState(false);
   const [caption, setCaption] = useState('');
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [sharedConsumed, setSharedConsumed] = useState(false);
+
+  // Share-to-HUB: auto-set pendingImage dari shared file + pre-fill caption.
+  // Guard sharedConsumed supaya tidak duplikat di re-render.
+  useEffect(() => {
+    if (sharedConsumed) return;
+    if (!sharedFiles?.length && !sharedText) return;
+
+    (async () => {
+      if (sharedText) setCaption(sharedText);
+
+      const first = sharedFiles?.[0];
+      if (first?.path) {
+        try {
+          const rawUri = first.path;
+          const uri    = rawUri.startsWith('file://') ? rawUri : `file://${rawUri}`;
+          const transcoded = await transcodeHeicIfNeeded({
+            uri,
+            name: first.fileName ?? `shared-${Date.now()}.jpg`,
+            type: first.mimeType ?? 'image/jpeg',
+          });
+          setPendingImage(transcoded);
+        } catch (e) {
+          console.warn('[Share] consume sharedFiles gagal:', e);
+        }
+      }
+      setSharedConsumed(true);
+    })();
+  }, [sharedFiles, sharedText, sharedConsumed]);
   const [highlightedMsgId, setHighlightedMsgId] = useState<number | null>(null);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);
