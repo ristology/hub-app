@@ -119,40 +119,50 @@ export default function ShareToHubScreen() {
       const nav = navigationRef.current;
       if (!nav?.isReady()) return;
 
-      // PATTERN: navigate LANGSUNG ke nama tab (bukan via 'MainTabs' nested
-      // 3-level). Match EXACT pattern yg sudah ada di utils/deepLink.ts
-      // dispatchNavigation utk handle notif tap → list/detail screen.
+      // STRATEGI: explicit TWO-STEP navigation supaya tidak bergantung
+      // pada interpretasi RN `initial: false` yg ambigu (terbukti dari
+      // iterasi sebelumnya — kadang push, kadang reset, sulit predict).
       //
-      // navigationRef.navigate('Feed', { screen, initial: false, params })
-      //   → switch ke Feed tab + push screen di atas FeedScreen list
-      //   → initial: false menjaga FeedScreen ada di stack history
-      //   → goBack dari pushed screen → land di FeedScreen list (BUKAN
-      //     bubble ke parent tab navigator → switch ke Beranda)
+      // STEP 2a: Switch ke tab tujuan → ini mount stack dgn list screen
+      //          sbg initial route (default behavior, no quirks).
+      //          Stack tujuan jadi: [ListScreen]
+      // STEP 2b: Navigate ke target screen by unique route name →
+      //          navigationRef lookup di tree, push di atas list screen
+      //          yg sudah ada. Stack jadi: [ListScreen, TargetScreen]
       //
-      // Sebelumnya saya navigate('MainTabs', { screen: 'Feed', params: {...}})
-      // yg interpretasi RN beda di Tab vs Stack hierarchy → bug iteratif.
-      if (target.key === 'feed') {
-        nav.navigate('Feed' as never, {
-          screen: 'CreateFeed',
-          initial: false,
-          params: sharedPayload,
-        } as never);
-      } else if (target.key === 'errorlog') {
-        nav.navigate('ErrorLog' as never, {
-          screen: 'CreateErrorLog',
-          initial: false,
-          params: sharedPayload,
-        } as never);
-      } else if (target.key === 'chat') {
-        nav.navigate('Pesan' as never, {
-          screen: 'ChatList',
-          initial: false,
-          params: { shareMode: true, ...sharedPayload },
-        } as never);
-      }
+      // Hasil: setelah posting sukses + CreateFeed.goBack() → pop
+      // TargetScreen → land di ListScreen. TIDAK bubble ke tab navigator
+      // (Beranda), TIDAK ada state stale yg bikin tap Feed re-open form.
+      const targetMap = {
+        feed:     { tab: 'Feed',     screen: 'CreateFeed',     params: sharedPayload },
+        errorlog: { tab: 'ErrorLog', screen: 'CreateErrorLog', params: sharedPayload },
+        chat:     { tab: 'Pesan',    screen: 'ChatList',       params: { shareMode: true, ...sharedPayload } },
+      } as const;
+      const cfg = targetMap[target.key];
 
-      // Reset share intent setelah navigate trigger
-      resetShareIntent();
+      // STEP 2a: switch tab (mount stack dgn initial list screen)
+      nav.navigate(cfg.tab as never);
+
+      // STEP 2b: push target screen ke stack tujuan. Delay 150ms supaya
+      // tab switch + stack mount sempat settle dulu (kalau tidak, navigate
+      // target screen bisa fire SEBELUM FeedStack siap, screen jadi initial
+      // alih2 push, kembali ke bug awal).
+      setTimeout(() => {
+        const navAgain = navigationRef.current;
+        if (!navAgain?.isReady()) return;
+        // Untuk Chat, target screen-nya = ChatList itu sendiri (initial
+        // route ChatStack). Tidak perlu push, cuma set params via merge.
+        // Tab switch di Step 2a sudah cukup; params di-pass via setParams
+        // (kalau perlu) atau lewat navigate ke ChatList lg dgn params.
+        if (cfg.tab === 'Pesan' && cfg.screen === 'ChatList') {
+          navAgain.navigate(cfg.screen as never, cfg.params as never);
+        } else {
+          // Push CreateFeed/CreateErrorLog di atas list screen
+          navAgain.navigate(cfg.screen as never, cfg.params as never);
+        }
+        // Reset share intent setelah navigate trigger
+        resetShareIntent();
+      }, 150);
     }, 350);
   };
 
