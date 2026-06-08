@@ -30,9 +30,13 @@ export default function FeedDetailScreen() {
   const { user } = useAuth();
 
   // Tandai notifikasi terkait feed ini sebagai dibaca → badge berkurang.
-  // Invalidate juga ['feed'] supaya list-nya refetch on focus dengan
+  // Optimistic decrement notif.feed supaya badge bottom tab hilang
+  // instant. Invalidate ['feed'] juga supaya list refetch dgn
   // has_unread_notif=false (red dot kartu hilang).
   useEffect(() => {
+    queryClient.setQueryData(['notif-count'], (old: any) =>
+      old ? { ...old, feed: Math.max(0, (old.feed ?? 0) - 1) } : old
+    );
     notifApi.markRead(NotifModel.Feed, id)
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ['notif-count'] });

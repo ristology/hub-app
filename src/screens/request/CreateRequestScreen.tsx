@@ -13,8 +13,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import {
   requestApi,
   type CreateRequestPayload, type UpdateRequestPayload,
-  type FileAsset, type KlienRingkas,
+  type FileAsset, type KlienRingkas, type RequestTipe,
 } from '../../api/clientRequest';
+import { errorLogApi, type KategoriError } from '../../api/errorLog';
 import DatePickerInput from '../../components/DatePickerInput';
 import SaveButton from '../../components/SaveButton';
 import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
@@ -59,6 +60,23 @@ export default function CreateRequestScreen() {
   const [keterangan, setKeterangan]   = useState('');
   const [klienOpen, setKlienOpen]     = useState(false);
 
+  // Tipe request: 'baru' (form lama) atau 'terkait_fitur' (butuh pick kategori).
+  // Untuk create mode: tipe BELUM dipilih sampai user pilih di TipeSheet (modal awal).
+  // Untuk edit mode: pre-fill dari data existing → langsung skip TipeSheet.
+  const [tipe, setTipe]               = useState<RequestTipe | null>(null);
+  const [kategoriId, setKategoriId]   = useState<number | null>(null);
+  const [tipeSheetOpen, setTipeSheetOpen]       = useState(false);
+  const [kategoriSheetOpen, setKategoriSheetOpen] = useState(false);
+
+  // Fetch kategori list (share dgn Error Log) — cuma di-fetch saat butuh.
+  const { data: kategoriData } = useQuery({
+    queryKey: ['error-log', 'kategori'],
+    queryFn:  () => errorLogApi.kategori(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const kategoriList = kategoriData?.data ?? [];
+  const kategoriPicked = kategoriList.find((k) => k.id === kategoriId) ?? null;
+
   // Lampiran baru
   const [newGambar,  setNewGambar]  = useState<FileAsset[]>([]);
   const [newDokumen, setNewDokumen] = useState<FileAsset[]>([]);
@@ -75,6 +93,10 @@ export default function CreateRequestScreen() {
     enabled:  isEdit,
   });
 
+  // PIC-only edit mode — backend mark via can_edit_deadline_only flag.
+  // Render simplified form yg cuma punya field deadline.
+  const deadlineOnly = isEdit && existingData?.data.can_edit_deadline_only === true;
+
   useEffect(() => {
     if (!isEdit || !existingData || initialized) return;
     const r = existingData.data;
@@ -83,6 +105,8 @@ export default function CreateRequestScreen() {
     setTglReq(r.tanggal_request ?? todayISO());
     setDeadline(r.deadline ?? '');
     setKeterangan(r.keterangan ?? '');
+    setTipe(r.tipe ?? 'baru');
+    setKategoriId(r.kategori_error_id ?? null);
 
     const urls = r.gambar_urls ?? [];
     const ids  = r.gambar_ids  ?? [];
@@ -96,6 +120,12 @@ export default function CreateRequestScreen() {
 
     setInitialized(true);
   }, [existingData, initialized, isEdit]);
+
+  // Create mode: buka TipeSheet pertama kali screen mount (sebelum form muncul).
+  // Edit mode: skip — tipe sudah ter-pre-fill dari existingData.
+  useEffect(() => {
+    if (!isEdit) setTipeSheetOpen(true);
+  }, [isEdit]);
 
   const activeExistingGambar  = existingGambar.filter((g) => !g.markedForRemoval).length;
   const activeExistingDokumen = existingDokumen.filter((d) => !d.markedForRemoval).length;
@@ -206,7 +236,18 @@ export default function CreateRequestScreen() {
   const removeNewDokumen = (idx: number) => setNewDokumen((p) => p.filter((_, i) => i !== idx));
 
   const submit = () => {
-    if (!namaKlien.trim())  return Alert.alert('Validasi', 'Nama klien wajib diisi.');
+    // PIC-only edit: hanya boleh ubah deadline, skip semua validasi lain.
+    if (deadlineOnly) {
+      updateMutation.mutate({
+        deadline: deadline || '',
+      });
+      return;
+    }
+
+    if (!tipe)              return Alert.alert('Validasi', 'Tipe request wajib dipilih.');
+    if (tipe === 'terkait_fitur' && !kategoriId) {
+      return Alert.alert('Validasi', 'Kategori wajib dipilih untuk Request Terkait Fitur.');
+    }
     if (!keterangan.trim()) return Alert.alert('Validasi', 'Keterangan wajib diisi.');
     if (!tanggalRequest)    return Alert.alert('Validasi', 'Tanggal request wajib diisi.');
 
@@ -216,22 +257,26 @@ export default function CreateRequestScreen() {
         ...existingDokumen.filter((d) => d.markedForRemoval).map((d) => d.id),
       ];
       updateMutation.mutate({
-        nama_klien:      namaKlien.trim(),
-        klien_id:        klienId,
-        tanggal_request: tanggalRequest,
-        deadline:        deadline || '',
-        keterangan:      keterangan.trim(),
+        nama_klien:        namaKlien.trim() || null,
+        klien_id:          klienId,
+        tanggal_request:   tanggalRequest,
+        deadline:          deadline || '',
+        keterangan:        keterangan.trim(),
+        tipe,
+        kategori_error_id: tipe === 'terkait_fitur' ? kategoriId : null,
         gambar:              newGambar.length  > 0 ? newGambar  : undefined,
         dokumen:             newDokumen.length > 0 ? newDokumen : undefined,
         remove_lampiran_ids: removeIds.length  > 0 ? removeIds  : undefined,
       });
     } else {
       createMutation.mutate({
-        nama_klien:      namaKlien.trim(),
-        klien_id:        klienId,
-        tanggal_request: tanggalRequest,
-        deadline:        deadline || undefined,
-        keterangan:      keterangan.trim(),
+        nama_klien:        namaKlien.trim() || undefined,
+        klien_id:          klienId,
+        tanggal_request:   tanggalRequest,
+        deadline:          deadline || undefined,
+        keterangan:        keterangan.trim(),
+        tipe,
+        kategori_error_id: tipe === 'terkait_fitur' ? kategoriId : undefined,
         gambar:  newGambar.length  > 0 ? newGambar  : undefined,
         dokumen: newDokumen.length > 0 ? newDokumen : undefined,
       });
@@ -245,15 +290,62 @@ export default function CreateRequestScreen() {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="close" size={22} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.topTitle}>{isEdit ? 'Edit Request' : 'Request Baru'}</Text>
+          <Text style={styles.topTitle}>
+            {deadlineOnly ? 'Ubah Deadline' : (isEdit ? 'Edit Request' : 'Request Baru')}
+          </Text>
           <SaveButton onPress={submit} loading={isPending} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll}>
-          <Text style={styles.label}>Nama Klien <Text style={styles.req}>*</Text></Text>
+          {deadlineOnly && (
+            <View style={styles.infoBanner}>
+              <Ionicons name="information-circle-outline" size={16} color="#a5b4fc" />
+              <Text style={styles.infoBannerText}>
+                Sebagai PIC handler, kamu hanya bisa mengubah deadline. Field lain dikunci.
+              </Text>
+            </View>
+          )}
+
+          {deadlineOnly ? (
+            <>
+              <Text style={styles.label}>Deadline</Text>
+              <DatePickerInput value={deadline} onChange={setDeadline} placeholder="Pilih deadline (opsional)" />
+            </>
+          ) : (
+          <>
+          {/* Tipe Request — badge + tombol ubah */}
+          <Text style={styles.label}>Tipe Request <Text style={styles.req}>*</Text></Text>
+          <TouchableOpacity style={styles.tipeBadgeRow} onPress={() => setTipeSheetOpen(true)}>
+            <View style={styles.tipeBadge}>
+              <Ionicons
+                name={tipe === 'terkait_fitur' ? 'construct-outline' : 'sparkles-outline'}
+                size={14}
+                color="#a5b4fc"
+              />
+              <Text style={styles.tipeBadgeText}>
+                {tipe === 'terkait_fitur' ? 'Request Terkait Fitur' : tipe === 'baru' ? 'Request Baru' : 'Pilih tipe…'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-down" size={16} color="#8a94a6" />
+          </TouchableOpacity>
+
+          {/* Kategori — hanya tampil kalau tipe = terkait_fitur */}
+          {tipe === 'terkait_fitur' && (
+            <>
+              <Text style={styles.label}>Kategori <Text style={styles.req}>*</Text></Text>
+              <TouchableOpacity style={styles.klienBox} onPress={() => setKategoriSheetOpen(true)}>
+                <Text style={[styles.klienText, !kategoriPicked && styles.placeholder]} numberOfLines={1}>
+                  {kategoriPicked?.nama ?? 'Pilih kategori…'}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color="#8a94a6" />
+              </TouchableOpacity>
+            </>
+          )}
+
+          <Text style={styles.label}>Nama Klien</Text>
           <TouchableOpacity style={styles.klienBox} onPress={() => setKlienOpen(true)}>
             <Text style={[styles.klienText, !namaKlien && styles.placeholder]} numberOfLines={1}>
-              {namaKlien || 'Cari atau ketik nama klien...'}
+              {namaKlien || 'Opsional — cari atau ketik nama klien...'}
             </Text>
             <Ionicons name="search" size={18} color="#8a94a6" />
           </TouchableOpacity>
@@ -355,6 +447,8 @@ export default function CreateRequestScreen() {
             <Ionicons name="document-attach-outline" size={18} color="#3b82f6" />
             <Text style={styles.mediaText}>Pilih Dokumen (PDF, Word, Excel, PPT)</Text>
           </TouchableOpacity>
+          </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -372,7 +466,143 @@ export default function CreateRequestScreen() {
           setKlienOpen(false);
         }}
       />
+
+      <TipeSheet
+        visible={tipeSheetOpen}
+        currentTipe={tipe}
+        onClose={() => {
+          // Edit mode: pakai tipe existing (tidak null) — tutup sheet langsung.
+          // Create mode: tipe masih null kalau user dismiss — paksa pilih dgn
+          // tetap menampilkan sheet sampai dipilih, atau goBack kalau dismiss.
+          if (!tipe) navigation.goBack();
+          else setTipeSheetOpen(false);
+        }}
+        onPick={(t) => {
+          setTipe(t);
+          // Reset kategori kalau pindah ke 'baru'
+          if (t === 'baru') setKategoriId(null);
+          setTipeSheetOpen(false);
+          // Auto-buka KategoriSheet kalau pilih terkait_fitur & belum ada kategori
+          if (t === 'terkait_fitur' && !kategoriId) {
+            setTimeout(() => setKategoriSheetOpen(true), 200);
+          }
+        }}
+      />
+
+      <KategoriSheet
+        visible={kategoriSheetOpen}
+        list={kategoriList}
+        currentId={kategoriId}
+        onClose={() => setKategoriSheetOpen(false)}
+        onPick={(id) => {
+          setKategoriId(id);
+          setKategoriSheetOpen(false);
+        }}
+      />
     </SafeAreaView>
+  );
+}
+
+// ── Sheet pilih tipe request ──────────────────────────────────
+function TipeSheet({ visible, currentTipe, onClose, onPick }: {
+  visible: boolean;
+  currentTipe: RequestTipe | null;
+  onClose: () => void;
+  onPick: (t: RequestTipe) => void;
+}) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={pickerStyles.backdrop}>
+        <View style={pickerStyles.sheet}>
+          <View style={pickerStyles.handle} />
+          <View style={pickerStyles.header}>
+            <Text style={pickerStyles.title}>Tipe Request</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          <Text style={tipeStyles.subtitle}>Pilih jenis request yang ingin dicatat</Text>
+
+          <TouchableOpacity
+            style={[tipeStyles.card, currentTipe === 'baru' && tipeStyles.cardActive]}
+            onPress={() => onPick('baru')}
+            activeOpacity={0.7}
+          >
+            <View style={tipeStyles.cardIconWrap}>
+              <Ionicons name="sparkles-outline" size={28} color="#a5b4fc" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={tipeStyles.cardTitle}>Request Baru</Text>
+              <Text style={tipeStyles.cardDesc}>Permintaan fitur baru atau request umum dari klien.</Text>
+            </View>
+            {currentTipe === 'baru' && (
+              <Ionicons name="checkmark-circle" size={22} color="#22c55e" />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[tipeStyles.card, currentTipe === 'terkait_fitur' && tipeStyles.cardActive]}
+            onPress={() => onPick('terkait_fitur')}
+            activeOpacity={0.7}
+          >
+            <View style={tipeStyles.cardIconWrap}>
+              <Ionicons name="construct-outline" size={28} color="#a5b4fc" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={tipeStyles.cardTitle}>Request Terkait Fitur</Text>
+              <Text style={tipeStyles.cardDesc}>Perbaikan / penyesuaian fitur yang sudah ada (pilih kategori).</Text>
+            </View>
+            {currentTipe === 'terkait_fitur' && (
+              <Ionicons name="checkmark-circle" size={22} color="#22c55e" />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ── Sheet pilih kategori (share dgn Error Log) ─────────────────
+function KategoriSheet({ visible, list, currentId, onClose, onPick }: {
+  visible: boolean;
+  list: KategoriError[];
+  currentId: number | null;
+  onClose: () => void;
+  onPick: (id: number) => void;
+}) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={pickerStyles.backdrop}>
+        <View style={pickerStyles.sheet}>
+          <View style={pickerStyles.handle} />
+          <View style={pickerStyles.header}>
+            <Text style={pickerStyles.title}>Pilih Kategori</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          <FlatList
+            data={list}
+            keyExtractor={(item) => String(item.id)}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <TouchableOpacity onPress={() => onPick(item.id)} style={pickerStyles.item}>
+                <Ionicons name="pricetag-outline" size={18} color="#3b82f6" />
+                <Text style={pickerStyles.itemText}>{item.nama}</Text>
+                {currentId === item.id && (
+                  <Ionicons name="checkmark" size={20} color="#22c55e" />
+                )}
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={
+              <Text style={pickerStyles.empty}>Belum ada kategori terdaftar.</Text>
+            }
+            contentContainerStyle={{ paddingBottom: 24 }}
+          />
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -533,6 +763,53 @@ const styles = StyleSheet.create({
     borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11,
     justifyContent: 'center', marginTop: 4,
   },
+
+  // Tipe badge row
+  tipeBadgeRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 14, paddingVertical: 11, borderRadius: 10,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  tipeBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(79,106,240,0.15)',
+    borderWidth: 1, borderColor: 'rgba(79,106,240,0.30)',
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+  },
+  tipeBadgeText: { color: '#a5b4fc', fontSize: 12, fontWeight: '600' },
+
+  infoBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(79,106,240,0.10)',
+    borderColor: 'rgba(79,106,240,0.30)', borderWidth: 1,
+    borderRadius: 10, padding: 10, marginBottom: 14,
+  },
+  infoBannerText: { color: '#a5b4fc', fontSize: 12, flex: 1, lineHeight: 16 },
+});
+
+const tipeStyles = StyleSheet.create({
+  subtitle: {
+    color: '#8a94a6', fontSize: 12,
+    marginBottom: 16,
+  },
+  card: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12, padding: 14, marginBottom: 10,
+  },
+  cardActive: {
+    backgroundColor: 'rgba(79,106,240,0.10)',
+    borderColor:     'rgba(79,106,240,0.40)',
+  },
+  cardIconWrap: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(79,106,240,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  cardTitle: { color: '#fff', fontSize: 14, fontWeight: '600', marginBottom: 2 },
+  cardDesc:  { color: '#8a94a6', fontSize: 12, lineHeight: 16 },
 });
 
 const pickerStyles = StyleSheet.create({

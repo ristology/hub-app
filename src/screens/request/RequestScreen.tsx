@@ -12,7 +12,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import {
   requestApi,
-  type ClientRequest, type RequestStatus, type PicRingkas, type KlienRingkas,
+  type ClientRequest, type RequestStatus, type RequestTipe, type PicRingkas, type KlienRingkas,
 } from '../../api/clientRequest';
 import RequestCard from './components/RequestCard';
 import SwipeableCard, { type SwipeAction } from '../../components/SwipeableCard';
@@ -40,6 +40,7 @@ type Filters = {
   search?: string;
   status?: RequestStatus | null;
   klien?:  number | null;
+  pic_id?: number | null;
   dari?:   string;
   sampai?: string;
   quick_filter?: QuickFilter;
@@ -51,6 +52,7 @@ function countActive(f: Filters): number {
   if (f.search?.trim()) n++;
   if (f.status)         n++;
   if (f.klien)          n++;
+  if (f.pic_id)         n++;
   if (f.dari)           n++;
   if (f.sampai)         n++;
   if (f.milikku)        n++;
@@ -71,28 +73,47 @@ export default function RequestScreen() {
   const insets      = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
 
+  // Tab tipe — default 'terkait_fitur' supaya IT/PIC default lihat antrian
+  // perbaikan fitur (auto-assigned). Tab 'baru' utk request umum yg masih
+  // perlu approval manual.
+  const [tipeAktif, setTipeAktif] = useState<RequestTipe>('terkait_fitur');
+
   const [filters, setFilters]       = useState<Filters>({});
   const [filterOpen, setFilterOpen] = useState(false);
   const [draft, setDraft]           = useState<Filters>({});
   const [klienNama, setKlienNama]   = useState('');
   const [klienPickerOpen, setKlienPickerOpen] = useState(false);
-  const [pickerOpen, setPickerOpen]           = useState<'status' | null>(null);
+  const [pickerOpen, setPickerOpen]           = useState<'status' | 'pic' | null>(null);
   const [assignTarget, setAssignTarget]       = useState<ClientRequest | null>(null);
+  const [picList, setPicList]                 = useState<PicRingkas[]>([]);
+
+  // Load PIC list sekali — utk filter dropdown. Hanya karyawan IT yg punya user_id.
+  useEffect(() => {
+    requestApi.listPic().then(({ data }) => setPicList(data)).catch(() => {});
+  }, []);
+
+  const picOptions = useMemo<PickerOption[]>(() => [
+    { id: null, label: 'Semua PIC' },
+    ...picList.map((p) => ({ id: p.user_id, label: p.nama })),
+  ], [picList]);
 
   const openFilterSheet = () => { setDraft(filters); setFilterOpen(true); };
 
   const handlePickStatus = (opt: PickerOption) => { setDraft((d) => ({ ...d, status: opt.id as RequestStatus | null })); setPickerOpen(null); };
   const handlePickKlien  = (k: KlienRingkas)   => { setDraft((d) => ({ ...d, klien: k.id })); setKlienNama(k.nama); setKlienPickerOpen(false); };
+  const handlePickPic    = (opt: PickerOption) => { setDraft((d) => ({ ...d, pic_id: opt.id as number | null })); setPickerOpen(null); };
 
   const apiParams = useMemo(() => ({
+    tipe: tipeAktif,
     ...(filters.status       && { status:       filters.status }),
     ...(filters.klien        && { klien:        filters.klien }),
+    ...(filters.pic_id       && { pic_id:       filters.pic_id }),
     ...(filters.dari         && { dari:         filters.dari }),
     ...(filters.sampai       && { sampai:       filters.sampai }),
     ...(filters.quick_filter && { quick_filter: filters.quick_filter }),
     ...(filters.milikku      && { milikku: 1 }),
     ...(filters.search?.trim() && { search: filters.search.trim() }),
-  }), [filters]);
+  }), [filters, tipeAktif]);
 
   // Toggle stat-box quick filter
   const handleTapStat = useCallback((qf: QuickFilter) => {
@@ -107,7 +128,11 @@ export default function RequestScreen() {
     placeholderData: keepPreviousData,
   });
 
-  const { data: stats } = useQuery({ queryKey: ['request-stats'], queryFn: requestApi.stats });
+  // Stats per-tab + tab_counts (semua tipe) supaya badge tab tampil jumlah.
+  const { data: stats } = useQuery({
+    queryKey: ['request-stats', tipeAktif],
+    queryFn:  () => requestApi.stats(tipeAktif),
+  });
 
   const terimaMut = useMutation({
     mutationFn: ({ id, picUserId }: { id: number; picUserId: number }) => requestApi.terima(id, picUserId),
@@ -177,6 +202,27 @@ export default function RequestScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Tab tipe — segmented control. Badge utama: total per tipe.
+          Badge merah (kecil): jumlah unread per tipe (cuma kalau > 0). */}
+      <View style={styles.tabsRow}>
+        <TabButton
+          label="Terkait Fitur"
+          icon="construct-outline"
+          active={tipeAktif === 'terkait_fitur'}
+          count={stats?.tab_counts?.terkait_fitur}
+          unread={stats?.unread_tab_counts?.terkait_fitur}
+          onPress={() => setTipeAktif('terkait_fitur')}
+        />
+        <TabButton
+          label="Baru"
+          icon="sparkles-outline"
+          active={tipeAktif === 'baru'}
+          count={stats?.tab_counts?.baru}
+          unread={stats?.unread_tab_counts?.baru}
+          onPress={() => setTipeAktif('baru')}
+        />
+      </View>
+
       {activeCount > 0 && (
         <View style={styles.chipsRow}>
           {filters.search?.trim() && <Chip label={`"${filters.search.trim()}"`} onClear={() => setFilters({ ...filters, search: '' })} />}
@@ -208,8 +254,18 @@ export default function RequestScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />}
         ListEmptyComponent={
           <View style={styles.center}>
-            <Ionicons name="mail-outline" size={48} color="#3b3f4a" />
-            <Text style={styles.empty}>{activeCount > 0 ? 'Tidak ada hasil dengan filter ini.' : 'Belum ada request.'}</Text>
+            <Ionicons
+              name={tipeAktif === 'terkait_fitur' ? 'construct-outline' : 'sparkles-outline'}
+              size={48}
+              color="#3b3f4a"
+            />
+            <Text style={styles.empty}>
+              {activeCount > 0
+                ? 'Tidak ada hasil dengan filter ini.'
+                : (tipeAktif === 'terkait_fitur'
+                    ? 'Belum ada Request Terkait Fitur.'
+                    : 'Belum ada Request Baru.')}
+            </Text>
           </View>
         }
       />
@@ -223,10 +279,12 @@ export default function RequestScreen() {
         draft={draft}
         klienNama={klienNama}
         statusLabel={STATUS_OPTIONS.find((o) => o.id === draft.status)?.label}
+        picLabel={picOptions.find((o) => o.id === draft.pic_id)?.label}
         onDraftChange={setDraft}
         onClearKlien={() => { setDraft((d) => ({ ...d, klien: null })); setKlienNama(''); }}
         onOpenStatus={() => setPickerOpen('status')}
         onOpenKlien={() => setKlienPickerOpen(true)}
+        onOpenPic={() => setPickerOpen('pic')}
         onClose={() => setFilterOpen(false)}
         onApply={(f) => { setFilters(f); setFilterOpen(false); }}
         onReset={() => { setDraft({}); setKlienNama(''); }}
@@ -238,6 +296,15 @@ export default function RequestScreen() {
         options={STATUS_OPTIONS}
         selectedId={draft.status ?? null}
         onPick={handlePickStatus}
+        onClose={() => setPickerOpen(null)}
+      />
+
+      <PickerSheet
+        visible={pickerOpen === 'pic'}
+        title="Pilih PIC"
+        options={picOptions}
+        selectedId={draft.pic_id ?? null}
+        onPick={handlePickPic}
         onClose={() => setPickerOpen(null)}
       />
 
@@ -269,6 +336,38 @@ function Chip({ label, onClear }: { label: string; onClear: () => void }) {
   );
 }
 
+function TabButton({ label, icon, active, count, unread, onPress }: {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  active: boolean;
+  count: number | undefined;
+  unread?: number;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[styles.tabBtn, active && styles.tabBtnActive]}
+      activeOpacity={0.7}
+    >
+      <Ionicons name={icon} size={16} color={active ? '#a5b4fc' : '#8a94a6'} />
+      <Text style={[styles.tabBtnText, active && styles.tabBtnTextActive]} numberOfLines={1}>
+        {label}
+      </Text>
+      {count != null && (
+        <View style={[styles.tabBadge, active && styles.tabBadgeActive]}>
+          <Text style={[styles.tabBadgeText, active && styles.tabBadgeTextActive]}>{count}</Text>
+        </View>
+      )}
+      {unread != null && unread > 0 && (
+        <View style={styles.tabUnreadBadge}>
+          <Text style={styles.tabUnreadBadgeText}>{unread > 99 ? '99+' : unread}</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 function StatBox({ label, value, color, active, onPress }: {
   label: string; value: number; color: string; active?: boolean; onPress?: () => void;
 }) {
@@ -289,18 +388,20 @@ type FilterSheetProps = {
   draft: Filters;
   klienNama: string;
   statusLabel?: string;
+  picLabel?: string;
   onDraftChange: (d: Filters) => void;
   onClearKlien: () => void;
   onOpenStatus: () => void;
   onOpenKlien: () => void;
+  onOpenPic: () => void;
   onClose: () => void;
   onApply: (f: Filters) => void;
   onReset: () => void;
 };
 
 function FilterSheet({
-  visible, draft, klienNama, statusLabel,
-  onDraftChange, onClearKlien, onOpenStatus, onOpenKlien,
+  visible, draft, klienNama, statusLabel, picLabel,
+  onDraftChange, onClearKlien, onOpenStatus, onOpenKlien, onOpenPic,
   onClose, onApply, onReset,
 }: FilterSheetProps) {
   const insets   = useSafeAreaInsets();
@@ -418,6 +519,12 @@ function FilterSheet({
             empty={!draft.klien}
             onPress={onOpenKlien}
             onClear={draft.klien ? onClearKlien : undefined} />
+
+          <Text style={fsStyles.label}>PIC / Handler</Text>
+          <Field value={picLabel ?? 'Semua PIC'}
+            empty={!draft.pic_id}
+            onPress={onOpenPic}
+            onClear={draft.pic_id ? () => onDraftChange({ ...draft, pic_id: null }) : undefined} />
 
           <Text style={fsStyles.label}>Tanggal request — Dari</Text>
           <View style={fsStyles.row}>
@@ -611,7 +718,7 @@ function AssignPicModal({ visible, target, loading, onClose, onSubmit }: {
           <View style={picStyles.header}>
             <View style={{ flex: 1 }}>
               <Text style={picStyles.title}>Assign Request</Text>
-              {target && <Text style={picStyles.subtitle} numberOfLines={1}>{target.nama_klien}</Text>}
+              {target && <Text style={picStyles.subtitle} numberOfLines={1}>{target.nama_klien ?? 'Tanpa Klien'}</Text>}
             </View>
             <TouchableOpacity onPress={onClose} hitSlop={8}>
               <Ionicons name="close" size={24} color="#fff" />
@@ -678,6 +785,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center',
   },
   searchBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+
+  // Tab tipe row — segmented control 2 tab
+  tabsRow: {
+    flexDirection: 'row', gap: 8,
+    paddingHorizontal: 16, paddingBottom: 10,
+  },
+  tabBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 9, paddingHorizontal: 10, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  tabBtnActive: {
+    backgroundColor: 'rgba(79,106,240,0.15)',
+    borderColor:     'rgba(79,106,240,0.40)',
+  },
+  tabBtnText:       { color: '#8a94a6', fontSize: 13, fontWeight: '600' },
+  tabBtnTextActive: { color: '#fff' },
+  tabBadge: {
+    paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)', minWidth: 22, alignItems: 'center',
+  },
+  tabBadgeActive: { backgroundColor: 'rgba(79,106,240,0.40)' },
+  tabBadgeText:   { color: '#8a94a6', fontSize: 11, fontWeight: '700' },
+  tabBadgeTextActive: { color: '#fff' },
+  tabUnreadBadge: {
+    paddingHorizontal: 5, paddingVertical: 1, borderRadius: 7,
+    backgroundColor: '#ef4444', minWidth: 18, alignItems: 'center',
+  },
+  tabUnreadBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
 
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 16, paddingBottom: 8 },
   chip: {

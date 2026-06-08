@@ -13,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   requestApi, type RequestKomentar, type PicRingkas,
 } from '../../api/clientRequest';
+import { useAuth } from '../../store/auth';
 import { notifApi, NotifModel } from '../../api/notif';
 import PhotoCarousel    from '../../components/PhotoCarousel';
 import ImageViewerModal from '../../components/ImageViewerModal';
@@ -55,10 +56,18 @@ export default function RequestDetailScreen() {
   const toast = useToast();
   const tabBarStyle = useTabBarStyle();
 
-  // Tandai notif Request ini sebagai dibaca → badge bottom tab berkurang
+  // Tandai notif Request ini sebagai dibaca → badge bottom tab + tab
+  // (Terkait Fitur/Baru) + menu Request + card list semua refresh.
+  // Sebelumnya hanya invalidate notif-count → tab badge tidak update krn
+  // dia baca dari request-stats.
   useEffect(() => {
     notifApi.markRead(NotifModel.Request, id)
-      .then(() => queryClient.invalidateQueries({ queryKey: ['notif-count'] }))
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['notif-count'] });
+        queryClient.invalidateQueries({ queryKey: ['request-stats'] });
+        queryClient.invalidateQueries({ queryKey: ['request'] });
+        queryClient.invalidateQueries({ queryKey: ['home-request'] });
+      })
       .catch(() => {});
   }, [id]);
 
@@ -92,6 +101,8 @@ export default function RequestDetailScreen() {
   const [replyTo,     setReplyTo]     = useState<{ id: number; nama: string } | null>(null);
 
   const [terimaOpen, setTerimaOpen] = useState(false);
+  const [reassignOpen, setReassignOpen] = useState(false);
+  const currentUserId = useAuth((s) => s.user?.id ?? null);
   const [tolakOpen,  setTolakOpen]  = useState(false);
   const [responOpen, setResponOpen] = useState(false);
 
@@ -108,9 +119,16 @@ export default function RequestDetailScreen() {
   };
 
   const terimaMut = useMutation({
-    mutationFn: (picUserId: number) => requestApi.terima(id, picUserId),
+    mutationFn: (picUserId: number | null) => requestApi.terima(id, picUserId),
     onSuccess: () => { invalidate(); setTerimaOpen(false); },
     onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal terima request.'),
+  });
+
+  const reassignMut = useMutation({
+    mutationFn: ({ picUserId, catatan }: { picUserId: number; catatan?: string }) =>
+      requestApi.reassign(id, picUserId, catatan),
+    onSuccess: () => { invalidate(); setReassignOpen(false); },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal alihkan handler.'),
   });
 
   const tolakMut = useMutation({
@@ -191,6 +209,21 @@ export default function RequestDetailScreen() {
   const canSelesai = isIt && (r.status === 'diterima' || r.status === 'proses');
   const canRespon  = isIt && r.status !== 'selesai' && r.status !== 'ditolak';
 
+  // Reassign tampil utk SEMUA tipe (baru & terkait_fitur):
+  // - Status menunggu: any IT/Admin (initial assign — pilih PIC awal).
+  // - Status diterima/proses: PIC saat ini atau Admin (hand-over).
+  const isCurrentPic = currentUserId != null && r.pic?.id === currentUserId;
+  const canReassign  =
+    (r.status === 'menunggu' && isIt)
+    || ((r.status === 'diterima' || r.status === 'proses') && (isCurrentPic || isIt));
+
+  // Terima: langsung self-assign untuk SEMUA tipe (pic_id=null, backend
+  // default ke current user). Kalau IT mau assign ke orang lain, pakai
+  // "Alihkan" — flow same as Error Log.
+  const handleTerima = () => {
+    terimaMut.mutate(null);
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={{
@@ -205,14 +238,14 @@ export default function RequestDetailScreen() {
           </TouchableOpacity>
           <Text style={styles.topTitle}>Detail Request</Text>
           {r.can_edit && (
-            <>
-              <TouchableOpacity onPress={() => navigation.navigate('CreateRequest', { id })} style={styles.backBtn}>
-                <Ionicons name="create-outline" size={20} color="#3b82f6" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={confirmDelete} style={styles.backBtn}>
-                <Ionicons name="trash-outline" size={20} color="#ef4444" />
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity onPress={() => navigation.navigate('CreateRequest', { id })} style={styles.backBtn}>
+              <Ionicons name="create-outline" size={20} color="#3b82f6" />
+            </TouchableOpacity>
+          )}
+          {r.can_delete && (
+            <TouchableOpacity onPress={confirmDelete} style={styles.backBtn}>
+              <Ionicons name="trash-outline" size={20} color="#ef4444" />
+            </TouchableOpacity>
           )}
         </View>
 
@@ -223,9 +256,23 @@ export default function RequestDetailScreen() {
           onScroll={onScroll}
           scrollEventThrottle={16}
         >
-          <Text style={styles.namaKlien}>{r.nama_klien}</Text>
-          <View style={[styles.statusPill, { backgroundColor: statusStyle.bg }]}>
-            <Text style={[styles.statusText, { color: statusStyle.color }]}>{statusStyle.label}</Text>
+          <Text style={styles.namaKlien}>{r.nama_klien ?? 'Tanpa Klien'}</Text>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusPill, { backgroundColor: statusStyle.bg }]}>
+              <Text style={[styles.statusText, { color: statusStyle.color }]}>{statusStyle.label}</Text>
+            </View>
+            <View style={styles.tipePill}>
+              <Ionicons
+                name={r.tipe === 'terkait_fitur' ? 'construct-outline' : 'sparkles-outline'}
+                size={12}
+                color="#a5b4fc"
+              />
+              <Text style={styles.tipePillText}>
+                {r.tipe === 'terkait_fitur'
+                  ? `Terkait Fitur${r.kategori_error ? ' · ' + r.kategori_error.nama : ''}`
+                  : 'Request Baru'}
+              </Text>
+            </View>
           </View>
 
           {/* Lampiran gambar */}
@@ -293,13 +340,13 @@ export default function RequestDetailScreen() {
             </>
           )}
 
-          {/* Aksi IT/Admin */}
-          {isIt && (canTerima || canTolak || canSelesai || canRespon) && (
+          {/* Aksi IT/Admin — urutan: Terima, Tolak, Alihkan, Selesai, Respon */}
+          {(isIt || canReassign) && (canTerima || canTolak || canSelesai || canRespon || canReassign) && (
             <>
               <Text style={styles.sectionLabel}>AKSI IT / ADMIN</Text>
               <View style={styles.actionRow}>
                 {canTerima && (
-                  <TouchableOpacity style={[styles.actionBtn, styles.actionBlue]} onPress={() => setTerimaOpen(true)}>
+                  <TouchableOpacity style={[styles.actionBtn, styles.actionBlue]} onPress={handleTerima}>
                     <Ionicons name="checkmark-circle" size={16} color="#3b82f6" />
                     <Text style={[styles.actionText, { color: '#3b82f6' }]}>Terima</Text>
                   </TouchableOpacity>
@@ -308,6 +355,12 @@ export default function RequestDetailScreen() {
                   <TouchableOpacity style={[styles.actionBtn, styles.actionRed]} onPress={() => setTolakOpen(true)}>
                     <Ionicons name="close-circle" size={16} color="#ef4444" />
                     <Text style={[styles.actionText, { color: '#ef4444' }]}>Tolak</Text>
+                  </TouchableOpacity>
+                )}
+                {canReassign && (
+                  <TouchableOpacity style={[styles.actionBtn, styles.actionPurple]} onPress={() => setReassignOpen(true)}>
+                    <Ionicons name="swap-horizontal" size={16} color="#a78bfa" />
+                    <Text style={[styles.actionText, { color: '#a78bfa' }]}>Alihkan</Text>
                   </TouchableOpacity>
                 )}
                 {canSelesai && (
@@ -433,6 +486,14 @@ export default function RequestDetailScreen() {
         onClose={() => setTerimaOpen(false)}
         onSubmit={(picUserId) => terimaMut.mutate(picUserId)}
         loading={terimaMut.isPending}
+      />
+
+      <ReassignModal
+        visible={reassignOpen}
+        onClose={() => setReassignOpen(false)}
+        currentPicUserId={r.pic?.id ?? null}
+        onSubmit={(picUserId, catatan) => reassignMut.mutate({ picUserId, catatan })}
+        loading={reassignMut.isPending}
       />
 
       <TolakModal
@@ -633,6 +694,103 @@ function TolakModal({ visible, onClose, onSubmit, loading }: {
             {loading
               ? <ActivityIndicator size="small" color="#fff" />
               : <Text style={modalStyles.submitText}>Tolak Request</Text>
+            }
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+function ReassignModal({ visible, onClose, currentPicUserId, onSubmit, loading }: {
+  visible: boolean;
+  onClose: () => void;
+  currentPicUserId: number | null;
+  onSubmit: (picUserId: number, catatan?: string) => void;
+  loading: boolean;
+}) {
+  const [picList, setPicList] = useState<PicRingkas[]>([]);
+  const [loadingPic, setLoadingPic] = useState(false);
+  const [pickedId, setPickedId] = useState<number | null>(null);
+  const [catatan, setCatatan]   = useState('');
+
+  useEffect(() => {
+    if (!visible) { setPickedId(null); setCatatan(''); return; }
+    setLoadingPic(true);
+    requestApi.listPic()
+      .then(({ data }) => setPicList(data.filter((p) => p.user_id !== currentPicUserId)))
+      .finally(() => setLoadingPic(false));
+  }, [visible, currentPicUserId]);
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={modalStyles.backdrop}
+      >
+        <View style={modalStyles.sheet}>
+          <View style={modalStyles.handle} />
+          <View style={modalStyles.header}>
+            <Text style={modalStyles.title}>Alihkan Handler</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={modalStyles.label}>Pilih handler baru</Text>
+          {loadingPic ? (
+            <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 16 }} />
+          ) : picList.length === 0 ? (
+            <Text style={modalStyles.empty}>Tidak ada karyawan IT lain.</Text>
+          ) : (
+            <FlatList
+              data={picList}
+              keyExtractor={(item) => String(item.user_id)}
+              style={{ maxHeight: 240 }}
+              renderItem={({ item }) => {
+                const selected = pickedId === item.user_id;
+                return (
+                  <TouchableOpacity
+                    onPress={() => setPickedId(item.user_id)}
+                    style={[modalStyles.picItem, selected && { backgroundColor: 'rgba(167,139,250,0.10)' }]}
+                  >
+                    {item.foto ? (
+                      <Image source={{ uri: item.foto }} style={modalStyles.picAvatar} />
+                    ) : (
+                      <View style={[modalStyles.picAvatar, modalStyles.picAvatarFb]}>
+                        <Text style={{ color: '#fff', fontWeight: '700' }}>
+                          {item.nama.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    <Text style={modalStyles.picName}>{item.nama}</Text>
+                    {selected && <Ionicons name="checkmark-circle" size={20} color="#a78bfa" />}
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          )}
+
+          <Text style={[modalStyles.label, { marginTop: 12 }]}>Catatan pengalihan (opsional)</Text>
+          <TextInput
+            style={[modalStyles.input, { minHeight: 70 }]}
+            placeholder="Mis. alasan alih handler / instruksi awal..."
+            placeholderTextColor="#6b7280"
+            value={catatan}
+            onChangeText={setCatatan}
+            multiline
+            textAlignVertical="top"
+            maxLength={1000}
+          />
+
+          <TouchableOpacity
+            style={[modalStyles.submitBtn, { backgroundColor: '#a78bfa' }]}
+            onPress={() => pickedId != null && onSubmit(pickedId, catatan.trim() || undefined)}
+            disabled={pickedId == null || loading}
+          >
+            {loading
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Text style={modalStyles.submitText}>Alihkan ke Handler Ini</Text>
             }
           </TouchableOpacity>
         </View>
@@ -855,11 +1013,22 @@ const styles = StyleSheet.create({
   topTitle: { color: '#fff', fontSize: 16, fontWeight: '600', flex: 1, marginLeft: 4 },
   scroll: { padding: 16, paddingBottom: 24 },
   namaKlien: { color: '#fff', fontSize: 22, fontWeight: '700' },
+  statusRow: {
+    flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap',
+    gap: 6, marginTop: 8,
+  },
   statusPill: {
     alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5,
-    borderRadius: 12, marginTop: 8,
+    borderRadius: 12,
   },
   statusText: { fontSize: 12, fontWeight: '700' },
+  tipePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
+    backgroundColor: 'rgba(79,106,240,0.15)',
+    borderWidth: 1, borderColor: 'rgba(79,106,240,0.30)',
+  },
+  tipePillText: { color: '#a5b4fc', fontSize: 11, fontWeight: '600' },
   sectionLabel: {
     color: '#6b7280', fontSize: 11, fontWeight: '700',
     letterSpacing: 0.8, marginTop: 18, marginBottom: 8,
@@ -895,6 +1064,7 @@ const styles = StyleSheet.create({
   actionRed:    { backgroundColor: 'rgba(239,68,68,0.10)',   borderColor: 'rgba(239,68,68,0.40)' },
   actionGreen:  { backgroundColor: 'rgba(34,197,94,0.10)',   borderColor: 'rgba(34,197,94,0.40)' },
   actionYellow: { backgroundColor: 'rgba(245,158,11,0.10)',  borderColor: 'rgba(245,158,11,0.40)' },
+  actionPurple: { backgroundColor: 'rgba(167,139,250,0.10)', borderColor: 'rgba(167,139,250,0.40)' },
   actionText: { fontSize: 12, fontWeight: '600' },
 
   responItem: {

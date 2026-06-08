@@ -1,18 +1,27 @@
 import { apiClient } from './client';
 
 export type RequestStatus = 'menunggu' | 'diterima' | 'proses' | 'selesai' | 'ditolak';
+export type RequestTipe   = 'baru' | 'terkait_fitur';
+
+export type KategoriRingkas = { id: number; nama: string };
 
 export type ClientRequest = {
   id: number;
   milikku: boolean;
   can_edit: boolean;
+  can_edit_deadline_only?: boolean;
+  can_delete?: boolean;
   is_it_or_admin: boolean;
   has_unread_notif: boolean;
-  nama_klien: string;
+  nama_klien: string | null;
   klien_id: number | null;
   tanggal_request: string | null;
   deadline: string | null;
   keterangan: string;
+  tipe: RequestTipe;
+  tipe_label: string;
+  kategori_error_id: number | null;
+  kategori_error: KategoriRingkas | null;
   status: RequestStatus;
   status_label: string;
   deadline_status: 'normal' | 'near' | 'overdue';
@@ -53,6 +62,18 @@ export type RequestStats = {
   selesai:  number;
   ditolak:  number;
   overdue:  number;
+  // Tab badge counts — selalu kirim semua tipe supaya UI bisa tampilkan
+  // jumlah per-tab tanpa request kedua.
+  tab_counts?: {
+    baru:          number;
+    terkait_fitur: number;
+  };
+  // Unread count per tab — jumlah request yg punya log unread utk user.
+  unread_tab_counts?: {
+    baru:          number;
+    terkait_fitur: number;
+  };
+  unread_total?: number;
 };
 
 export type KlienRingkas = { id: number; nama: string };
@@ -61,11 +82,13 @@ export type PicRingkas   = { user_id: number; nama: string; foto: string | null 
 export type FileAsset = { uri: string; name: string; type: string };
 
 export type CreateRequestPayload = {
-  nama_klien: string;
+  nama_klien?: string | null;
   klien_id?: number | null;
   tanggal_request: string;
   deadline?: string;
   keterangan: string;
+  tipe: RequestTipe;
+  kategori_error_id?: number | null;
   gambar?:  FileAsset[];
   dokumen?: FileAsset[];
 };
@@ -80,19 +103,24 @@ type Paginated<T> = { data: T[]; meta?: { current_page: number; last_page: numbe
 
 export const requestApi = {
   list: async (params?: {
+    tipe?: RequestTipe;
     status?: RequestStatus;
     klien?: number;
     dari?: string;   // YYYY-MM-DD
     sampai?: string; // YYYY-MM-DD
     search?: string;
     page?: number;
+    milikku?: 0 | 1 | boolean;
+    quick_filter?: 'menunggu' | 'proses' | 'selesai' | 'overdue';
   }): Promise<Paginated<ClientRequest>> => {
     const { data } = await apiClient.get('/request', { params });
     return data;
   },
 
-  stats: async (): Promise<RequestStats> => {
-    const { data } = await apiClient.get('/request/stats');
+  stats: async (tipe?: RequestTipe): Promise<RequestStats> => {
+    const { data } = await apiClient.get('/request/stats', {
+      params: tipe ? { tipe } : undefined,
+    });
     return data;
   },
 
@@ -117,11 +145,15 @@ export const requestApi = {
 
   create: async (payload: CreateRequestPayload): Promise<{ data: ClientRequest }> => {
     const formData = new FormData();
-    formData.append('nama_klien',      payload.nama_klien);
+    if (payload.nama_klien)               formData.append('nama_klien', payload.nama_klien);
     formData.append('tanggal_request', payload.tanggal_request);
     formData.append('keterangan',      payload.keterangan);
-    if (payload.klien_id != null)        formData.append('klien_id', String(payload.klien_id));
-    if (payload.deadline)                formData.append('deadline', payload.deadline);
+    formData.append('tipe',            payload.tipe);
+    if (payload.klien_id != null)         formData.append('klien_id', String(payload.klien_id));
+    if (payload.deadline)                 formData.append('deadline', payload.deadline);
+    if (payload.tipe === 'terkait_fitur' && payload.kategori_error_id != null) {
+      formData.append('kategori_error_id', String(payload.kategori_error_id));
+    }
 
     payload.gambar?.forEach((f, i)  => formData.append(`gambar[${i}]`,  f as any));
     payload.dokumen?.forEach((f, i) => formData.append(`dokumen[${i}]`, f as any));
@@ -137,11 +169,15 @@ export const requestApi = {
     // Laravel multipart spoofing — POST + _method=PATCH supaya body multipart diparsing.
     formData.append('_method', 'PATCH');
 
-    if (payload.nama_klien      !== undefined) formData.append('nama_klien',      payload.nama_klien);
-    if (payload.tanggal_request !== undefined) formData.append('tanggal_request', payload.tanggal_request);
-    if (payload.keterangan      !== undefined) formData.append('keterangan',      payload.keterangan);
-    if (payload.klien_id        !== undefined) formData.append('klien_id', payload.klien_id != null ? String(payload.klien_id) : '');
-    if (payload.deadline        !== undefined) formData.append('deadline', payload.deadline ?? '');
+    if (payload.nama_klien        !== undefined) formData.append('nama_klien', payload.nama_klien ?? '');
+    if (payload.tanggal_request   !== undefined) formData.append('tanggal_request', payload.tanggal_request);
+    if (payload.keterangan        !== undefined) formData.append('keterangan',      payload.keterangan);
+    if (payload.klien_id          !== undefined) formData.append('klien_id', payload.klien_id != null ? String(payload.klien_id) : '');
+    if (payload.deadline          !== undefined) formData.append('deadline', payload.deadline ?? '');
+    if (payload.tipe              !== undefined) formData.append('tipe', payload.tipe);
+    if (payload.kategori_error_id !== undefined) {
+      formData.append('kategori_error_id', payload.kategori_error_id != null ? String(payload.kategori_error_id) : '');
+    }
 
     payload.gambar?.forEach((f, i)              => formData.append(`gambar[${i}]`,  f as any));
     payload.dokumen?.forEach((f, i)             => formData.append(`dokumen[${i}]`, f as any));
@@ -158,8 +194,19 @@ export const requestApi = {
     return data;
   },
 
-  terima: async (id: number, picUserId: number): Promise<{ data: ClientRequest }> => {
-    const { data } = await apiClient.post(`/request/${id}/terima`, { pic_id: picUserId });
+  terima: async (id: number, picUserId?: number | null): Promise<{ data: ClientRequest }> => {
+    // picUserId optional — backend allow null untuk tipe='terkait_fitur'
+    // (self-assign ke current user). Tipe 'baru' tetap wajib picUserId.
+    const body = picUserId != null ? { pic_id: picUserId } : {};
+    const { data } = await apiClient.post(`/request/${id}/terima`, body);
+    return data;
+  },
+
+  reassign: async (id: number, picUserId: number, catatanPengalihan?: string): Promise<{ data: ClientRequest }> => {
+    const { data } = await apiClient.post(`/request/${id}/reassign`, {
+      pic_id: picUserId,
+      catatan_pengalihan: catatanPengalihan,
+    });
     return data;
   },
 

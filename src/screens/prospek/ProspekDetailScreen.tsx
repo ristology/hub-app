@@ -42,10 +42,20 @@ export default function ProspekDetailScreen() {
   const { id, highlightKomentarId } = route.params;
   const queryClient = useQueryClient();
 
-  // Tandai notif Prospek ini sebagai dibaca → badge bottom tab berkurang
+  // Tandai notif Prospek ini sebagai dibaca → badge bottom tab + list +
+  // stats + home menu badge semua refresh. Optimistic decrement supaya
+  // badge hilang instant tanpa nunggu refetch.
   useEffect(() => {
+    queryClient.setQueryData(['notif-count'], (old: any) =>
+      old ? { ...old, prospek: Math.max(0, (old.prospek ?? 0) - 1) } : old
+    );
     notifApi.markRead(NotifModel.Prospek, id)
-      .then(() => queryClient.invalidateQueries({ queryKey: ['notif-count'] }))
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['notif-count'] });
+        queryClient.invalidateQueries({ queryKey: ['prospek'] });
+        queryClient.invalidateQueries({ queryKey: ['prospek-stats'] });
+        queryClient.invalidateQueries({ queryKey: ['home-prospek'] });
+      })
       .catch(() => {});
   }, [id]);
 

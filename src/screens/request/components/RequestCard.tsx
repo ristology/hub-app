@@ -42,6 +42,14 @@ export default function RequestCard({ request, onPress }: Props) {
         <View style={[styles.statusPill, { backgroundColor: statusStyle.bg }]}>
           <Text style={[styles.statusText, { color: statusStyle.color }]}>{statusStyle.label}</Text>
         </View>
+        {request.tipe === 'terkait_fitur' && (
+          <View style={styles.tipePill}>
+            <Ionicons name="construct-outline" size={10} color="#a5b4fc" />
+            <Text style={styles.tipePillText} numberOfLines={1}>
+              {request.kategori_error ? request.kategori_error.nama : 'Terkait Fitur'}
+            </Text>
+          </View>
+        )}
         {request.deadline_status === 'overdue' && (
           <View style={styles.overdueBadge}>
             <Ionicons name="alert-circle" size={11} color="#ef4444" />
@@ -50,7 +58,7 @@ export default function RequestCard({ request, onPress }: Props) {
         )}
       </View>
 
-      <Text style={styles.namaKlien} numberOfLines={1}>{request.nama_klien}</Text>
+      <Text style={styles.namaKlien} numberOfLines={1}>{request.nama_klien ?? 'Tanpa Klien'}</Text>
       <Text style={styles.keterangan} numberOfLines={2}>{request.keterangan}</Text>
 
       <View style={styles.metaRow}>
@@ -124,6 +132,14 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
   },
   overdueText:{ color: '#ef4444', fontSize: 10, fontWeight: '600' },
+  tipePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8,
+    backgroundColor: 'rgba(79,106,240,0.15)',
+    borderWidth: 1, borderColor: 'rgba(79,106,240,0.30)',
+    maxWidth: 140,
+  },
+  tipePillText: { color: '#a5b4fc', fontSize: 10, fontWeight: '600' },
   namaKlien:  { color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 4 },
   keterangan: { color: '#c5cdd9', fontSize: 12, lineHeight: 17, marginBottom: 8 },
   metaRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 4 },

@@ -5,8 +5,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '../../store/auth';
+import { requestApi } from '../../api/clientRequest';
 
 type MenuItem = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -36,21 +38,41 @@ export default function MenuScreen() {
   const { user, logout } = useAuth();
   const visibleMenu = MENU_ITEMS.filter((m) => !m.visibleFor || m.visibleFor(user));
 
-  const renderMenu = (item: MenuItem) => (
-    <TouchableOpacity
-      key={item.label}
-      style={[styles.menuCard, item.disabled && styles.menuDisabled]}
-      onPress={() => item.screen && navigation.navigate(item.screen)}
-      disabled={item.disabled}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.iconWrap, { backgroundColor: item.color + '22' }]}>
-        <Ionicons name={item.icon} size={26} color={item.color} />
-      </View>
-      <Text style={styles.menuLabel}>{item.label}</Text>
-      {item.disabled && <Text style={styles.menuSoon}>Segera</Text>}
-    </TouchableOpacity>
-  );
+  // Request unread badge — share query key dgn HomeScreen ('home-request')
+  // supaya re-render konsisten saat user buka detail (mark-read).
+  const requestStats = useQuery({
+    queryKey: ['home-request'],
+    queryFn:  () => requestApi.stats(),
+  });
+  const requestUnread = requestStats.data?.unread_total ?? 0;
+
+  const badgeMap: Record<string, number | undefined> = {
+    Request: requestUnread,
+  };
+
+  const renderMenu = (item: MenuItem) => {
+    const badgeCount = badgeMap[item.label] ?? 0;
+    return (
+      <TouchableOpacity
+        key={item.label}
+        style={[styles.menuCard, item.disabled && styles.menuDisabled]}
+        onPress={() => item.screen && navigation.navigate(item.screen)}
+        disabled={item.disabled}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.iconWrap, { backgroundColor: item.color + '22' }]}>
+          <Ionicons name={item.icon} size={26} color={item.color} />
+          {badgeCount > 0 && (
+            <View style={styles.menuBadge}>
+              <Text style={styles.menuBadgeText}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.menuLabel}>{item.label}</Text>
+        {item.disabled && <Text style={styles.menuSoon}>Segera</Text>}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -121,7 +143,16 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 44, height: 44, borderRadius: 22,
     alignItems: 'center', justifyContent: 'center',
+    position: 'relative',
   },
+  menuBadge: {
+    position: 'absolute', top: -2, right: -6,
+    backgroundColor: '#ef4444', borderRadius: 10,
+    paddingHorizontal: 5, paddingVertical: 1,
+    minWidth: 18, alignItems: 'center',
+    borderWidth: 2, borderColor: '#0d1421',
+  },
+  menuBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
   menuLabel: { color: '#fff', fontSize: 12, fontWeight: '500', textAlign: 'center' },
   menuSoon: { color: '#6b7280', fontSize: 9, fontStyle: 'italic' },
 

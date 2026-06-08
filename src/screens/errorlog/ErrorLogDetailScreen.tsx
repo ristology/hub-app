@@ -51,10 +51,22 @@ export default function ErrorLogDetailScreen() {
   const insets = useSafeAreaInsets();
   const toast = useToast();
 
-  // Tandai notif Error Log ini sebagai dibaca → badge bottom tab berkurang
+  // Tandai notif Error Log ini sebagai dibaca → badge bottom tab + tab
+  // counter + card list + home menu badge semua refresh.
+  // Optimistic: decrement notif.error_log instant supaya badge hilang
+  // tanpa nunggu refetch (sebelumnya cuma invalidate notif-count, badge
+  // baru update setelah refetch jalan ~200-300ms — terasa lambat).
   useEffect(() => {
+    queryClient.setQueryData(['notif-count'], (old: any) =>
+      old ? { ...old, error_log: Math.max(0, (old.error_log ?? 0) - 1) } : old
+    );
     notifApi.markRead(NotifModel.ErrorLog, id)
-      .then(() => queryClient.invalidateQueries({ queryKey: ['notif-count'] }))
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['notif-count'] });
+        queryClient.invalidateQueries({ queryKey: ['error-log'] });
+        queryClient.invalidateQueries({ queryKey: ['error-log-stats'] });
+        queryClient.invalidateQueries({ queryKey: ['home-errorlog'] });
+      })
       .catch(() => {});
   }, [id]);
   const [kbHeight, setKbHeight] = useState(0);

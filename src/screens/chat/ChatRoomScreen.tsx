@@ -39,6 +39,11 @@ type ActionItem = {
 function ChatActionSheet({
   visible, title, items, onClose,
 }: { visible: boolean; title?: string; items: ActionItem[]; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
+  // Android gesture nav / 3-button nav bar tinggi-nya variatif (mis. Samsung
+  // gesture pill cukup besar) — hardcode paddingBottom 30 sering ketutup tombol
+  // Batal. Pakai insets.bottom + 12 dgn floor 24 supaya selalu clear nav bar.
+  const sheetPaddingBottom = Math.max(insets.bottom + 12, 24);
   return (
     <Modal
       visible={visible}
@@ -52,7 +57,10 @@ function ChatActionSheet({
         activeOpacity={1}
         onPress={onClose}
       >
-        <View style={styles.sheetContainer} onStartShouldSetResponder={() => true}>
+        <View
+          style={[styles.sheetContainer, { paddingBottom: sheetPaddingBottom }]}
+          onStartShouldSetResponder={() => true}
+        >
           {title && <Text style={styles.sheetTitle}>{title}</Text>}
           {items.map((it, i) => (
             <TouchableOpacity
@@ -224,18 +232,42 @@ export default function ChatRoomScreen() {
     refetchInterval: 5000, // polling 5 detik (sementara, sebelum Reverb integrated)
   });
 
-  // Mark read setiap kali layar dibuka / data berubah
-  useEffect(() => {
-    chatApi.markRead(roomId).catch(() => {});
+  // Mark read setiap kali layar dibuka / data berubah.
+  // PENTING: invalidate CHAIN setelah markRead resolve (sebelumnya
+  // invalidate immediate → race condition, server belum proses markRead
+  // saat refetch jalan → badge stuck). Plus invalidate notif-count
+  // (bottom tab badge Pesan) — sebelumnya cuma chat-rooms, badge bottom
+  // tab harus tunggu polling 20s.
+  // Optimistic: hitung notif.pesan baru dgn mengurangi unread room ini
+  // dari total. Room lain yg masih ada unread tetap terhitung.
+  const clearPesanBadgeOptimistic = useCallback(() => {
+    queryClient.setQueryData(['notif-count'], (old: any) => {
+      if (!old) return old;
+      const rooms: any = queryClient.getQueryData(['chat-rooms']);
+      const currentRoomUnread = Array.isArray(rooms)
+        ? (rooms.find((r: any) => r.id === roomId)?.unread_count ?? 0)
+        : 0;
+      return { ...old, pesan: Math.max(0, (old.pesan ?? 0) - currentRoomUnread) };
+    });
+  }, [queryClient, roomId]);
+
+  const onMarkReadDone = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['chat-rooms'] });
-  }, [roomId, data]);
+    queryClient.invalidateQueries({ queryKey: ['notif-count'] });
+  }, [queryClient]);
+
+  useEffect(() => {
+    clearPesanBadgeOptimistic();
+    chatApi.markRead(roomId).then(onMarkReadDone).catch(() => {});
+  }, [roomId, data, clearPesanBadgeOptimistic, onMarkReadDone]);
 
   // Refetch saat layar fokus (mis. user kembali dari background) — pastikan
-  // reads array selalu up-to-date untuk render status read
+  // reads array selalu up-to-date untuk render status read.
   useFocusEffect(useCallback(() => {
     refetch();
-    chatApi.markRead(roomId).catch(() => {});
-  }, [roomId, refetch]));
+    clearPesanBadgeOptimistic();
+    chatApi.markRead(roomId).then(onMarkReadDone).catch(() => {});
+  }, [roomId, refetch, clearPesanBadgeOptimistic, onMarkReadDone]));
 
   const sendMutation = useMutation({
     mutationFn: (payload: {
@@ -1153,7 +1185,7 @@ const styles = StyleSheet.create({
   sheetContainer: {
     backgroundColor: '#0d1421',
     borderTopLeftRadius: 16, borderTopRightRadius: 16,
-    paddingTop: 10, paddingBottom: 30, paddingHorizontal: 8,
+    paddingTop: 10, paddingHorizontal: 8,
     borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)',
   },
   sheetTitle: {
