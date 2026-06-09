@@ -58,6 +58,7 @@ export default function CreateRequestScreen() {
   const [tanggalRequest, setTglReq]   = useState(todayISO());
   const [deadline, setDeadline]       = useState('');
   const [keterangan, setKeterangan]   = useState('');
+  const [url, setUrl]                 = useState('');
   const [klienOpen, setKlienOpen]     = useState(false);
 
   // Tipe request: 'baru' (form lama) atau 'terkait_fitur' (butuh pick kategori).
@@ -105,6 +106,7 @@ export default function CreateRequestScreen() {
     setTglReq(r.tanggal_request ?? todayISO());
     setDeadline(r.deadline ?? '');
     setKeterangan(r.keterangan ?? '');
+    setUrl(r.url ?? '');
     setTipe(r.tipe ?? 'baru');
     setKategoriId(r.kategori_error_id ?? null);
 
@@ -262,6 +264,7 @@ export default function CreateRequestScreen() {
         tanggal_request:   tanggalRequest,
         deadline:          deadline || '',
         keterangan:        keterangan.trim(),
+        url:               url.trim() || null,
         tipe,
         kategori_error_id: tipe === 'terkait_fitur' ? kategoriId : null,
         gambar:              newGambar.length  > 0 ? newGambar  : undefined,
@@ -275,6 +278,7 @@ export default function CreateRequestScreen() {
         tanggal_request:   tanggalRequest,
         deadline:          deadline || undefined,
         keterangan:        keterangan.trim(),
+        url:               url.trim() || undefined,
         tipe,
         kategori_error_id: tipe === 'terkait_fitur' ? kategoriId : undefined,
         gambar:  newGambar.length  > 0 ? newGambar  : undefined,
@@ -366,6 +370,19 @@ export default function CreateRequestScreen() {
             multiline
             numberOfLines={6}
             textAlignVertical="top"
+          />
+
+          <Text style={styles.label}>URL <Text style={styles.optional}>(opsional)</Text></Text>
+          <TextInput
+            style={styles.input}
+            value={url}
+            onChangeText={setUrl}
+            placeholder="https://app.klien.com/halaman-request"
+            placeholderTextColor="#6b7280"
+            keyboardType="url"
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={500}
           />
 
           {/* Lampiran gambar */}
@@ -713,6 +730,7 @@ const styles = StyleSheet.create({
     marginTop: 12, marginBottom: 6, letterSpacing: 0.5,
   },
   req: { color: '#ef4444' },
+  optional: { color: '#6b7280', fontSize: 12, fontWeight: '400' },
   input: {
     backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff',
     paddingHorizontal: 14, paddingVertical: 11, borderRadius: 10,

@@ -18,6 +18,7 @@ export type ClientRequest = {
   tanggal_request: string | null;
   deadline: string | null;
   keterangan: string;
+  url: string | null;
   tipe: RequestTipe;
   tipe_label: string;
   kategori_error_id: number | null;
@@ -87,6 +88,7 @@ export type CreateRequestPayload = {
   tanggal_request: string;
   deadline?: string;
   keterangan: string;
+  url?: string | null;
   tipe: RequestTipe;
   kategori_error_id?: number | null;
   gambar?:  FileAsset[];
@@ -151,6 +153,7 @@ export const requestApi = {
     formData.append('tipe',            payload.tipe);
     if (payload.klien_id != null)         formData.append('klien_id', String(payload.klien_id));
     if (payload.deadline)                 formData.append('deadline', payload.deadline);
+    if (payload.url)                      formData.append('url', payload.url);
     if (payload.tipe === 'terkait_fitur' && payload.kategori_error_id != null) {
       formData.append('kategori_error_id', String(payload.kategori_error_id));
     }
@@ -178,6 +181,7 @@ export const requestApi = {
     if (payload.kategori_error_id !== undefined) {
       formData.append('kategori_error_id', payload.kategori_error_id != null ? String(payload.kategori_error_id) : '');
     }
+    if (payload.url !== undefined)              formData.append('url', payload.url ?? '');
 
     payload.gambar?.forEach((f, i)              => formData.append(`gambar[${i}]`,  f as any));
     payload.dokumen?.forEach((f, i)             => formData.append(`dokumen[${i}]`, f as any));

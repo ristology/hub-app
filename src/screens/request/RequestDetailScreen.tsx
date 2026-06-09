@@ -290,6 +290,16 @@ export default function RequestDetailScreen() {
           <Text style={styles.sectionLabel}>KETERANGAN</Text>
           <LinkText text={r.keterangan} style={styles.keterangan} />
 
+          {/* URL */}
+          {r.url ? (
+            <>
+              <Text style={styles.sectionLabel}>URL TERKAIT</Text>
+              <View style={styles.infoBox}>
+                <LinkText text={r.url} style={styles.keterangan} />
+              </View>
+            </>
+          ) : null}
+
           {/* Tanggal & deadline */}
           <Text style={styles.sectionLabel}>JADWAL</Text>
           <View style={styles.infoBox}>

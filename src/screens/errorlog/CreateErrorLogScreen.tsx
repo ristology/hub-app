@@ -8,17 +8,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 
-import { errorLogApi } from '../../api/errorLog';
+import { errorLogApi, type FileAsset } from '../../api/errorLog';
 import { useToast } from '../../components/Toast';
 import PickerSheet, { type PickerOption } from '../../components/PickerSheet';
 import SaveButton from '../../components/SaveButton';
 import { pickAndCompressVideo, type PickedVideo, formatDuration } from '../../utils/videoPicker';
 import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
 
-const MAX_PHOTOS = 6;
-type NewFoto      = { uri: string; name: string; type: string };
-type ExistingFoto = { id: number; url: string; markedForRemoval: boolean };
+const MAX_PHOTOS  = 6;
+const MAX_DOKUMEN = 5;
+const MAX_DOKUMEN_BYTES = 20 * 1024 * 1024;
+type NewFoto         = { uri: string; name: string; type: string };
+type ExistingFoto    = { id: number; url: string; markedForRemoval: boolean };
+type ExistingDokumen = { id: number; nama: string; url: string; ukuran: number; markedForRemoval: boolean };
 type SharedFile = {
   fileName?: string | null;
   mimeType?: string | null;
@@ -72,6 +76,8 @@ export default function CreateErrorLogScreen() {
   const [password, setPassword]     = useState('');
   const [newFotos, setNewFotos]     = useState<NewFoto[]>([]);
   const [existingFotos, setExistingFotos] = useState<ExistingFoto[]>([]);
+  const [newDokumen, setNewDokumen] = useState<FileAsset[]>([]);
+  const [existingDokumen, setExistingDokumen] = useState<ExistingDokumen[]>([]);
   const [klienOpen, setKlienOpen]         = useState(false);
   const [kategoriOpen, setKategoriOpen]   = useState(false);
   const [initialized, setInitialized]     = useState(false);
@@ -140,6 +146,9 @@ export default function CreateErrorLogScreen() {
     const urls = log.foto_urls ?? [];
     const ids  = log.foto_ids  ?? [];
     setExistingFotos(urls.map((u, i) => ({ id: ids[i] ?? 0, url: u, markedForRemoval: false })));
+    setExistingDokumen((log.dokumen ?? []).map((d) => ({
+      id: d.id, nama: d.nama, url: d.url, ukuran: d.ukuran, markedForRemoval: false,
+    })));
     setExistingVideoUrl(log.video_url);
     setExistingVideoThumbnailUrl(log.video_thumbnail_url);
     setExistingVideoDuration(log.video_duration_sec);
@@ -148,6 +157,8 @@ export default function CreateErrorLogScreen() {
 
   const activeExisting = existingFotos.filter((p) => !p.markedForRemoval).length;
   const totalPhotos    = activeExisting + newFotos.length;
+  const activeExistingDok = existingDokumen.filter((d) => !d.markedForRemoval).length;
+  const totalDokumen      = activeExistingDok + newDokumen.length;
 
   const createMutation = useMutation({
     mutationFn: () => errorLogApi.create({
@@ -158,6 +169,7 @@ export default function CreateErrorLogScreen() {
       username: username || undefined,
       password: password || undefined,
       fotos:    newFotos,
+      dokumen:  newDokumen.length > 0 ? newDokumen : undefined,
       video:              newVideo?.video,
       video_thumbnail:    newVideo?.thumbnail,
       video_duration_sec: newVideo?.video.durationSec,
@@ -181,6 +193,8 @@ export default function CreateErrorLogScreen() {
       password:          password || null,
       fotos:             newFotos.length > 0 ? newFotos : undefined,
       remove_photo_ids:  existingFotos.filter((p) => p.markedForRemoval).map((p) => p.id),
+      dokumen:           newDokumen.length > 0 ? newDokumen : undefined,
+      remove_dokumen_ids: existingDokumen.filter((d) => d.markedForRemoval).map((d) => d.id),
       video:              newVideo?.video,
       video_thumbnail:    newVideo?.thumbnail,
       video_duration_sec: newVideo?.video.durationSec,
@@ -244,6 +258,45 @@ export default function CreateErrorLogScreen() {
   };
 
   const removeNewFoto = (index: number) => setNewFotos((prev) => prev.filter((_, i) => i !== index));
+
+  const pickDokumen = async () => {
+    if (totalDokumen >= MAX_DOKUMEN) {
+      Alert.alert('Maksimal', `Maksimal ${MAX_DOKUMEN} dokumen.`); return;
+    }
+    const result = await DocumentPicker.getDocumentAsync({
+      multiple: true,
+      copyToCacheDirectory: true,
+      type: [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      ],
+    });
+    if (result.canceled) return;
+    const remaining = MAX_DOKUMEN - totalDokumen;
+    const accepted: FileAsset[] = [];
+    for (const a of result.assets.slice(0, remaining)) {
+      if (a.size && a.size > MAX_DOKUMEN_BYTES) {
+        Alert.alert('Terlalu besar', `"${a.name}" melebihi 20 MB, dilewati.`);
+        continue;
+      }
+      accepted.push({
+        uri:  a.uri,
+        name: a.name ?? `dokumen-${Date.now()}`,
+        type: a.mimeType ?? 'application/octet-stream',
+      });
+    }
+    if (accepted.length) setNewDokumen((prev) => [...prev, ...accepted]);
+  };
+
+  const removeNewDokumen = (index: number) => setNewDokumen((prev) => prev.filter((_, i) => i !== index));
+  const toggleExistingDokumenRemoval = (id: number) => {
+    setExistingDokumen((prev) => prev.map((d) => d.id === id ? { ...d, markedForRemoval: !d.markedForRemoval } : d));
+  };
 
   // Video — max 1 per laporan error
   const pickVideoFromGallery = async () => {
@@ -384,6 +437,56 @@ export default function CreateErrorLogScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+          </Field>
+
+          {/* Dokumen — existing (tandai hapus) + new */}
+          <Field label={`Lampiran Dokumen (opsional, ${totalDokumen}/${MAX_DOKUMEN})`}>
+            {existingDokumen.map((d) => (
+              <TouchableOpacity
+                key={`ex-dok-${d.id}`}
+                onPress={() => toggleExistingDokumenRemoval(d.id)}
+                style={[styles.dokumenRow, d.markedForRemoval && { opacity: 0.4 }]}
+              >
+                <Ionicons name="document-text-outline" size={18} color="#22d3ee" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.dokumenName, d.markedForRemoval && { textDecorationLine: 'line-through' }]} numberOfLines={1}>
+                    {d.nama}
+                  </Text>
+                  <Text style={styles.dokumenSize}>{(d.ukuran / 1024 / 1024).toFixed(2)} MB</Text>
+                </View>
+                <Ionicons
+                  name={d.markedForRemoval ? 'add-circle' : 'close-circle'}
+                  size={20}
+                  color={d.markedForRemoval ? '#22c55e' : '#ef4444'}
+                />
+              </TouchableOpacity>
+            ))}
+            {newDokumen.map((d, idx) => (
+              <View key={`new-dok-${idx}`} style={styles.dokumenRow}>
+                <Ionicons name="document-text-outline" size={18} color="#22d3ee" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.dokumenName} numberOfLines={1}>{d.name}</Text>
+                  <Text style={styles.dokumenSize}>Baru</Text>
+                </View>
+                <TouchableOpacity onPress={() => removeNewDokumen(idx)} hitSlop={8}>
+                  <Ionicons name="close-circle" size={20} color="#ef4444" />
+                </TouchableOpacity>
+              </View>
+            ))}
+            {existingDokumen.some((d) => d.markedForRemoval) && (
+              <Text style={styles.removeHint}>Tap ikon hijau untuk batalkan penghapusan</Text>
+            )}
+            <TouchableOpacity
+              onPress={pickDokumen}
+              style={[styles.mediaBtn, { alignSelf: 'flex-start', marginTop: 4 }]}
+              disabled={totalDokumen >= MAX_DOKUMEN}
+            >
+              <Ionicons name="document-attach-outline" size={20} color={totalDokumen >= MAX_DOKUMEN ? '#6b7280' : '#22d3ee'} />
+              <Text style={[styles.mediaText, { color: totalDokumen >= MAX_DOKUMEN ? '#6b7280' : '#22d3ee' }]}>
+                Pilih Dokumen
+              </Text>
+            </TouchableOpacity>
+            <Text style={[styles.removeHint, { marginTop: 6 }]}>PDF, Word, Excel, PowerPoint — maks. 20 MB/file</Text>
           </Field>
 
           {/* Video preview */}
@@ -536,6 +639,14 @@ const styles = StyleSheet.create({
   fotoMarked: { opacity: 0.35 },
   fotoRemove: { position: 'absolute', top: -6, right: -6, backgroundColor: '#0d1421', borderRadius: 11 },
   removeHint: { color: '#8a94a6', fontSize: 11, fontStyle: 'italic', marginBottom: 8 },
+  dokumenRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 8, paddingHorizontal: 10,
+    backgroundColor: 'rgba(34,211,238,0.08)',
+    borderRadius: 8, marginBottom: 6,
+  },
+  dokumenName: { color: '#fff', fontSize: 13, fontWeight: '500' },
+  dokumenSize: { color: '#8a94a6', fontSize: 11, marginTop: 1 },
   mediaRow:   { flexDirection: 'row', gap: 16, paddingTop: 4 },
   mediaBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
   videoPreviewWrap: {

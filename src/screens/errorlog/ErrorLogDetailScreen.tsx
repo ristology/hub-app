@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, ScrollView, Image, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Platform, Keyboard, Alert,
+  ActivityIndicator, Platform, Keyboard, Alert, Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToast } from '../../components/Toast';
@@ -309,6 +309,29 @@ export default function ErrorLogDetailScreen() {
                 {log.url && <InfoRow icon="link-outline" label="URL" value={log.url} />}
                 {log.username && <InfoRow icon="person-outline" label="Username" value={log.username} />}
                 {log.password && <InfoRow icon="key-outline" label="Password" value={log.password} />}
+              </View>
+            </>
+          )}
+
+          {/* Lampiran Dokumen */}
+          {log.dokumen && log.dokumen.length > 0 && (
+            <>
+              <Text style={styles.sectionLabel}>LAMPIRAN DOKUMEN</Text>
+              <View style={{ gap: 6, marginBottom: 12 }}>
+                {log.dokumen.map((d) => (
+                  <TouchableOpacity
+                    key={d.id}
+                    onPress={() => Linking.openURL(d.url).catch(() => Alert.alert('Error', 'Gagal buka dokumen.'))}
+                    style={dokStyles.row}
+                  >
+                    <Ionicons name="document-text-outline" size={18} color="#22d3ee" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={dokStyles.name} numberOfLines={1}>{d.nama}</Text>
+                      <Text style={dokStyles.size}>{(d.ukuran / 1024 / 1024).toFixed(2)} MB</Text>
+                    </View>
+                    <Ionicons name="download-outline" size={18} color="#22d3ee" />
+                  </TouchableOpacity>
+                ))}
               </View>
             </>
           )}
@@ -631,6 +654,17 @@ const komStyles = StyleSheet.create({
   avatarText: { color: '#fff', fontWeight: '700' },
   nama:    { color: '#fff', fontWeight: '600', fontSize: 13 },
   text:    { color: '#c5cdd9', fontSize: 13, marginTop: 2, lineHeight: 18 },
+});
+
+const dokStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 10, paddingHorizontal: 12,
+    backgroundColor: 'rgba(34,211,238,0.08)',
+    borderRadius: 8,
+  },
+  name: { color: '#fff', fontSize: 13, fontWeight: '500' },
+  size: { color: '#8a94a6', fontSize: 11, marginTop: 1 },
 });
 
 const styles = StyleSheet.create({

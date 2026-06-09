@@ -28,6 +28,7 @@ export type ErrorLog = {
   handler?: { id: number; nama_lengkap: string; foto: string | null } | null;
   foto_urls?: string[];
   foto_ids?: number[];
+  dokumen?: { id: number; nama: string; url: string; ukuran: number }[];
   video_url: string | null;
   video_thumbnail_url: string | null;
   video_duration_sec: number | null;
@@ -57,6 +58,8 @@ export type KategoriError = { id: number; nama: string };
 export type KlienOption   = { id: number; nama: string };
 export type HandlerOption = { id: number; nama: string };
 
+export type FileAsset = { uri: string; name: string; type: string };
+
 export type CreateErrorLogPayload = {
   klien_id?: number;
   url?: string;
@@ -64,9 +67,10 @@ export type CreateErrorLogPayload = {
   password?: string;
   keterangan: string;
   kategori_error_id: number;
-  fotos?: { uri: string; name: string; type: string }[];
-  video?:              { uri: string; name: string; type: string };
-  video_thumbnail?:    { uri: string; name: string; type: string };
+  fotos?: FileAsset[];
+  dokumen?: FileAsset[];
+  video?:              FileAsset;
+  video_thumbnail?:    FileAsset;
   video_duration_sec?: number;
 };
 
@@ -77,10 +81,12 @@ export type UpdateErrorLogPayload = {
   password?: string | null;
   keterangan?: string;
   kategori_error_id?: number;
-  fotos?: { uri: string; name: string; type: string }[];
+  fotos?: FileAsset[];
   remove_photo_ids?: number[];
-  video?:              { uri: string; name: string; type: string };
-  video_thumbnail?:    { uri: string; name: string; type: string };
+  dokumen?: FileAsset[];
+  remove_dokumen_ids?: number[];
+  video?:              FileAsset;
+  video_thumbnail?:    FileAsset;
   video_duration_sec?: number;
   remove_video?:       boolean;
 };
@@ -143,6 +149,9 @@ export const errorLogApi = {
     payload.fotos?.forEach((foto, i) => {
       formData.append(`fotos[${i}]`, foto as any);
     });
+    payload.dokumen?.forEach((dok, i) => {
+      formData.append(`dokumen[${i}]`, dok as any);
+    });
 
     if (payload.video) {
       formData.append('video', payload.video as any);
@@ -173,6 +182,12 @@ export const errorLogApi = {
     });
     payload.remove_photo_ids?.forEach((pid, i) => {
       formData.append(`remove_photo_ids[${i}]`, String(pid));
+    });
+    payload.dokumen?.forEach((dok, i) => {
+      formData.append(`dokumen[${i}]`, dok as any);
+    });
+    payload.remove_dokumen_ids?.forEach((did, i) => {
+      formData.append(`remove_dokumen_ids[${i}]`, String(did));
     });
 
     if (payload.video) {
