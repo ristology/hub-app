@@ -1,75 +1,91 @@
 import React from 'react';
-import { Text, type TextStyle, type StyleProp } from 'react-native';
+import { Linking, Text, type TextStyle, type StyleProp } from 'react-native';
 
 type Props = {
   text: string;
   style?: StyleProp<TextStyle>;
   numberOfLines?: number;
   mentionColor?: string;
+  linkColor?: string;
 };
 
 /**
- * Render text dengan highlight @mention.
+ * Render text dengan highlight @mention + URL autolink (tappable).
  *
- * Mendukung 2 format mention:
+ * Mention:
  * 1. Underscore (mobile picker): `@Budi_Santoso` → tampil `@Budi Santoso` (semua hijau)
- * 2. Spasi (typed di web): `@Budi Santoso` → tampil `@Budi Santoso` (semua hijau)
+ * 2. Spasi (typed di web):       `@Budi Santoso` → tampil `@Budi Santoso` (semua hijau)
  *
- * Heuristik untuk format spasi: setelah `@` + kata pertama, lanjutkan menggabungkan
- * kata berikutnya selama kata itu **diawali huruf kapital** (pattern nama Indonesia
- * yang konvensional, mis. `Budi Santoso`, `Anggun Sri Wahyuni`).
- *
- * Berhenti saat hit kata lowercase, punctuation berat, atau end of line — karena
- * itu menandakan akhir nama dan mulai kalimat berikutnya.
+ * URL: http(s):// atau www. — di-tap buka via Linking. Trailing punctuation
+ * (.,;:!?)]}) di-trim supaya kalimat tetap natural.
  */
-export default function MentionText({ text, style, numberOfLines, mentionColor = '#22c55e' }: Props) {
+
+type Part =
+  | { kind: 'text';    text: string }
+  | { kind: 'mention'; text: string }
+  | { kind: 'link';    text: string; href: string };
+
+const MENTION_SRC = '@[\\p{L}\\p{N}_]+(?:\\s+\\p{Lu}[\\p{L}\\p{N}_]*)*';
+const URL_SRC     = '(?:https?:\\/\\/|www\\.)[^\\s<>"\']+';
+
+function buildParts(text: string): Part[] {
+  const re = new RegExp(`(${URL_SRC})|(${MENTION_SRC})`, 'giu');
+  const parts: Part[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push({ kind: 'text', text: text.slice(last, m.index) });
+
+    if (m[1]) {
+      let raw = m[1];
+      const trailMatch = raw.match(/[.,;:!?)\]}>]+$/);
+      let trail = '';
+      if (trailMatch) { trail = trailMatch[0]; raw = raw.slice(0, -trail.length); }
+      const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+      parts.push({ kind: 'link', text: raw, href });
+      if (trail) parts.push({ kind: 'text', text: trail });
+    } else if (m[2]) {
+      parts.push({ kind: 'mention', text: m[2] });
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push({ kind: 'text', text: text.slice(last) });
+  return parts;
+}
+
+export default function MentionText({
+  text, style, numberOfLines,
+  mentionColor = '#22c55e',
+  linkColor    = '#3b82f6',
+}: Props) {
   if (!text) return null;
 
-  // Regex match:
-  //  - @ + word chars (boleh include underscore + huruf/angka)
-  //  - diikuti optional grup: spasi + Word kapital + chars
-  //  - bisa berulang (multi-word names)
-  //
-  //  Contoh match:
-  //   - @Budi_Santoso
-  //   - @Budi Santoso
-  //   - @Anggun Sri Wahyuni Putri
-  //   - @Henriyansah
-  //
-  //  Yang TIDAK ikut match:
-  //   - @Budi santoso  → cuma "@Budi" (santoso lowercase, dianggap kalimat lanjutan)
-  //   - @Budi, halo    → cuma "@Budi" (koma break)
-  const mentionPattern = /@[\p{L}\p{N}_]+(?:\s+\p{Lu}[\p{L}\p{N}_]*)*/gu;
-
-  // Split: gunakan capturing group supaya part yang match dan tidak match keduanya disertakan
-  const parts: { text: string; isMention: boolean }[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = mentionPattern.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push({ text: text.slice(lastIndex, match.index), isMention: false });
-    }
-    parts.push({ text: match[0], isMention: true });
-    lastIndex = match.index + match[0].length;
-  }
-  if (lastIndex < text.length) {
-    parts.push({ text: text.slice(lastIndex), isMention: false });
-  }
+  const parts = buildParts(text);
 
   return (
     <Text style={style} numberOfLines={numberOfLines}>
-      {parts.map((part, i) => {
-        if (part.isMention) {
-          // Replace underscore dgn spasi untuk display friendly (`@Budi_Santoso` → `@Budi Santoso`)
-          const display = part.text.replace(/_/g, ' ');
+      {parts.map((p, i) => {
+        if (p.kind === 'mention') {
+          const display = p.text.replace(/_/g, ' ');
           return (
             <Text key={i} style={{ color: mentionColor, fontWeight: '600' }}>
               {display}
             </Text>
           );
         }
-        return <Text key={i}>{part.text}</Text>;
+        if (p.kind === 'link') {
+          return (
+            <Text
+              key={i}
+              style={{ color: linkColor, textDecorationLine: 'underline' }}
+              onPress={() => Linking.openURL(p.href).catch(() => {})}
+            >
+              {p.text}
+            </Text>
+          );
+        }
+        return <Text key={i}>{p.text}</Text>;
       })}
     </Text>
   );
