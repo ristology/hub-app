@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '../../store/auth';
 import ProfileSheet from '../../components/ProfileSheet';
+import OtaUpdateBanner from '../../components/OtaUpdateBanner';
 import { tugasApi }       from '../../api/tugas';
 import { prospekApi }     from '../../api/prospek';
 import { errorLogApi }    from '../../api/errorLog';
@@ -89,6 +90,9 @@ export default function HomeScreen() {
             </View>
           )}
         </TouchableOpacity>
+
+        {/* Banner update OTA — auto muncul saat update tersedia & belum dismissed */}
+        <OtaUpdateBanner />
 
         {/* Hari Ini */}
         <Text style={styles.sectionLabel}>HARI INI</Text>

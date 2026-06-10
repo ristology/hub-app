@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '../../store/auth';
 import { requestApi } from '../../api/clientRequest';
+import { useOtaUpdate } from '../../store/otaUpdate';
 
 type MenuItem = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -37,6 +38,7 @@ export default function MenuScreen() {
   const navigation = useNavigation<any>();
   const { user, logout } = useAuth();
   const visibleMenu = MENU_ITEMS.filter((m) => !m.visibleFor || m.visibleFor(user));
+  const updateAvailable = useOtaUpdate((s) => s.available);
 
   // Request unread badge — share query key dgn HomeScreen ('home-request')
   // supaya re-render konsisten saat user buka detail (mark-read).
@@ -102,6 +104,28 @@ export default function MenuScreen() {
           {visibleMenu.map(renderMenu)}
         </View>
 
+        {/* Pembaruan Aplikasi — full-width row dengan red dot bila ada update */}
+        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>SISTEM</Text>
+        <TouchableOpacity
+          style={styles.systemRow}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('Update')}
+        >
+          <View style={[styles.iconWrap, { backgroundColor: 'rgba(245,158,11,0.18)' }]}>
+            <Ionicons name="cloud-download-outline" size={22} color="#f59e0b" />
+            {updateAvailable && <View style={styles.dotBadge} />}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.systemRowTitle}>Pembaruan Aplikasi</Text>
+            <Text style={styles.systemRowSub}>
+              {updateAvailable
+                ? 'Versi baru tersedia — tap untuk pasang'
+                : 'Cek versi terbaru aplikasi'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#6b7280" />
+        </TouchableOpacity>
+
         {/* Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
           <Ionicons name="log-out-outline" size={20} color="#ef4444" />
@@ -155,6 +179,21 @@ const styles = StyleSheet.create({
   menuBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
   menuLabel: { color: '#fff', fontSize: 12, fontWeight: '500', textAlign: 'center' },
   menuSoon: { color: '#6b7280', fontSize: 9, fontStyle: 'italic' },
+
+  systemRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12, padding: 12,
+  },
+  systemRowTitle: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  systemRowSub:   { color: '#9ca3af', fontSize: 11, marginTop: 2 },
+  dotBadge: {
+    position: 'absolute', top: -2, right: -2,
+    width: 12, height: 12, borderRadius: 6,
+    backgroundColor: '#ef4444',
+    borderWidth: 2, borderColor: '#0d1421',
+  },
 
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

@@ -16,9 +16,11 @@ import DokumenStack    from './DokumenStack';
 import InvoiceStack    from './InvoiceStack';
 import HomeScreen      from '../screens/home/HomeScreen';
 import AktivitasScreen from '../screens/aktivitas/AktivitasScreen';
+import UpdateScreen    from '../screens/menu/UpdateScreen';
 import { notifApi } from '../api/notif';
 import AnimatedTabBar from './AnimatedTabBar';
 import { useTabBarStyle } from './useTabBarStyle';
+import { useOtaUpdate } from '../hooks/useOtaUpdate';
 
 type TabIconName = keyof typeof Ionicons.glyphMap;
 
@@ -55,6 +57,11 @@ function badge(n?: number): number | string | undefined {
 
 export default function BottomTabNavigator() {
   const tabBarStyle = useTabBarStyle();
+
+  // OTA update auto-check (on mount + AppState foreground). Hook ini di-call
+  // di sini supaya jalan sekali per session login & state global (Zustand)
+  // bisa dibaca oleh banner Home, drawer item, dan UpdateScreen.
+  useOtaUpdate();
 
   // Polling notif count tiap 20 detik. Akan di-invalidate manual saat user
   // buka detail screen (mark-read) supaya badge update real-time.
@@ -194,6 +201,11 @@ export default function BottomTabNavigator() {
             ? { display: 'none' }
             : tabBarStyle,
         })}
+      />
+      <Tab.Screen
+        name="Update"
+        component={UpdateScreen}
+        options={hiddenTabRoute}
       />
     </Tab.Navigator>
   );

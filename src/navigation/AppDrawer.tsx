@@ -9,6 +9,7 @@ import { useAppDrawer } from '../context/AppDrawerContext';
 import { useAuth } from '../store/auth';
 import { navigationRef } from '../utils/deepLink';
 import { notifApi } from '../api/notif';
+import { useOtaUpdate } from '../store/otaUpdate';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -46,6 +47,7 @@ export default function AppDrawer() {
     refetchInterval: 20000,
   });
   const requestUnread = notif?.request ?? 0;
+  const otaAvailable  = useOtaUpdate((s) => s.available);
 
   // Animasi: panel selalu di-mount, hanya digeser via translateX
   const slideX    = useRef(new Animated.Value(-PANEL_WIDTH)).current;
@@ -154,6 +156,7 @@ export default function AppDrawer() {
   if (showInvoice) {
     items.push({ key: 'invoice', label: 'Invoice', icon: 'receipt-outline', route: 'Invoice' });
   }
+  items.push({ key: 'update', label: 'Update', icon: 'cloud-download-outline', route: 'Update' });
 
   const goTo = (route: string) => {
     animateClose();
@@ -195,6 +198,7 @@ export default function AppDrawer() {
         <View style={styles.panelCard}>
           {items.map((item) => {
             const count = item.key === 'request' ? requestUnread : 0;
+            const showDot = item.key === 'update' && otaAvailable;
             return (
               <TouchableOpacity
                 key={item.key}
@@ -209,6 +213,7 @@ export default function AppDrawer() {
                       <Text style={styles.itemBadgeText}>{count > 99 ? '99+' : count}</Text>
                     </View>
                   )}
+                  {showDot && <View style={styles.itemDot} />}
                 </View>
                 <Text style={styles.itemLabel} numberOfLines={1}>{item.label}</Text>
               </TouchableOpacity>
@@ -293,6 +298,14 @@ const styles = StyleSheet.create({
   },
   itemBadgeText: {
     color: '#fff', fontSize: 9, fontWeight: '700',
+  },
+  // Dot kecil (no number) — utk update notifier
+  itemDot: {
+    position: 'absolute',
+    top: -4, right: -4,
+    width: 10, height: 10, borderRadius: 5,
+    backgroundColor: '#ef4444',
+    borderWidth: 1.5, borderColor: '#141e32',
   },
 
   // Fin/handle pada edge kiri
