@@ -32,6 +32,10 @@ export type ChatMessage = {
   dokumen_size: number | null;
   dokumen_mime: string | null;
   dihapus_at: string | null;
+  /** Set saat user edit pesan. Null = belum pernah diedit. */
+  edited_at:  string | null;
+  /** True kalau msg ini masih dalam window 15 menit dan bukan media — backend gate. */
+  can_edit?:  boolean;
   created_at: string;
   user: {
     id: number;
@@ -157,6 +161,16 @@ export const chatApi = {
   /** Soft-delete pesan (hanya pengirim) */
   deleteMessage: async (roomId: number, messageId: number): Promise<void> => {
     await apiClient.delete(`/chat/rooms/${roomId}/messages/${messageId}`);
+  },
+
+  /** Edit pesan teks (hanya milik sendiri, dalam window 15 menit). Backend gate. */
+  editMessage: async (
+    roomId: number,
+    messageId: number,
+    pesan: string,
+  ): Promise<{ message: ChatMessage }> => {
+    const { data } = await apiClient.patch(`/chat/rooms/${roomId}/messages/${messageId}`, { pesan });
+    return data;
   },
 
   /** Teruskan pesan (gambar/video) ke satu atau beberapa room lain */

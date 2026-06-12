@@ -179,6 +179,8 @@ export default function ChatRoomScreen() {
   const [pickingDoc, setPickingDoc] = useState(false);
   const [caption, setCaption] = useState('');
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  /** State edit mode — null = mode kirim normal. Set saat user pilih "Edit pesan". */
+  const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [sharedConsumed, setSharedConsumed] = useState(false);
 
   // Share-to-HUB: auto-set pendingImage dari shared file + pre-fill caption.
@@ -311,8 +313,25 @@ export default function ChatRoomScreen() {
     },
   });
 
+  const editMutation = useMutation({
+    mutationFn: ({ messageId, pesan }: { messageId: number; pesan: string }) =>
+      chatApi.editMessage(roomId, messageId, pesan),
+    onSuccess: () => {
+      setEditingMessage(null);
+      setPesan('');
+      queryClient.invalidateQueries({ queryKey: ['chat-room', roomId] });
+    },
+    onError: (e: any) => {
+      Alert.alert('Gagal edit', e.response?.data?.message ?? 'Periksa koneksi & coba lagi.');
+    },
+  });
+
   const handleSend = () => {
     if (!pesan.trim()) return;
+    if (editingMessage) {
+      editMutation.mutate({ messageId: editingMessage.id, pesan: pesan.trim() });
+      return;
+    }
     sendMutation.mutate({ pesan: pesan.trim(), replyToId: replyTo?.id });
   };
 
@@ -611,6 +630,18 @@ export default function ChatRoomScreen() {
       // Text-only: tetap bisa teruskan
       items.push({ label: 'Teruskan', icon: 'arrow-redo-outline', onPress: () => setForwardMsgId(msg.id) });
     }
+    // Edit — hanya pesan teks milik sendiri dalam window 15 menit (backend gate via can_edit).
+    if (isMine && msg.tipe === 'text' && msg.can_edit) {
+      items.push({
+        label: 'Edit pesan',
+        icon: 'pencil-outline',
+        onPress: () => {
+          setEditingMessage(msg);
+          setPesan(msg.pesan ?? '');
+          setReplyTo(null);
+        },
+      });
+    }
     if (isMine) {
       items.push({
         label: 'Hapus pesan',
@@ -740,6 +771,9 @@ export default function ChatRoomScreen() {
             </>
           )}
           <View style={styles.bubbleMeta}>
+            {item.edited_at && !isHapus && (
+              <Text style={styles.bubbleEdited}>diedit</Text>
+            )}
             <Text style={styles.bubbleTime}>{formatTime(item.created_at)}</Text>
             {isMine && !isHapus && (
               getMessageStatus(item) === 'read' ? (
@@ -846,7 +880,7 @@ export default function ChatRoomScreen() {
         )}
 
         {/* Reply banner */}
-        {replyTo && (
+        {replyTo && !editingMessage && (
           <View style={styles.replyBanner}>
             <View style={styles.replyBannerBar} />
             <View style={{ flex: 1 }}>
@@ -865,22 +899,47 @@ export default function ChatRoomScreen() {
           </View>
         )}
 
+        {/* Edit banner — tampil saat user pilih "Edit pesan" dari long-press */}
+        {editingMessage && (
+          <View style={[styles.replyBanner, { borderLeftColor: '#f59e0b' }]}>
+            <View style={[styles.replyBannerBar, { backgroundColor: '#f59e0b' }]} />
+            <Ionicons name="pencil" size={14} color="#f59e0b" style={{ marginRight: 6 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.replyBannerLabel, { color: '#fbbf24' }]}>Mengedit pesan</Text>
+              <Text style={styles.replyBannerText} numberOfLines={1}>
+                {editingMessage.pesan}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => { setEditingMessage(null); setPesan(''); }}
+              hitSlop={8}
+            >
+              <Ionicons name="close" size={18} color="#8a94a6" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Input bar */}
         <View style={styles.inputBar}>
           {/* Satu tombol "+" — tap → Alert pilih gambar/video/dokumen.
-              Lebih hemat ruang horizontal dibanding 3 ikon terpisah. */}
+              Lebih hemat ruang horizontal dibanding 3 ikon terpisah.
+              Disabled saat edit mode — edit hanya teks. */}
           <TouchableOpacity
             onPress={openAttachMenu}
             style={styles.iconBtn}
-            disabled={sendMutation.isPending || videoCompressing || pickingDoc}
+            disabled={sendMutation.isPending || videoCompressing || pickingDoc || !!editingMessage}
           >
             {(videoCompressing || pickingDoc)
               ? <ActivityIndicator size="small" color="#3b82f6" />
-              : <Ionicons name="add-circle" size={28} color="#3b82f6" />}
+              : <Ionicons name="add-circle" size={28} color={editingMessage ? '#374151' : '#3b82f6'} />}
           </TouchableOpacity>
           <TextInput
             style={styles.input}
-            placeholder={replyTo ? `Balas ${replyTo.user.nama}...` : 'Tulis pesan...'}
+            placeholder={
+              editingMessage ? 'Edit pesan...'
+              : replyTo ? `Balas ${replyTo.user.nama}...`
+              : 'Tulis pesan...'
+            }
             placeholderTextColor="#6b7280"
             value={pesan}
             onChangeText={setPesan}
@@ -888,13 +947,13 @@ export default function ChatRoomScreen() {
             maxLength={5000}
           />
           <TouchableOpacity
-            style={styles.sendBtn}
+            style={[styles.sendBtn, editingMessage && { backgroundColor: '#f59e0b' }]}
             onPress={handleSend}
-            disabled={!pesan.trim() || sendMutation.isPending}
+            disabled={!pesan.trim() || sendMutation.isPending || editMutation.isPending}
           >
-            {sendMutation.isPending
+            {(sendMutation.isPending || editMutation.isPending)
               ? <ActivityIndicator size="small" color="#fff" />
-              : <Ionicons name="send" size={18} color="#fff" />
+              : <Ionicons name={editingMessage ? 'checkmark' : 'send'} size={18} color="#fff" />
             }
           </TouchableOpacity>
         </View>
@@ -1133,6 +1192,7 @@ const styles = StyleSheet.create({
   bubbleDeleted:     { opacity: 0.6 },
   bubbleDeletedText: { color: '#8a94a6', fontSize: 13, fontStyle: 'italic' },
   bubbleTime:   { color: 'rgba(255,255,255,0.5)', fontSize: 10 },
+  bubbleEdited: { color: 'rgba(255,255,255,0.5)', fontSize: 10, fontStyle: 'italic', marginRight: 4 },
   bubbleMeta:   {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     marginTop: 3, alignSelf: 'flex-end',
