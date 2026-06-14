@@ -17,7 +17,7 @@ import ImageViewerModal  from '../../components/ImageViewerModal';
 import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
 import { useKomentarHighlight } from '../../hooks/useKomentarHighlight';
-import { formatRelativeWaktu, formatTanggalLengkap } from '../../utils/formatDate';
+import { formatRelativeWaktu, formatTanggalLengkap, formatRelativeDanTanggal } from '../../utils/formatDate';
 
 type RouteParams = { id: number; highlightKomentarId?: number | null };
 
@@ -351,6 +351,7 @@ function CommentItem({ k, bindRef, highlighted, onReply }: {
       <View style={{ flex: 1, marginLeft: 10 }}>
         <Text style={styles.commentName}>{k.nama}</Text>
         <MentionText text={k.komentar} style={styles.commentText} />
+        <Text style={styles.commentTime}>{formatRelativeDanTanggal(k.created_at)}</Text>
         {onReply && (
           <TouchableOpacity onPress={onReply} hitSlop={6}>
             <Text style={styles.replyBtn}>Balas</Text>
@@ -414,6 +415,7 @@ const styles = StyleSheet.create({
   commentAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#1c2333' },
   commentName:   { color: '#fff', fontWeight: '600', fontSize: 13 },
   commentText:   { color: '#c5cdd9', fontSize: 13, marginTop: 2, lineHeight: 18 },
+  commentTime:   { color: '#6b7280', fontSize: 10, marginTop: 4 },
   empty:         { color: '#8a94a6', fontSize: 13, fontStyle: 'italic' },
   inputBar:      {
     flexDirection: 'row', padding: 10, gap: 8,

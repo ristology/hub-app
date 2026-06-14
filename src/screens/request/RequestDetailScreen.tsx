@@ -21,6 +21,7 @@ import KaryawanPicker from '../../components/KaryawanPicker';
 import MentionText    from '../../components/MentionText';
 import LinkText       from '../../components/LinkText';
 import { useKomentarHighlight } from '../../hooks/useKomentarHighlight';
+import { formatRelativeDanTanggal } from '../../utils/formatDate';
 import type { KaryawanRingkas } from '../../api/feed';
 
 type RouteParams = { id: number; highlightKomentarId?: number | null };
@@ -582,6 +583,7 @@ function KomentarItem({ k, bindRef, highlighted, onReply }: {
       <View style={{ flex: 1, marginLeft: 10 }}>
         <Text style={komStyles.nama}>{k.nama}</Text>
         <MentionText text={k.komentar} style={komStyles.text} />
+        <Text style={komStyles.time}>{formatRelativeDanTanggal(k.created_at)}</Text>
         {onReply && (
           <TouchableOpacity onPress={onReply} hitSlop={6}>
             <Text style={komStyles.replyBtn}>Balas</Text>
@@ -967,6 +969,7 @@ const komStyles = StyleSheet.create({
   avatarText: { color: '#fff', fontWeight: '700' },
   nama:    { color: '#fff', fontWeight: '600', fontSize: 13 },
   text:    { color: '#c5cdd9', fontSize: 13, marginTop: 2, lineHeight: 18 },
+  time:    { color: '#6b7280', fontSize: 10, marginTop: 4 },
 });
 
 const modalStyles = StyleSheet.create({
