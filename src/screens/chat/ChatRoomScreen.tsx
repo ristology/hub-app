@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, Image,
-  StyleSheet, ActivityIndicator, Platform, Keyboard, Alert, Modal,
+  StyleSheet, ActivityIndicator, Platform, Keyboard, Alert, Modal, Animated,
+  type ViewToken,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -183,6 +184,54 @@ export default function ChatRoomScreen() {
   /** State edit mode — null = mode kirim normal. Set saat user pilih "Edit pesan". */
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [sharedConsumed, setSharedConsumed] = useState(false);
+
+  // ── Sticky date header (a la WhatsApp) ─────────────────────────────
+  // Label tanggal grup pesan yg sedang di top viewport (visual). Tampil
+  // float di atas FlatList saat user scroll, auto-fade keluar 2 detik
+  // setelah scroll berhenti.
+  const [stickyLabel, setStickyLabel]   = useState<string>('');
+  const stickyOpacity                   = useRef(new Animated.Value(0)).current;
+  const stickyHideTimerRef              = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showStickyDate = useCallback(() => {
+    if (stickyHideTimerRef.current) clearTimeout(stickyHideTimerRef.current);
+    Animated.timing(stickyOpacity, {
+      toValue: 1, duration: 150, useNativeDriver: true,
+    }).start();
+  }, [stickyOpacity]);
+
+  const scheduleStickyHide = useCallback(() => {
+    if (stickyHideTimerRef.current) clearTimeout(stickyHideTimerRef.current);
+    stickyHideTimerRef.current = setTimeout(() => {
+      Animated.timing(stickyOpacity, {
+        toValue: 0, duration: 250, useNativeDriver: true,
+      }).start();
+    }, 2000);
+  }, [stickyOpacity]);
+
+  useEffect(() => () => {
+    if (stickyHideTimerRef.current) clearTimeout(stickyHideTimerRef.current);
+  }, []);
+
+  // viewabilityConfig HARUS stable supaya FlatList tidak warn "Changing
+  // viewabilityConfig on the fly is not supported".
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 10 }).current;
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    if (!viewableItems.length) return;
+    // FlatList inverted: index lebih tinggi = visually di atas. Topmost visible
+    // = item dgn index terbesar di antara viewable.
+    const topmost = viewableItems.reduce((max, v) =>
+      (v.index ?? -1) > (max.index ?? -1) ? v : max
+    );
+    const item = topmost.item as ChatListItem;
+    let label = '';
+    if (item.type === 'separator') {
+      label = item.label;
+    } else {
+      label = formatChatDateSeparator(item.message.created_at);
+    }
+    if (label) setStickyLabel(label);
+  }).current;
 
   // Share-to-HUB: auto-set pendingImage dari shared file + pre-fill caption.
   // Guard sharedConsumed supaya tidak duplikat di re-render. CLEAR params
@@ -889,22 +938,40 @@ export default function ChatRoomScreen() {
             <ActivityIndicator size="large" color="#3b82f6" />
           </View>
         ) : (
-          <FlatList
-            ref={flatListRef}
-            data={listItems}
-            keyExtractor={(item) => item.key}
-            renderItem={renderListItem}
-            inverted // pesan terbaru di bawah, scroll ke atas untuk lihat history
-            contentContainerStyle={styles.list}
-            onScrollToIndexFailed={(info) => {
-              // Pesan target belum rendered (FlatList virtualization). Retry dgn delay.
-              setTimeout(() => {
-                flatListRef.current?.scrollToIndex({
-                  index: info.index, animated: true, viewPosition: 0.5,
-                });
-              }, 300);
-            }}
-          />
+          <View style={{ flex: 1 }}>
+            <FlatList
+              ref={flatListRef}
+              data={listItems}
+              keyExtractor={(item) => item.key}
+              renderItem={renderListItem}
+              inverted // pesan terbaru di bawah, scroll ke atas untuk lihat history
+              contentContainerStyle={styles.list}
+              viewabilityConfig={viewabilityConfig}
+              onViewableItemsChanged={onViewableItemsChanged}
+              onScrollBeginDrag={showStickyDate}
+              onScroll={showStickyDate}
+              scrollEventThrottle={16}
+              onScrollEndDrag={scheduleStickyHide}
+              onMomentumScrollEnd={scheduleStickyHide}
+              onScrollToIndexFailed={(info) => {
+                // Pesan target belum rendered (FlatList virtualization). Retry dgn delay.
+                setTimeout(() => {
+                  flatListRef.current?.scrollToIndex({
+                    index: info.index, animated: true, viewPosition: 0.5,
+                  });
+                }, 300);
+              }}
+            />
+            {/* Sticky date header — floating di atas FlatList, fade in/out */}
+            {!!stickyLabel && (
+              <Animated.View
+                pointerEvents="none"
+                style={[styles.stickyDate, { opacity: stickyOpacity }]}
+              >
+                <Text style={styles.stickyDateText}>{stickyLabel}</Text>
+              </Animated.View>
+            )}
+          </View>
         )}
 
         {/* Pesan gagal kirim — ghost bubble dgn icon error + retry/remove */}
@@ -1198,6 +1265,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   dateSeparatorText: { color: '#cbd5e1', fontSize: 11, fontWeight: '600' },
+  // Sticky pill di top FlatList — tampil saat scroll, fade out 2s setelah idle
+  stickyDate: {
+    position: 'absolute',
+    top: 8, alignSelf: 'center', left: 0, right: 0,
+    alignItems: 'center',
+  },
+  stickyDateText: {
+    color: '#cbd5e1', fontSize: 11, fontWeight: '700',
+    backgroundColor: 'rgba(20, 30, 50, 0.92)',
+    paddingHorizontal: 14, paddingVertical: 6,
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4,
+    elevation: 3,
+  },
   bubbleRowLeft:  { justifyContent: 'flex-start' },
   bubbleRowRight: { justifyContent: 'flex-end' },
   bubbleAvatar:   { width: 28, height: 28, borderRadius: 14, backgroundColor: '#1c2333' },
