@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, Image,
   StyleSheet, ActivityIndicator, Platform, Keyboard, Alert, Modal,
@@ -23,6 +23,7 @@ import VideoThumbnail   from '../../components/VideoThumbnail';
 import { pickAndCompressVideo, type PickedVideo, formatDuration } from '../../utils/videoPicker';
 import { openDocumentExternal, openDocumentSmart } from '../../utils/openDocument';
 import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
+import { localDateKey, formatChatDateSeparator } from '../../utils/formatDate';
 import ForwardSheet from './ForwardSheet';
 import LinkText from '../../components/LinkText';
 
@@ -477,6 +478,38 @@ export default function ChatRoomScreen() {
 
   const messages = (data?.messages.data ?? []) as ChatMessage[];
 
+  /**
+   * Inject date separator items di antara grup tanggal. messages dari API
+   * urut newest→oldest. FlatList `inverted` → index lebih tinggi tampil di
+   * atas visual. Separator untuk tanggal X harus tampil di atas pesan paling
+   * tua tanggal X (= di atas messages[i] saat messages[i+1] beda tanggal,
+   * atau saat i = last index = oldest message overall).
+   *
+   * Bentuk item gabungan didiskriminasi via `type` — renderItem branch.
+   */
+  type ChatListItem =
+    | { type: 'message';   key: string; message: ChatMessage }
+    | { type: 'separator'; key: string; label: string };
+
+  const listItems = useMemo<ChatListItem[]>(() => {
+    const items: ChatListItem[] = [];
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i];
+      items.push({ type: 'message', key: `m-${m.id}`, message: m });
+      const next = messages[i + 1];
+      const currKey = localDateKey(m.created_at);
+      const nextKey = next ? localDateKey(next.created_at) : null;
+      if (currKey !== nextKey) {
+        items.push({
+          type: 'separator',
+          key:  `sep-${currKey}`,
+          label: formatChatDateSeparator(m.created_at),
+        });
+      }
+    }
+    return items;
+  }, [messages]);
+
   // Tipe room + nama/foto dinamis dari query — supaya kalau admin edit nama
   // grup di GroupInfoScreen, top bar ikut update saat balik (bukan stale
   // route param). Fallback ke route param sebelum query selesai.
@@ -499,7 +532,9 @@ export default function ChatRoomScreen() {
   // Inverted FlatList scrollToIndex sering flaky di iOS — wrapper sini retry
   // dgn ascending delay supaya pasti landing setelah virtualization render item.
   const scrollToMessage = (messageId: number) => {
-    const idx = messages.findIndex((m) => m.id === messageId);
+    // findIndex di listItems (bukan messages) karena FlatList data = listItems
+    // sekarang punya separator items juga.
+    const idx = listItems.findIndex((it) => it.type === 'message' && it.message.id === messageId);
     if (idx < 0) {
       // Pesan tidak ada di list yg sudah di-load (mungkin di history lebih lama)
       return;
@@ -659,6 +694,17 @@ export default function ChatRoomScreen() {
       });
     }
     return items;
+  };
+
+  const renderListItem = ({ item }: { item: ChatListItem }) => {
+    if (item.type === 'separator') {
+      return (
+        <View style={styles.dateSeparator}>
+          <Text style={styles.dateSeparatorText}>{item.label}</Text>
+        </View>
+      );
+    }
+    return renderMessage({ item: item.message });
   };
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
@@ -845,9 +891,9 @@ export default function ChatRoomScreen() {
         ) : (
           <FlatList
             ref={flatListRef}
-            data={messages}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={renderMessage}
+            data={listItems}
+            keyExtractor={(item) => item.key}
+            renderItem={renderListItem}
             inverted // pesan terbaru di bawah, scroll ke atas untuk lihat history
             contentContainerStyle={styles.list}
             onScrollToIndexFailed={(info) => {
@@ -1144,6 +1190,14 @@ const styles = StyleSheet.create({
   list: { padding: 12, gap: 8 },
 
   bubbleRow:      { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 6 },
+  dateSeparator:  {
+    alignSelf: 'center',
+    marginVertical: 12,
+    paddingHorizontal: 12, paddingVertical: 5,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+  },
+  dateSeparatorText: { color: '#cbd5e1', fontSize: 11, fontWeight: '600' },
   bubbleRowLeft:  { justifyContent: 'flex-start' },
   bubbleRowRight: { justifyContent: 'flex-end' },
   bubbleAvatar:   { width: 28, height: 28, borderRadius: 14, backgroundColor: '#1c2333' },

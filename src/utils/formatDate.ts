@@ -60,3 +60,40 @@ export function formatRelativeWaktu(iso: string): string {
 export function formatRelativeDanTanggal(iso: string): string {
   return `${formatRelativeWaktu(iso)} · ${formatTanggalJam(iso)}`;
 }
+
+/**
+ * Key tanggal lokal (YYYY-MM-DD) — pakai zona waktu device. Dipakai untuk
+ * group chat message by date supaya separator stabil di local timezone
+ * (kalau pakai toISOString.slice akan UTC → bisa miss-grup di sekitar tengah malam).
+ */
+export function localDateKey(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * Label separator tanggal di chat (mirip WhatsApp):
+ * - Hari ini  → "Hari Ini"
+ * - Kemarin   → "Kemarin"
+ * - Tahun sama → "8 Juni"
+ * - Tahun beda → "8 Juni 2025"
+ */
+export function formatChatDateSeparator(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+
+  const now      = new Date();
+  const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const dKey     = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  if (dKey === todayKey) return 'Hari Ini';
+
+  const yesterday    = new Date(now); yesterday.setDate(now.getDate() - 1);
+  const yesterdayKey = `${yesterday.getFullYear()}-${pad(yesterday.getMonth() + 1)}-${pad(yesterday.getDate())}`;
+  if (dKey === yesterdayKey) return 'Kemarin';
+
+  if (d.getFullYear() === now.getFullYear()) {
+    return `${d.getDate()} ${BULAN_PANJANG[d.getMonth()]}`;
+  }
+  return `${d.getDate()} ${BULAN_PANJANG[d.getMonth()]} ${d.getFullYear()}`;
+}
