@@ -12,6 +12,11 @@
  * - fetchUpdateAsync TIDAK expose progress real (per Expo SDK 50+ doc).
  * - Kita set `downloading=true` saat mulai, lalu `reloadAsync()` saat selesai
  *   — app restart sendiri dengan bundle baru.
+ *
+ * Source "Apa yang baru":
+ * - EAS `--message` SDK 54 tidak propagate ke manifest yg di-deliver ke app.
+ *   Solusi: backend serve `latest-update.json` di public root, mobile fetch
+ *   saat detect update available. Lihat [[project_ota_in_app_installer]].
  */
 import { useEffect, useRef, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
@@ -19,6 +24,27 @@ import * as Updates from 'expo-updates';
 import { useOtaUpdate as useOtaStore } from '../store/otaUpdate';
 
 const MIN_CHECK_INTERVAL_MS = 60 * 1000; // 60s minimum antara 2 auto-check
+
+/** Endpoint static — backend serve JSON ini dari public/app/latest-update.json.
+ *  Format: { runtime_version, released_at (ISO), message }. */
+const CHANGELOG_URL = 'https://hub.afresto.id/app/latest-update.json';
+
+async function fetchChangelog(): Promise<{ message: string | null; releasedAt: string | null }> {
+  try {
+    const res = await fetch(CHANGELOG_URL, {
+      cache: 'no-store' as RequestCache,
+      headers: { 'Accept': 'application/json' },
+    });
+    if (!res.ok) return { message: null, releasedAt: null };
+    const data = await res.json();
+    return {
+      message:    typeof data?.message    === 'string' ? data.message    : null,
+      releasedAt: typeof data?.released_at === 'string' ? data.released_at : null,
+    };
+  } catch {
+    return { message: null, releasedAt: null };
+  }
+}
 
 export function useOtaUpdate() {
   const store           = useOtaStore();
@@ -37,12 +63,24 @@ export function useOtaUpdate() {
       const result = await Updates.checkForUpdateAsync();
       if (result.isAvailable) {
         const manifest: any = result.manifest;
+
+        // Fetch changelog dari backend — paralel ke set state supaya tidak
+        // block banner availability. Kalau gagal, fallback ke text generic
+        // di UpdateScreen.
+        const changelog = await fetchChangelog();
+
         await store.setAvailable({
           manifestId:  manifest?.id ?? String(now),
-          message:     manifest?.extra?.expoClient?.extra?.eas?.message
+          // Prioritas: backend changelog → manifest field (multi-path) → null.
+          message:     changelog.message
+                       ?? manifest?.metadata?.updateMessage
+                       ?? manifest?.extra?.eas?.message
+                       ?? manifest?.extra?.expoClient?.extra?.eas?.message
                        ?? manifest?.message
                        ?? null,
-          publishedAt: manifest?.createdAt ?? null,
+          publishedAt: changelog.releasedAt
+                       ?? manifest?.createdAt
+                       ?? null,
         });
       } else {
         store.clearAvailable();
