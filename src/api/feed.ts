@@ -50,6 +50,9 @@ export type FeedKomentar = {
   nama: string;
   foto: string;
   created_at: string;
+  edited_at?: string | null;
+  can_edit?: boolean;
+  can_delete?: boolean;
   replies?: FeedKomentar[];
 };
 
@@ -195,6 +198,12 @@ export const feedApi = {
       komentar,
       parent_id: parentId,
     });
+    return data;
+  },
+
+  /** Edit komentar (window 15 menit, hanya komentator sendiri — backend gate). */
+  editComment: async (feedId: number, komentarId: number, komentar: string): Promise<{ data: FeedKomentar }> => {
+    const { data } = await apiClient.patch(`/feed/${feedId}/komentar/${komentarId}`, { komentar });
     return data;
   },
 };

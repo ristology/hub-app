@@ -39,6 +39,9 @@ export type ProspekKomentar = {
   nama: string;
   foto: string | null;
   created_at: string;
+  edited_at?: string | null;
+  can_edit?: boolean;
+  can_delete?: boolean;
   replies?: ProspekKomentar[];
 };
 
@@ -133,6 +136,12 @@ export const prospekApi = {
       komentar,
       parent_id: parentId,
     });
+    return data;
+  },
+
+  /** Edit komentar (window 15 menit, hanya komentator sendiri — backend gate). */
+  editComment: async (prospekId: number, komentarId: number, komentar: string): Promise<{ data: ProspekKomentar }> => {
+    const { data } = await apiClient.patch(`/prospek/${prospekId}/komentar/${komentarId}`, { komentar });
     return data;
   },
 };

@@ -44,6 +44,9 @@ export type ErrorLogKomentar = {
   nama: string;
   foto: string | null;
   created_at: string;
+  edited_at?: string | null;
+  can_edit?: boolean;
+  can_delete?: boolean;
   replies?: ErrorLogKomentar[];
 };
 
@@ -234,6 +237,12 @@ export const errorLogApi = {
       komentar,
       parent_id: parentId,
     });
+    return data;
+  },
+
+  /** Edit komentar (window 15 menit, hanya komentator sendiri — backend gate). */
+  editComment: async (errorLogId: number, komentarId: number, komentar: string): Promise<{ data: ErrorLogKomentar }> => {
+    const { data } = await apiClient.patch(`/error-log/${errorLogId}/komentar/${komentarId}`, { komentar });
     return data;
   },
 };

@@ -53,6 +53,9 @@ export type RequestKomentar = {
   nama: string;
   foto: string | null;
   created_at: string;
+  edited_at?: string | null;
+  can_edit?: boolean;
+  can_delete?: boolean;
   replies?: RequestKomentar[];
 };
 
@@ -238,6 +241,12 @@ export const requestApi = {
       komentar,
       parent_id: parentId,
     });
+    return data;
+  },
+
+  /** Edit komentar (window 15 menit, hanya komentator sendiri — backend gate). */
+  editComment: async (requestId: number, komentarId: number, komentar: string): Promise<{ data: RequestKomentar }> => {
+    const { data } = await apiClient.patch(`/request/${requestId}/komentar/${komentarId}`, { komentar });
     return data;
   },
 };

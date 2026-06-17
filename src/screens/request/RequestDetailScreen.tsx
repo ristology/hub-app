@@ -156,6 +156,33 @@ export default function RequestDetailScreen() {
     onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal kirim komentar.'),
   });
 
+  // ── Edit komentar (long-press own, window 15 menit) ──
+  const [editingKom, setEditingKom] = useState<{ id: number; original: string } | null>(null);
+  const editCommentMut = useMutation({
+    mutationFn: ({ kid, text }: { kid: number; text: string }) => requestApi.editComment(id, kid, text),
+    onSuccess: () => { setEditingKom(null); setKomentar(''); invalidate(); },
+    onError: (e: any) => Alert.alert('Gagal edit', e.response?.data?.message ?? 'Periksa koneksi.'),
+  });
+
+  const handleLongPressKom = (k: RequestKomentar) => {
+    if (!k.can_edit) return;
+    Alert.alert('Komentar', '', [
+      { text: 'Edit', onPress: () => {
+          setEditingKom({ id: k.id, original: k.komentar });
+          setKomentar(k.komentar);
+          setReplyTo(null);
+        } },
+      { text: 'Batal', style: 'cancel' },
+    ]);
+  };
+
+  const handleSubmitKomentar = () => {
+    const t = komentar.trim();
+    if (!t) return;
+    if (editingKom) editCommentMut.mutate({ kid: editingKom.id, text: t });
+    else commentMut.mutate(t);
+  };
+
   const destroyMut = useMutation({
     mutationFn: () => requestApi.destroy(id),
     onSuccess: () => {
@@ -425,6 +452,7 @@ export default function RequestDetailScreen() {
                   bindRef={registerKomRef(k.id)}
                   highlighted={highlightedId === k.id}
                   onReply={() => setReplyTo({ id: k.id, nama: k.nama })}
+                  onLongPress={() => handleLongPressKom(k)}
                 />
                 {k.replies && k.replies.length > 0 && k.replies.map((r) => (
                   <View key={r.id} style={komStyles.replyWrap}>
@@ -433,6 +461,7 @@ export default function RequestDetailScreen() {
                       bindRef={registerKomRef(r.id)}
                       highlighted={highlightedId === r.id}
                       onReply={() => setReplyTo({ id: k.id, nama: r.nama })}
+                      onLongPress={() => handleLongPressKom(r)}
                     />
                   </View>
                 ))}
@@ -444,11 +473,22 @@ export default function RequestDetailScreen() {
         </ScrollView>
 
         {/* Reply banner */}
-        {replyTo && (
+        {replyTo && !editingKom && (
           <View style={styles.replyBanner}>
             <Ionicons name="arrow-undo" size={14} color="#3b82f6" />
             <Text style={styles.replyBannerText}>Membalas <Text style={{ fontWeight: '700' }}>{replyTo.nama}</Text></Text>
             <TouchableOpacity onPress={() => setReplyTo(null)} hitSlop={8}>
+              <Ionicons name="close" size={16} color="#8a94a6" />
+            </TouchableOpacity>
+          </View>
+        )}
+        {editingKom && (
+          <View style={[styles.replyBanner, { borderLeftColor: '#f59e0b' }]}>
+            <Ionicons name="pencil" size={14} color="#f59e0b" />
+            <Text style={[styles.replyBannerText, { color: '#fbbf24' }]} numberOfLines={1}>
+              Mengedit komentar: {editingKom.original.slice(0, 60)}
+            </Text>
+            <TouchableOpacity onPress={() => { setEditingKom(null); setKomentar(''); }} hitSlop={8}>
               <Ionicons name="close" size={16} color="#8a94a6" />
             </TouchableOpacity>
           </View>
@@ -461,20 +501,24 @@ export default function RequestDetailScreen() {
           </TouchableOpacity>
           <TextInput
             style={styles.input}
-            placeholder={replyTo ? `Balas ${replyTo.nama}...` : 'Tulis komentar... ketik @ untuk mention'}
+            placeholder={
+              editingKom ? 'Edit komentar...'
+              : replyTo ? `Balas ${replyTo.nama}...`
+              : 'Tulis komentar... ketik @ untuk mention'
+            }
             placeholderTextColor="#6b7280"
             value={komentar}
             onChangeText={handleKomentarChange}
             multiline
           />
           <TouchableOpacity
-            style={styles.sendBtn}
-            onPress={() => komentar.trim() && commentMut.mutate(komentar.trim())}
-            disabled={!komentar.trim() || commentMut.isPending}
+            style={[styles.sendBtn, editingKom && { backgroundColor: '#f59e0b' }]}
+            onPress={handleSubmitKomentar}
+            disabled={!komentar.trim() || commentMut.isPending || editCommentMut.isPending}
           >
-            {commentMut.isPending
+            {(commentMut.isPending || editCommentMut.isPending)
               ? <ActivityIndicator size="small" color="#fff" />
-              : <Ionicons name="send" size={18} color="#fff" />
+              : <Ionicons name={editingKom ? 'checkmark' : 'send'} size={18} color="#fff" />
             }
           </TouchableOpacity>
         </View>
@@ -565,14 +609,22 @@ function UserRow({ label, nama, foto }: { label: string; nama: string; foto: str
   );
 }
 
-function KomentarItem({ k, bindRef, highlighted, onReply }: {
+function KomentarItem({ k, bindRef, highlighted, onReply, onLongPress }: {
   k: RequestKomentar;
   bindRef?: (v: View | null) => void;
   highlighted?: boolean;
   onReply?: () => void;
+  onLongPress?: () => void;
 }) {
   return (
-    <View ref={bindRef} style={[komStyles.item, highlighted && komStyles.itemHighlight]}>
+    <TouchableOpacity
+      ref={bindRef as any}
+      activeOpacity={onLongPress ? 0.7 : 1}
+      onLongPress={onLongPress}
+      delayLongPress={350}
+      disabled={!onLongPress}
+      style={[komStyles.item, highlighted && komStyles.itemHighlight]}
+    >
       {k.foto ? (
         <Image source={{ uri: k.foto }} style={komStyles.avatar} />
       ) : (
@@ -583,14 +635,17 @@ function KomentarItem({ k, bindRef, highlighted, onReply }: {
       <View style={{ flex: 1, marginLeft: 10 }}>
         <Text style={komStyles.nama}>{k.nama}</Text>
         <MentionText text={k.komentar} style={komStyles.text} />
-        <Text style={komStyles.time}>{formatRelativeDanTanggal(k.created_at)}</Text>
+        <Text style={komStyles.time}>
+          {formatRelativeDanTanggal(k.created_at)}
+          {k.edited_at ? <Text style={{ fontStyle: 'italic' }}> · diedit</Text> : null}
+        </Text>
         {onReply && (
           <TouchableOpacity onPress={onReply} hitSlop={6}>
             <Text style={komStyles.replyBtn}>Balas</Text>
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
