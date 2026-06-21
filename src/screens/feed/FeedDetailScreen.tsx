@@ -12,6 +12,8 @@ import { notifApi, NotifModel } from '../../api/notif';
 import { useAuth } from '../../store/auth';
 import PhotoCarousel     from '../../components/PhotoCarousel';
 import VideoThumbnail    from '../../components/VideoThumbnail';
+import DriveLinkCard     from '../../components/DriveLinkCard';
+import { extractDriveFileIds } from '../../utils/driveEmbed';
 import VideoPlayerModal  from '../../components/VideoPlayerModal';
 import ImageViewerModal  from '../../components/ImageViewerModal';
 import KaryawanPicker from '../../components/KaryawanPicker';
@@ -238,6 +240,11 @@ export default function FeedDetailScreen() {
           </View>
 
           {feed.konten ? <MentionText text={feed.konten} style={styles.konten} /> : null}
+
+          {/* Google Drive video — auto-detect dari link di konten, tap → buka Drive */}
+          {extractDriveFileIds(feed.konten).map((fid) => (
+            <DriveLinkCard key={fid} fileId={fid} />
+          ))}
 
           {feed.foto_urls?.length > 0 && (
             <View style={{ marginBottom: 12 }}>

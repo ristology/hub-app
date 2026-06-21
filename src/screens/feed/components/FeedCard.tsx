@@ -6,7 +6,9 @@ import PhotoCarousel     from '../../../components/PhotoCarousel';
 import VideoThumbnail    from '../../../components/VideoThumbnail';
 import ImageViewerModal  from '../../../components/ImageViewerModal';
 import MentionText       from '../../../components/MentionText';
+import DriveLinkCard     from '../../../components/DriveLinkCard';
 import { formatRelativeWaktu, formatTanggalJam } from '../../../utils/formatDate';
+import { extractDriveFileIds } from '../../../utils/driveEmbed';
 
 type Props = {
   feed: Feed;
@@ -67,6 +69,11 @@ export default function FeedCard({ feed, onPress, onLike }: Props) {
           <MentionText text={feed.konten} style={styles.konten} numberOfLines={4} />
         </TouchableOpacity>
       ) : null}
+
+      {/* Google Drive video — auto-detect dari link di konten, tap → buka Drive */}
+      {extractDriveFileIds(feed.konten).map((fid) => (
+        <DriveLinkCard key={fid} fileId={fid} />
+      ))}
 
       {/* Foto carousel — tap foto buka lightbox fullscreen, swipe untuk pindah halaman */}
       {feed.foto_urls?.length > 0 && (
