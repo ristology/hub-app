@@ -24,6 +24,13 @@ export type Feed = {
   sudah_like: boolean;
   can_edit: boolean;
   has_unread_notif: boolean;
+  /** Karyawan yang di-tag di post (chip biru di bawah header). */
+  tags?: {
+    id: number;
+    user_id: number | null;
+    nama_lengkap: string;
+    foto: string | null;
+  }[];
   komentar?: FeedKomentar[];
   created_at: string;
 };

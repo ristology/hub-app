@@ -63,6 +63,27 @@ export default function FeedCard({ feed, onPress, onLike }: Props) {
         </TouchableOpacity>
       </View>
 
+      {/* Tag karyawan — chip biru, parity dgn web "HUB bersama [...]" */}
+      {feed.tags && feed.tags.length > 0 && (
+        <View style={styles.tagRow}>
+          <Text style={styles.tagLabel}>bersama</Text>
+          {feed.tags.map((t) => (
+            <View key={t.id} style={styles.tagChip}>
+              {t.foto ? (
+                <Image source={{ uri: t.foto }} style={styles.tagAvatar} />
+              ) : (
+                <View style={[styles.tagAvatar, styles.tagAvatarFallback]}>
+                  <Text style={styles.tagAvatarText}>
+                    {t.nama_lengkap?.charAt(0).toUpperCase() ?? '?'}
+                  </Text>
+                </View>
+              )}
+              <Text style={styles.tagText} numberOfLines={1}>{t.nama_lengkap}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
       {/* Konten — tap masuk detail */}
       {feed.konten ? (
         <TouchableOpacity activeOpacity={0.7} onPress={onPress}>
@@ -165,6 +186,24 @@ const styles = StyleSheet.create({
   meta:      { color: '#8a94a6', fontSize: 11, marginTop: 1 },
   waktu:     { color: '#6b7280', fontSize: 10, marginTop: 2 },
   konten:    { color: '#d6dce6', fontSize: 14, lineHeight: 20, marginBottom: 10 },
+
+  // Tag karyawan chip row — parity dgn web "HUB bersama [chip][chip]"
+  tagRow: {
+    flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center',
+    gap: 6, marginBottom: 10,
+  },
+  tagLabel: { color: '#8a94a6', fontSize: 12, marginRight: 2 },
+  tagChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingLeft: 3, paddingRight: 10, paddingVertical: 3,
+    backgroundColor: 'rgba(59,130,246,0.14)',
+    borderRadius: 14,
+    borderWidth: 1, borderColor: 'rgba(59,130,246,0.30)',
+  },
+  tagAvatar: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#1c2333' },
+  tagAvatarFallback: { alignItems: 'center', justifyContent: 'center' },
+  tagAvatarText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  tagText: { color: '#93c5fd', fontSize: 12, fontWeight: '600', maxWidth: 160 },
   photoWrap: { marginBottom: 10 },
   footer:    { flexDirection: 'row', alignItems: 'center', gap: 18 },
   action:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
