@@ -709,6 +709,21 @@ export default function ChatRoomScreen() {
       items.push({ label: 'Download', icon: 'download-outline', onPress: () => handleDownloadMedia(msg) });
       items.push({ label: 'Teruskan', icon: 'arrow-redo-outline', onPress: () => setForwardMsgId(msg.id) });
     } else if (isFile) {
+      // Dokumen — tap default sudah buka via openDocumentSmart. Aksi tambahan:
+      // simpan ke device → download + share sheet (iOS "Save to Files",
+      // Android "Save / Drive / app lain"). User explicit dapat opsi save.
+      items.push({
+        label: 'Simpan dokumen',
+        icon: 'download-outline',
+        onPress: async () => {
+          if (!msg.dokumen_url) return;
+          await openDocumentExternal(
+            msg.dokumen_url,
+            msg.dokumen_nama ?? 'dokumen',
+            msg.dokumen_mime ?? undefined,
+          );
+        },
+      });
       items.push({ label: 'Teruskan', icon: 'arrow-redo-outline', onPress: () => setForwardMsgId(msg.id) });
     } else {
       // Text-only: tetap bisa teruskan

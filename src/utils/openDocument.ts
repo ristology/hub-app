@@ -37,8 +37,14 @@ export async function openDocumentSmart(
       return true;
     }
 
-    // PDF / image / text / other browser-native — buka langsung di browser
+    // PDF / image / text / other browser-native — buka langsung di browser.
+    // Android: Chrome sering gagal handle PDF via Linking (mime/intent issue) →
+    // user lapor "tidak bisa buka & tidak bisa download". Fallback ke
+    // download+share sheet, lebih reliable + user dapat opsi save.
     if (BROWSER_NATIVE_EXTS.has(ext)) {
+      if (Platform.OS === 'android' && ext === 'pdf') {
+        return await openDocumentExternal(fileUrl, filename, 'application/pdf');
+      }
       await Linking.openURL(fileUrl);
       return true;
     }
