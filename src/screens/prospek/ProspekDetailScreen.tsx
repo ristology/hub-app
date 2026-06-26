@@ -229,6 +229,29 @@ export default function ProspekDetailScreen() {
     );
   };
 
+  // ── Jadikan Klien Resmi (convert) ─────────────────────────
+  const convertMutation = useMutation({
+    mutationFn: () => prospekApi.convertToKlien(id),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['prospek', id] });
+      queryClient.invalidateQueries({ queryKey: ['prospek'] });
+      queryClient.invalidateQueries({ queryKey: ['prospek-stats'] });
+      toast.success(res.message ?? 'Prospek berhasil jadi klien resmi.');
+    },
+    onError: (e: any) => Alert.alert('Gagal', e.response?.data?.message ?? 'Gagal jadikan klien resmi.'),
+  });
+
+  const confirmConvert = () => {
+    Alert.alert(
+      'Jadikan Klien Resmi?',
+      `Klien "${data?.data.nama_klien ?? ''}" akan didaftarkan sebagai klien resmi. Lanjutkan?`,
+      [
+        { text: 'Batal' },
+        { text: 'Jadikan Klien', onPress: () => convertMutation.mutate() },
+      ],
+    );
+  };
+
   if (isLoading || !data) {
     return (
       <SafeAreaView style={styles.container}>
@@ -312,6 +335,26 @@ export default function ProspekDetailScreen() {
                 </View>
               ) : null;
             })()
+          )}
+
+          {/* Jadikan Klien Resmi — tampil hanya kalau status='kontrak' DAN user
+              adalah Creator/Admin/Direktur (backend gate via can_convert). */}
+          {p.can_convert && (
+            <TouchableOpacity
+              style={styles.convertBtn}
+              onPress={confirmConvert}
+              disabled={convertMutation.isPending}
+              activeOpacity={0.85}
+            >
+              {convertMutation.isPending ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="trophy" size={18} color="#fff" />
+                  <Text style={styles.convertBtnText}>Jadikan Klien Resmi</Text>
+                </>
+              )}
+            </TouchableOpacity>
           )}
 
           {/* Kontak */}
@@ -642,6 +685,16 @@ const styles = StyleSheet.create({
   pertemuanKet: { color: '#d6dce6', fontSize: 13, lineHeight: 19 },
   pertemuanRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   pertemuanNext: { color: '#22c55e', fontSize: 11, marginTop: 4 },
+  // "Jadikan Klien Resmi" — tombol solid hijau (parity dgn web btn-success)
+  convertBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#22c55e',
+    paddingVertical: 14, borderRadius: 12,
+    marginTop: 4, marginBottom: 16,
+    shadowColor: '#22c55e', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 3 }, shadowRadius: 6,
+    elevation: 3,
+  },
+  convertBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   addPertemuanBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: 'rgba(34,197,94,0.12)',

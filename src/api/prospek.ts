@@ -6,6 +6,8 @@ export type Prospek = {
   id: number;
   milikku: boolean;
   can_edit: boolean;
+  /** True kalau user adalah Creator/Admin/Direktur DAN status = 'kontrak'. Backend gate. */
+  can_convert?: boolean;
   has_unread_notif: boolean;
   nama_klien: string;
   alamat: string | null;
@@ -114,6 +116,16 @@ export const prospekApi = {
 
   destroy: async (id: number) => {
     const { data } = await apiClient.delete(`/prospek/${id}`);
+    return data;
+  },
+
+  /** Convert prospek → klien resmi. Hanya Creator/Admin/Direktur + status='kontrak'. Backend gate. */
+  convertToKlien: async (id: number): Promise<{
+    ok: boolean;
+    message: string;
+    klien: { id: number; kode_klien: string; nama_klien: string };
+  }> => {
+    const { data } = await apiClient.post(`/prospek/${id}/convert`);
     return data;
   },
 
