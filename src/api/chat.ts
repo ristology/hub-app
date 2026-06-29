@@ -183,6 +183,22 @@ export const chatApi = {
     await apiClient.post(`/chat/rooms/${roomId}/read`);
   },
 
+  /**
+   * Info siapa sudah baca + siapa belum baca pesan ini.
+   * Hanya bisa dipanggil utk pesan sendiri di grup. Backend gate.
+   */
+  messageReadStatus: async (
+    roomId: number,
+    messageId: number,
+  ): Promise<{
+    is_group: boolean;
+    read_by:   { user_id: number; nama: string; foto: string | null; read_at: string }[];
+    unread_by: { user_id: number; nama: string; foto: string | null }[];
+  }> => {
+    const { data } = await apiClient.get(`/chat/rooms/${roomId}/messages/${messageId}/read-status`);
+    return data;
+  },
+
   /** Total unread count semua room */
   unreadCount: async (): Promise<{ total: number }> => {
     const { data } = await apiClient.get('/chat/unread-count');

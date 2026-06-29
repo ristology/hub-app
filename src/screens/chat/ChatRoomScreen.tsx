@@ -26,6 +26,7 @@ import { openDocumentExternal, openDocumentSmart } from '../../utils/openDocumen
 import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
 import { localDateKey, formatChatDateSeparator } from '../../utils/formatDate';
 import ForwardSheet from './ForwardSheet';
+import MessageReadStatusModal from './MessageReadStatusModal';
 import LinkText from '../../components/LinkText';
 
 // Bottom sheet action menu — gantikan Alert.alert yg Android-nya stuck saat
@@ -271,6 +272,8 @@ export default function ChatRoomScreen() {
   const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);
   // id pesan yang sedang diteruskan — buka ForwardSheet kalau non-null
   const [forwardMsgId, setForwardMsgId] = useState<number | null>(null);
+  /** Pesan yang sedang dibuka modal "Info dibaca"-nya. */
+  const [readStatusMsg, setReadStatusMsg] = useState<ChatMessage | null>(null);
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [actionSheetMsg, setActionSheetMsg] = useState<ChatMessage | null>(null);
   const toast = useToast();
@@ -739,6 +742,15 @@ export default function ChatRoomScreen() {
           setPesan(msg.pesan ?? '');
           setReplyTo(null);
         },
+      });
+    }
+    // "Info dibaca" — hanya untuk pesan sendiri di grup chat. Private chat
+    // sudah punya single/double tick — tidak perlu modal.
+    if (isMine && isGroup && !msg.dihapus_at) {
+      items.push({
+        label: 'Info dibaca',
+        icon: 'eye-outline',
+        onPress: () => setReadStatusMsg(msg),
       });
     }
     if (isMine) {
@@ -1229,6 +1241,14 @@ export default function ChatRoomScreen() {
         visible={forwardMsgId !== null}
         messageId={forwardMsgId}
         onClose={() => setForwardMsgId(null)}
+      />
+
+      {/* Modal "Info dibaca" — siapa baca / belum baca pesan grup. */}
+      <MessageReadStatusModal
+        visible={readStatusMsg !== null}
+        roomId={readStatusMsg ? roomId : null}
+        messageId={readStatusMsg?.id ?? null}
+        onClose={() => setReadStatusMsg(null)}
       />
 
       {/* Bottom sheet "+" attach (Gambar/Video/Dokumen) — gantikan Alert.alert
