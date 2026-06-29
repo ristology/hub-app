@@ -324,6 +324,14 @@ export default function ChatRoomScreen() {
     chatApi.markRead(roomId).then(onMarkReadDone).catch(() => {});
   }, [roomId, refetch, clearPesanBadgeOptimistic, onMarkReadDone]));
 
+  // ── Anti double-submit lock (sync via useRef) ─────────────────
+  // mutation.isPending baru jadi true SETELAH React re-render. Kalau user
+  // tap super cepat / multi-touch, 2 onPress bisa masuk di tick yg sama
+  // SEBELUM disabled prop terupdate → 2x sendMutation.mutate() → pesan
+  // double terkirim. useRef sync di JS, lock instant tanpa nunggu render.
+  const sendLockRef = useRef(false);
+  const releaseSendLock = () => { sendLockRef.current = false; };
+
   const sendMutation = useMutation({
     mutationFn: (payload: {
       pesan?: string;
@@ -364,6 +372,7 @@ export default function ChatRoomScreen() {
       }
       Alert.alert('Gagal kirim', e.response?.data?.message ?? 'Periksa koneksi & coba lagi.');
     },
+    onSettled: releaseSendLock,
   });
 
   const editMutation = useMutation({
@@ -377,10 +386,13 @@ export default function ChatRoomScreen() {
     onError: (e: any) => {
       Alert.alert('Gagal edit', e.response?.data?.message ?? 'Periksa koneksi & coba lagi.');
     },
+    onSettled: releaseSendLock,
   });
 
   const handleSend = () => {
+    if (sendLockRef.current) return;          // sync lock — block tap kedua di tick yg sama
     if (!pesan.trim()) return;
+    sendLockRef.current = true;
     if (editingMessage) {
       editMutation.mutate({ messageId: editingMessage.id, pesan: pesan.trim() });
       return;
@@ -389,6 +401,8 @@ export default function ChatRoomScreen() {
   };
 
   const retryFailed = (f: { tempId: string; pesan: string; replyToId?: number }) => {
+    if (sendLockRef.current) return;
+    sendLockRef.current = true;
     sendMutation.mutate({ pesan: f.pesan, replyToId: f.replyToId, tempId: f.tempId });
   };
 
@@ -427,7 +441,9 @@ export default function ChatRoomScreen() {
   };
 
   const sendPendingImage = () => {
+    if (sendLockRef.current) return;
     if (!pendingImage) return;
+    sendLockRef.current = true;
     sendMutation.mutate({
       pesan: caption.trim() || undefined,
       foto: pendingImage,
@@ -457,7 +473,9 @@ export default function ChatRoomScreen() {
   };
 
   const sendPendingVideo = () => {
+    if (sendLockRef.current) return;
     if (!pendingVideo) return;
+    sendLockRef.current = true;
     sendMutation.mutate({
       pesan: caption.trim() || undefined,
       video:              pendingVideo.video,
@@ -513,6 +531,8 @@ export default function ChatRoomScreen() {
         return;
       }
 
+      if (sendLockRef.current) return;
+      sendLockRef.current = true;
       sendMutation.mutate({
         dokumen: {
           uri:  a.uri,
