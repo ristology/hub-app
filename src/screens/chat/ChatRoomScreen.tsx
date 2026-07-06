@@ -27,7 +27,8 @@ import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
 import { localDateKey, formatChatDateSeparator } from '../../utils/formatDate';
 import ForwardSheet from './ForwardSheet';
 import MessageReadStatusModal from './MessageReadStatusModal';
-import LinkText from '../../components/LinkText';
+import MentionText from '../../components/MentionText';
+import KaryawanPicker from '../../components/KaryawanPicker';
 
 // Bottom sheet action menu — gantikan Alert.alert yg Android-nya stuck saat
 // >3 button atau Modal-conflict. Backdrop tap & hardware back close otomatis
@@ -274,6 +275,57 @@ export default function ChatRoomScreen() {
   const [forwardMsgId, setForwardMsgId] = useState<number | null>(null);
   /** Pesan yang sedang dibuka modal "Info dibaca"-nya. */
   const [readStatusMsg, setReadStatusMsg] = useState<ChatMessage | null>(null);
+
+  // ── @Mention picker (WhatsApp-style) ───────────────────────────
+  // Detect char '@' terakhir di input → buka KaryawanPicker → sisip
+  // "@Nama_Underscore" di posisi @ tersebut. Pattern mirror Feed
+  // komentar (FeedDetailScreen.handleKomentarChange + insertMention).
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionAt, setMentionAt]     = useState<number | null>(null);
+
+  const handleChangePesan = (next: string) => {
+    // Deteksi @ HANYA saat user menambah karakter (append) supaya paste teks
+    // dgn @ tidak trigger picker. Char terakhir === '@' → buka picker.
+    if (next.length > pesan.length && next.charAt(next.length - 1) === '@') {
+      setMentionAt(next.length - 1);
+      setMentionOpen(true);
+    }
+    setPesan(next);
+  };
+
+  const insertMention = (k: { id: number; nama: string; jabatan?: string | null; foto?: string | null }) => {
+    if (mentionAt === null) { setMentionOpen(false); return; }
+    // Format underscore konsisten dgn Feed — "Andi Arif Rahmatullah" →
+    // "@Andi_Arif_Rahmatullah ". Regex MentionText highlight kedua format
+    // (underscore + spasi) hijau di bubble.
+    const tag = '@' + k.nama.replace(/\s+/g, '_') + ' ';
+    const before = pesan.substring(0, mentionAt);
+    const after  = pesan.substring(mentionAt + 1);
+    setPesan(before + tag + after);
+    setMentionAt(null);
+    setMentionOpen(false);
+  };
+
+  const cancelMention = () => {
+    setMentionAt(null);
+    setMentionOpen(false);
+  };
+
+  // Adapter: chatApi.searchUsers return { data: ChatUser[] } dgn field
+  // `user_id`. KaryawanPicker expect { data: KaryawanRingkas[] } dgn `id`.
+  // Map user_id → id supaya kompatibel (id hanya dipakai internal picker,
+  // yg dikirim ke insertMention cuma nama).
+  const mentionSearchFn = async (q: string) => {
+    const res = await chatApi.searchUsers(q);
+    return {
+      data: res.data.map((u) => ({
+        id:      u.user_id,
+        nama:    u.nama,
+        jabatan: u.jabatan,
+        foto:    u.foto,
+      })),
+    };
+  };
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [actionSheetMsg, setActionSheetMsg] = useState<ChatMessage | null>(null);
   const toast = useToast();
@@ -904,7 +956,7 @@ export default function ChatRoomScreen() {
                 </TouchableOpacity>
               )}
               {item.pesan && (
-                <LinkText
+                <MentionText
                   text={item.pesan}
                   style={styles.bubbleText}
                   linkColor={isMine ? '#bfdbfe' : '#7dd3fc'}
@@ -1098,11 +1150,11 @@ export default function ChatRoomScreen() {
             placeholder={
               editingMessage ? 'Edit pesan...'
               : replyTo ? `Balas ${replyTo.user.nama}...`
-              : 'Tulis pesan...'
+              : 'Tulis pesan... ketik @ untuk sebut karyawan'
             }
             placeholderTextColor="#6b7280"
             value={pesan}
-            onChangeText={setPesan}
+            onChangeText={handleChangePesan}
             multiline
             maxLength={5000}
           />
@@ -1269,6 +1321,16 @@ export default function ChatRoomScreen() {
         roomId={readStatusMsg ? roomId : null}
         messageId={readStatusMsg?.id ?? null}
         onClose={() => setReadStatusMsg(null)}
+      />
+
+      {/* @Mention karyawan picker — muncul saat user ketik @ di input */}
+      <KaryawanPicker
+        visible={mentionOpen}
+        onClose={cancelMention}
+        mode="single"
+        onPick={insertMention}
+        title="Sebut karyawan"
+        searchFn={mentionSearchFn}
       />
 
       {/* Bottom sheet "+" attach (Gambar/Video/Dokumen) — gantikan Alert.alert
