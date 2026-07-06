@@ -13,8 +13,16 @@ type Props = {
  * Render text dengan highlight @mention + URL autolink (tappable).
  *
  * Mention:
- * 1. Underscore (mobile picker): `@Budi_Santoso` → tampil `@Budi Santoso` (semua hijau)
- * 2. Spasi (typed di web):       `@Budi Santoso` → tampil `@Budi Santoso` (semua hijau)
+ * Format `@Nama_Underscore` — dari picker (mobile + web) yg auto-replace
+ * spasi jadi underscore. Regex STOP di karakter non-word (spasi/tanda baca),
+ * cegah greedy chaining ke kata-kata setelah mention (bug: kalimat formal
+ * Indonesia dgn banyak Title Case bisa ke-highlight semua).
+ *
+ * Contoh:
+ *  - `@Rasmi_Retnaningtyas jangan lupa` → highlight `@Rasmi Retnaningtyas`, sisanya text default
+ *  - `@Andi Rahmatullah tolong cek` → hanya `@Andi` di-highlight (user harus pakai picker)
+ *
+ * Underscore di-display sebagai spasi (`@Rasmi Retnaningtyas`).
  *
  * URL: http(s):// atau www. — di-tap buka via Linking. Trailing punctuation
  * (.,;:!?)]}) di-trim supaya kalimat tetap natural.
@@ -25,7 +33,9 @@ type Part =
   | { kind: 'mention'; text: string }
   | { kind: 'link';    text: string; href: string };
 
-const MENTION_SRC = '@[\\p{L}\\p{N}_]+(?:\\s+\\p{Lu}[\\p{L}\\p{N}_]*)*';
+// STRICT: @ + word chars (letters/digits/underscore) — no space continuation.
+// Picker menjamin format underscore, user typing tanpa picker cuma dapat 1-word highlight.
+const MENTION_SRC = '@[\\p{L}\\p{N}_]+';
 const URL_SRC     = '(?:https?:\\/\\/|www\\.)[^\\s<>"\']+';
 
 function buildParts(text: string): Part[] {

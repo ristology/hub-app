@@ -232,9 +232,12 @@ export const chatApi = {
     return data;
   },
 
-  /** Search user untuk start new chat */
-  searchUsers: async (q: string = ''): Promise<{ data: ChatUser[] }> => {
-    const { data } = await apiClient.get('/chat/users/search', { params: { q } });
+  /** Search user untuk start new chat. Kalau roomId disebut, hanya return
+   *  anggota room tsb (dipakai untuk @mention picker di dalam chat room). */
+  searchUsers: async (q: string = '', roomId?: number): Promise<{ data: ChatUser[] }> => {
+    const params: Record<string, string | number> = { q };
+    if (roomId) params.room_id = roomId;
+    const { data } = await apiClient.get('/chat/users/search', { params });
     return data;
   },
 

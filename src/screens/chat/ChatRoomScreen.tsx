@@ -315,8 +315,11 @@ export default function ChatRoomScreen() {
   // `user_id`. KaryawanPicker expect { data: KaryawanRingkas[] } dgn `id`.
   // Map user_id → id supaya kompatibel (id hanya dipakai internal picker,
   // yg dikirim ke insertMention cuma nama).
+  //
+  // Pass roomId → backend filter hanya anggota room (WhatsApp-style, cegah
+  // mention non-anggota yg tidak akan bisa lihat message).
   const mentionSearchFn = async (q: string) => {
-    const res = await chatApi.searchUsers(q);
+    const res = await chatApi.searchUsers(q, roomId);
     return {
       data: res.data.map((u) => ({
         id:      u.user_id,
