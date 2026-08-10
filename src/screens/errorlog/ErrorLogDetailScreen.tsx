@@ -26,16 +26,18 @@ import type { KaryawanRingkas } from '../../api/feed';
 type RouteParams = { id: number; highlightKomentarId?: number | null };
 
 const STATUS_OPTIONS: { key: ErrorLogStatus; label: string; color: string }[] = [
-  { key: 'open',        label: 'Open',       color: '#ef4444' },
-  { key: 'in_progress', label: 'Proses',     color: '#f59e0b' },
-  { key: 'resolved',    label: 'Resolved',   color: '#22c55e' },
-  { key: 'unresolved',  label: 'Unresolved', color: '#a78bfa' },
-  { key: 'closed',      label: 'Closed',     color: '#8a94a6' },
+  { key: 'open',             label: 'Open',             color: '#ef4444' },
+  { key: 'in_progress',      label: 'Proses',           color: '#f59e0b' },
+  { key: 'ready_for_review', label: 'Ready for Review', color: '#3b82f6' },
+  { key: 'resolved',         label: 'Resolved',         color: '#22c55e' },
+  { key: 'unresolved',       label: 'Unresolved',       color: '#a78bfa' },
+  { key: 'closed',           label: 'Closed',           color: '#8a94a6' },
 ];
 
 // Status yang boleh diubah handler. closed & open (reopen) adalah hak pelapor
 // — ditangani lewat tombol "Tindakan pelapor" terpisah.
-const HANDLER_KEYS: ErrorLogStatus[] = ['in_progress', 'resolved', 'unresolved'];
+// ready_for_review = handler mark "sudah selesai, minta konfirmasi pelapor".
+const HANDLER_KEYS: ErrorLogStatus[] = ['in_progress', 'ready_for_review', 'resolved', 'unresolved'];
 
 function formatDate(s: string | null): string {
   if (!s) return '—';
@@ -227,23 +229,41 @@ export default function ErrorLogDetailScreen() {
     );
   };
 
-  // Konfirmasi aksi pelapor — tutup kasus / buka kembali laporan
+  // Konfirmasi aksi pelapor — tutup, buka kembali, atau konfirmasi review
   const confirmStatus = (status: ErrorLogStatus) => {
-    const isClose = status === 'closed';
-    Alert.alert(
-      isClose ? 'Tutup Laporan?' : 'Buka Kembali Laporan?',
-      isClose
-        ? 'Laporan error ini akan ditandai selesai (Closed).'
-        : 'Laporan akan dibuka kembali ke status Open agar dapat ditangani ulang.',
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: isClose ? 'Tutup' : 'Buka Kembali',
-          style: isClose ? 'default' : 'destructive',
-          onPress: () => statusMutation.mutate(status),
-        },
-      ],
-    );
+    const currentStatus = data?.data?.status;
+    const isReviewApprove = currentStatus === 'ready_for_review' && status === 'resolved';
+    const isReviewReject  = currentStatus === 'ready_for_review' && status === 'in_progress';
+
+    let title: string;
+    let msg: string;
+    let btnText: string;
+    let btnStyle: 'default' | 'destructive' = 'default';
+
+    if (isReviewApprove) {
+      title = 'Setujui — Sudah Selesai?';
+      msg = 'Laporan akan ditandai Resolved. Anda konfirmasi bahwa perbaikan sudah selesai.';
+      btnText = 'Ya, Setujui';
+    } else if (isReviewReject) {
+      title = 'Belum Selesai?';
+      msg = 'Laporan dikembalikan ke In Progress supaya handler bisa perbaiki. Sebaiknya isi komentar catatan yg perlu diperbaiki.';
+      btnText = 'Ya, Belum Selesai';
+      btnStyle = 'destructive';
+    } else if (status === 'closed') {
+      title = 'Tutup Laporan?';
+      msg = 'Laporan error ini akan ditandai selesai (Closed).';
+      btnText = 'Tutup';
+    } else {
+      title = 'Buka Kembali Laporan?';
+      msg = 'Laporan akan dibuka kembali ke status Open agar dapat ditangani ulang.';
+      btnText = 'Buka Kembali';
+      btnStyle = 'destructive';
+    }
+
+    Alert.alert(title, msg, [
+      { text: 'Batal', style: 'cancel' },
+      { text: btnText, style: btnStyle, onPress: () => statusMutation.mutate(status) },
+    ]);
   };
 
   if (isLoading || !data) {
@@ -429,6 +449,37 @@ export default function ErrorLogDetailScreen() {
                   Alihkan ke PIC Lain
                 </Text>
               </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Aksi pelapor — konfirmasi review saat status ready_for_review.
+              Tampilkan 2 tombol besar biar jelas: Setujui (→ resolved) atau
+              Belum Selesai (→ in_progress). */}
+          {log.can_close && log.status === 'ready_for_review' && (
+            <View style={styles.statusActionWrap}>
+              <Text style={styles.statusHint}>Handler minta konfirmasi Anda</Text>
+              <View style={{ gap: 8 }}>
+                <TouchableOpacity
+                  onPress={() => confirmStatus('resolved')}
+                  disabled={statusMutation.isPending}
+                  style={[styles.reviewBtn, { backgroundColor: 'rgba(34,197,94,0.15)', borderColor: 'rgba(34,197,94,0.45)' }]}
+                >
+                  <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+                  <Text style={[styles.reviewBtnText, { color: '#22c55e' }]}>
+                    Setujui — Sudah Selesai (Resolved)
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => confirmStatus('in_progress')}
+                  disabled={statusMutation.isPending}
+                  style={[styles.reviewBtn, { backgroundColor: 'rgba(239,68,68,0.10)', borderColor: 'rgba(239,68,68,0.40)' }]}
+                >
+                  <Ionicons name="close-circle" size={16} color="#ef4444" />
+                  <Text style={[styles.reviewBtnText, { color: '#ef4444' }]}>
+                    Belum Selesai — Butuh Perbaikan
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
@@ -768,6 +819,11 @@ const styles = StyleSheet.create({
   statusActionWrap: { marginTop: 12 },
   statusHint: { color: '#6b7280', fontSize: 11, marginBottom: 6 },
   statusActionBtn: { flexDirection: 'row', gap: 6, justifyContent: 'center' },
+  reviewBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 12, borderRadius: 10, borderWidth: 1,
+  },
+  reviewBtnText: { fontSize: 13, fontWeight: '700' },
   catatanBox: {
     backgroundColor: 'rgba(34,197,94,0.06)',
     borderWidth: 1, borderColor: 'rgba(34,197,94,0.20)',

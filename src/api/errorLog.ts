@@ -1,6 +1,6 @@
 import { apiClient } from './client';
 
-export type ErrorLogStatus = 'open' | 'in_progress' | 'resolved' | 'unresolved' | 'closed';
+export type ErrorLogStatus = 'open' | 'in_progress' | 'ready_for_review' | 'resolved' | 'unresolved' | 'closed';
 
 export type ErrorLog = {
   id: number;
@@ -51,10 +51,11 @@ export type ErrorLogKomentar = {
 };
 
 export type ErrorLogStats = {
-  open:        number;
-  in_progress: number;
-  resolved:    number;
-  closed:      number;
+  open:             number;
+  in_progress:      number;
+  ready_for_review: number;
+  resolved:         number;
+  closed:           number;
 };
 
 export type KategoriError = { id: number; nama: string };

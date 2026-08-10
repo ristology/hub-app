@@ -24,12 +24,13 @@ type ErrorLogStackParamList = {
 const BULAN_INDO = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
 const STATUS_OPTIONS: PickerOption[] = [
-  { id: null,           label: 'Semua status' },
-  { id: 'open',         label: 'Open' },
-  { id: 'in_progress',  label: 'Proses' },
-  { id: 'resolved',     label: 'Resolved' },
-  { id: 'unresolved',   label: 'Unresolved' },
-  { id: 'closed',       label: 'Closed' },
+  { id: null,                label: 'Semua status' },
+  { id: 'open',              label: 'Open' },
+  { id: 'in_progress',       label: 'Proses' },
+  { id: 'ready_for_review',  label: 'Ready for Review' },
+  { id: 'resolved',          label: 'Resolved' },
+  { id: 'unresolved',        label: 'Unresolved' },
+  { id: 'closed',            label: 'Closed' },
 ];
 
 type Filters = {
