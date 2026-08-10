@@ -75,6 +75,16 @@ export default function ProspekCard({ prospek, onPress }: Props) {
           </Text>
         </View>
       )}
+
+      {/* Pencatat / creator */}
+      {prospek.pencatat && (
+        <View style={styles.pencatatRow}>
+          <Ionicons name="create-outline" size={11} color="#8a94a6" />
+          <Text style={styles.pencatatText} numberOfLines={1}>
+            Dicatat oleh {prospek.pencatat.nama_lengkap}
+          </Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
@@ -118,4 +128,6 @@ const styles = StyleSheet.create({
   kota:      { color: '#8a94a6', fontSize: 11, marginBottom: 6 },
   followUpRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   followUpText: { fontSize: 11, fontWeight: '500' },
+  pencatatRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  pencatatText: { color: '#8a94a6', fontSize: 11, flex: 1 },
 });
