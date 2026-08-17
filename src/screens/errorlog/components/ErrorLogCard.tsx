@@ -68,7 +68,7 @@ export default function ErrorLogCard({ log, onPress }: Props) {
           </View>
         )}
 
-        {log.handler && (
+        {log.handler ? (
           <>
             <Ionicons name="arrow-forward" size={12} color="#6b7280" />
             <View style={styles.userBox}>
@@ -80,6 +80,16 @@ export default function ErrorLogCard({ log, onPress }: Props) {
                 </View>
               )}
               <Text style={styles.userText} numberOfLines={1}>{log.handler.nama_lengkap}</Text>
+            </View>
+          </>
+        ) : (
+          // Kategori multi-PIC yg belum ada yg ambil — beri sinyal jelas di list
+          // supaya PIC tahu ada error menganggur tanpa harus buka detail.
+          <>
+            <Ionicons name="arrow-forward" size={12} color="#6b7280" />
+            <View style={styles.unassignedBox}>
+              <Ionicons name="hourglass-outline" size={11} color="#fbbf24" />
+              <Text style={styles.unassignedText}>Belum diambil</Text>
             </View>
           </>
         )}
@@ -125,4 +135,10 @@ const styles = StyleSheet.create({
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarText:{ color: '#fff', fontSize: 10, fontWeight: '700' },
   userText:  { color: '#c5cdd9', fontSize: 11, flexShrink: 1 },
+  unassignedBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(251,191,36,0.12)',
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
+  },
+  unassignedText: { color: '#fbbf24', fontSize: 10, fontWeight: '600' },
 });

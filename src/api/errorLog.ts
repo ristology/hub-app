@@ -12,6 +12,9 @@ export type ErrorLog = {
   can_close: boolean;
   /** Handler/admin — boleh alihkan handler ke PIC lain (overhandle) */
   can_reassign: boolean;
+  /** PIC kategori (atau admin) — boleh ambil penanganan saat handler masih kosong.
+   *  Hanya true utk kategori multi-PIC yg belum ada yg ambil. */
+  can_claim: boolean;
   has_unread_notif: boolean;
   url: string | null;
   username: string | null;
@@ -212,6 +215,13 @@ export const errorLogApi = {
       status,
       catatan_penanganan: catatan,
     });
+    return data;
+  },
+
+  /** Ambil penanganan error yg belum punya handler (kategori multi-PIC).
+   *  Backend atomic — kalau keburu diambil PIC lain, response 409. */
+  claim: async (id: number): Promise<{ data: ErrorLog }> => {
+    const { data } = await apiClient.post(`/error-log/${id}/claim`);
     return data;
   },
 

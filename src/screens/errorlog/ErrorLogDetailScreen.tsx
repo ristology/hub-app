@@ -129,6 +129,35 @@ export default function ErrorLogDetailScreen() {
     onError: (e: any) => Alert.alert('Error', e.response?.data?.message ?? 'Gagal ubah status.'),
   });
 
+  // Ambil penanganan (kategori multi-PIC, handler masih kosong).
+  // Backend atomic → 409 kalau keburu diambil PIC lain; refetch supaya UI
+  // langsung nunjukin siapa handler-nya sekarang.
+  const claimMutation = useMutation({
+    mutationFn: () => errorLogApi.claim(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['error-log', id] });
+      queryClient.invalidateQueries({ queryKey: ['error-log'] });
+      queryClient.invalidateQueries({ queryKey: ['error-log-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['home-errorlog'] });
+      toast.success('Anda sekarang handler error ini.');
+    },
+    onError: (e: any) => {
+      queryClient.invalidateQueries({ queryKey: ['error-log', id] });
+      Alert.alert('Gagal ambil', e.response?.data?.message ?? 'Periksa koneksi & coba lagi.');
+    },
+  });
+
+  const confirmClaim = () => {
+    Alert.alert(
+      'Ambil Penanganan?',
+      'Anda akan tercatat sebagai handler error ini. PIC lain diberi tahu agar tidak ikut mengerjakan.',
+      [
+        { text: 'Batal', style: 'cancel' },
+        { text: 'Ya, Ambil', onPress: () => claimMutation.mutate() },
+      ],
+    );
+  };
+
   const commentMutation = useMutation({
     mutationFn: (text: string) => errorLogApi.comment(id, text, replyTo?.id),
     onSuccess: (response) => {
@@ -403,6 +432,28 @@ export default function ErrorLogDetailScreen() {
             ) : null;
           })()}
 
+          {/* Ambil penanganan — kategori multi-PIC, handler masih kosong.
+              Tombol besar full-width: keputusan ini menentukan siapa yg pegang
+              error, jadi visual weight-nya sepadan (bukan chip kecil). */}
+          {log.can_claim && (
+            <View style={styles.statusActionWrap}>
+              <Text style={styles.statusHint}>Belum ada yang menangani</Text>
+              <TouchableOpacity
+                onPress={confirmClaim}
+                disabled={claimMutation.isPending}
+                style={[styles.reviewBtn, {
+                  backgroundColor: 'rgba(59,130,246,0.15)',
+                  borderColor: 'rgba(59,130,246,0.45)',
+                }]}
+              >
+                <Ionicons name="hand-left" size={16} color="#3b82f6" />
+                <Text style={[styles.reviewBtnText, { color: '#3b82f6' }]}>
+                  {claimMutation.isPending ? 'Mengambil…' : 'Ambil Penanganan'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Aksi handler — ubah status penanganan (in_progress / resolved) */}
           {log.can_update_status && log.status !== 'closed' && (
             <View style={styles.statusActionWrap}>
@@ -523,12 +574,19 @@ export default function ErrorLogDetailScreen() {
                 foto={log.pelapor.foto}
               />
             )}
-            {log.handler && (
+            {log.handler ? (
               <UserRow
                 label="Handler"
                 nama={log.handler.nama_lengkap}
                 foto={log.handler.foto}
               />
+            ) : (
+              <View style={styles.pendingHandlerRow}>
+                <Ionicons name="hourglass-outline" size={14} color="#fbbf24" />
+                <Text style={styles.pendingHandlerText}>
+                  Handler: menunggu PIC mengambil penanganan
+                </Text>
+              </View>
             )}
           </View>
 
@@ -824,6 +882,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12, borderRadius: 10, borderWidth: 1,
   },
   reviewBtnText: { fontSize: 13, fontWeight: '700' },
+  pendingHandlerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
+  pendingHandlerText: { color: '#fbbf24', fontSize: 12, flex: 1 },
   catatanBox: {
     backgroundColor: 'rgba(34,197,94,0.06)',
     borderWidth: 1, borderColor: 'rgba(34,197,94,0.20)',
