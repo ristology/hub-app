@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, TextInput, ScrollView, TouchableOpacity, Image,
   StyleSheet, Alert, ActivityIndicator, Keyboard, Platform,
@@ -92,6 +92,25 @@ export default function CreateErrorLogScreen() {
 
   const { data: klienData }    = useQuery({ queryKey: ['error-log-klien'],    queryFn: errorLogApi.klien });
   const { data: kategoriData } = useQuery({ queryKey: ['error-log-kategori'], queryFn: errorLogApi.kategori });
+
+  // Saring kategori mengikuti produk klien — sama dengan form web. Kategori Next
+  // (44+ modul dari sinkron menu LMS) dan Legacy tidak dicampur di satu daftar.
+  // Klien tanpa produk / belum dipilih → semua tampil. Sublabel = grup menu / produk.
+  const klienProduk = klienData?.data.find(k => k.id === klienId)?.produk ?? null;
+  const kategoriOptions = useMemo<PickerOption[]>(() =>
+    (kategoriData?.data ?? [])
+      .filter(k => !klienProduk || !k.produk || k.produk === klienProduk)
+      .map(k => ({
+        id: k.id,
+        label: k.nama,
+        sublabel: k.produk === 'next' ? `Next · ${k.grup ?? 'Lainnya'}` : k.produk === 'legacy' ? 'Legacy' : undefined,
+      })),
+    [kategoriData, klienProduk]);
+
+  // Klien diganti dan kategori yang terpilih tidak lagi cocok produknya → kosongkan
+  useEffect(() => {
+    if (kategoriId && !kategoriOptions.some(o => o.id === kategoriId)) setKategoriId(null);
+  }, [kategoriOptions, kategoriId]);
 
   // Load existing data untuk edit mode
   const { data: existingData } = useQuery({
@@ -594,7 +613,7 @@ export default function CreateErrorLogScreen() {
         searchable
         searchPlaceholder="Cari kategori..."
         selectedId={kategoriId}
-        options={(kategoriData?.data ?? []).map<PickerOption>((k) => ({ id: k.id, label: k.nama }))}
+        options={kategoriOptions}
         onPick={(opt) => setKategoriId(opt.id as number)}
       />
     </SafeAreaView>

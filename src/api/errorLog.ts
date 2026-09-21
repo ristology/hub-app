@@ -61,8 +61,9 @@ export type ErrorLogStats = {
   closed:           number;
 };
 
-export type KategoriError = { id: number; nama: string };
-export type KlienOption   = { id: number; nama: string };
+/** produk/grup dipakai menyaring picker mengikuti produk klien (Next: 44+ modul hasil sinkron menu LMS). */
+export type KategoriError = { id: number; nama: string; produk?: 'next' | 'legacy' | null; grup?: string | null };
+export type KlienOption   = { id: number; nama: string; produk?: 'next' | 'legacy' | null };
 export type HandlerOption = { id: number; nama: string };
 
 export type FileAsset = { uri: string; name: string; type: string };
