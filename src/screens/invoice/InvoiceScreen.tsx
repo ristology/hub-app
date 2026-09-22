@@ -11,7 +11,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { invoiceApi, type Invoice, type StatusBayar, type KlienRingkas } from '../../api/invoice';
 import SwipeableInvoiceCard from './components/SwipeableInvoiceCard';
-import KlienSearchBar from './components/KlienSearchBar';
+import KlienSearchBar from '../../components/KlienSearchBar';
 import TandaiLunasSheet, { type BuktiFile } from './components/TandaiLunasSheet';
 
 type ParamList = {
@@ -150,7 +150,7 @@ export default function InvoiceScreen() {
         </View>
         <View style={styles.center}>
           <Ionicons name="lock-closed-outline" size={48} color="#3b3f4a" />
-          <Text style={styles.empty}>Akses hanya untuk Admin & Karyawan Keuangan.</Text>
+          <Text style={styles.empty}>Akses hanya untuk Admin, Direktur, dan Karyawan Keuangan.</Text>
         </View>
       </SafeAreaView>
     );
@@ -175,6 +175,7 @@ export default function InvoiceScreen() {
       <KlienSearchBar
         selected={klien}
         onSelect={setKlien}
+        fetcher={(q) => invoiceApi.klienList(q)}
         placeholder="Cari nama klien..."
       />
 

@@ -4,12 +4,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { invoiceApi, type KlienRingkas } from '../../../api/invoice';
+export type KlienRingkas = { id: number; nama: string };
 
 type Props = {
   /** Klien yang sedang dipakai sebagai filter (null = semua klien) */
   selected: KlienRingkas | null;
   onSelect: (klien: KlienRingkas | null) => void;
+  /** Sumber saran — tiap modul mengirim endpoint-nya sendiri */
+  fetcher: (q: string) => Promise<{ data: KlienRingkas[] }>;
   placeholder?: string;
 };
 
@@ -17,10 +19,13 @@ type Props = {
  * Kolom pencarian nama klien bergaya autocomplete — sejajar dengan filter
  * klien di web (input teks + dropdown saran, bukan dropdown statis).
  *
+ * Dipakai bersama oleh Invoice, Pajak, dan Cashback; yang berbeda hanya
+ * `fetcher`-nya.
+ *
  * Dropdown-nya absolute + zIndex/elevation supaya menimpa stat box & chip
  * filter di bawahnya (Android butuh elevation, zIndex saja tidak cukup).
  */
-export default function KlienSearchBar({ selected, onSelect, placeholder }: Props) {
+export default function KlienSearchBar({ selected, onSelect, fetcher, placeholder }: Props) {
   const [query, setQuery]     = useState('');
   const [results, setResults] = useState<KlienRingkas[]>([]);
   const [open, setOpen]       = useState(false);
@@ -37,7 +42,7 @@ export default function KlienSearchBar({ selected, onSelect, placeholder }: Prop
     setLoading(true);
     const handle = setTimeout(async () => {
       try {
-        const { data } = await invoiceApi.klienList(q);
+        const { data } = await fetcher(q);
         setResults(data);
       } catch {
         setResults([]);

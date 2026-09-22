@@ -14,6 +14,8 @@ import RequestStack    from './RequestStack';
 import PerformanceStack from './PerformanceStack';
 import DokumenStack    from './DokumenStack';
 import InvoiceStack    from './InvoiceStack';
+import PajakStack      from './PajakStack';
+import CashbackStack   from './CashbackStack';
 import HomeScreen      from '../screens/home/HomeScreen';
 import AktivitasScreen from '../screens/aktivitas/AktivitasScreen';
 import UpdateScreen    from '../screens/menu/UpdateScreen';
@@ -198,6 +200,26 @@ export default function BottomTabNavigator() {
         options={({ route }) => ({
           ...hiddenTabRoute,
           tabBarStyle: getFocusedRouteNameFromRoute(route) === 'InvoiceDetail'
+            ? { display: 'none' }
+            : tabBarStyle,
+        })}
+      />
+      <Tab.Screen
+        name="Pajak"
+        component={PajakStack}
+        options={({ route }) => ({
+          ...hiddenTabRoute,
+          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'PajakDetail'
+            ? { display: 'none' }
+            : tabBarStyle,
+        })}
+      />
+      <Tab.Screen
+        name="Cashback"
+        component={CashbackStack}
+        options={({ route }) => ({
+          ...hiddenTabRoute,
+          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'CashbackDetail'
             ? { display: 'none' }
             : tabBarStyle,
         })}

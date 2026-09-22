@@ -151,10 +151,19 @@ export default function AppDrawer() {
     { key: 'aktivitas',   label: 'Aktivitas',   icon: 'pulse-outline',        route: 'Aktivitas' },
   ];
 
-  const showInvoice =
-    user?.role === 'admin' || (user?.departemen ?? '').toLowerCase().includes('keuangan');
-  if (showInvoice) {
-    items.push({ key: 'invoice', label: 'Invoice', icon: 'receipt-outline', route: 'Invoice' });
+  // Aturan tunggal menu keuangan — cermin User::canAccessInvoice() di backend:
+  // admin, direktur, atau karyawan Departemen Keuangan.
+  //
+  // Sebelumnya baris ini melewatkan 'direktur', jadi Direktur bisa membuka
+  // Invoice di web tapi menunya tidak muncul sama sekali di HP.
+  const bisaAksesKeuangan =
+    user?.role === 'admin' ||
+    user?.role === 'direktur' ||
+    (user?.departemen ?? '').toLowerCase().includes('keuangan');
+  if (bisaAksesKeuangan) {
+    items.push({ key: 'invoice',  label: 'Invoice',  icon: 'receipt-outline',       route: 'Invoice' });
+    items.push({ key: 'pajak',    label: 'Pajak',    icon: 'document-text-outline', route: 'Pajak' });
+    items.push({ key: 'cashback', label: 'Cashback', icon: 'gift-outline',          route: 'Cashback' });
   }
   items.push({ key: 'update', label: 'Update', icon: 'cloud-download-outline', route: 'Update' });
 
