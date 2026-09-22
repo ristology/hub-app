@@ -82,6 +82,7 @@ export default function ErrorLogDetailScreen() {
   }, []);
   const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady, scrollToKomentar } = useKomentarHighlight(highlightKomentarId);
   const [komentar, setKomentar] = useState('');
+  const [kendala,  setKendala]  = useState('');   // catatan "masih ada kendala" → Claude (§27)
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
   const [replyTo,     setReplyTo]     = useState<{ id: number; nama: string } | null>(null);
@@ -146,6 +147,32 @@ export default function ErrorLogDetailScreen() {
       Alert.alert('Gagal ambil', e.response?.data?.message ?? 'Periksa koneksi & coba lagi.');
     },
   });
+
+  // "Masih ada kendala — minta Claude perbaiki lagi" (§27): pelapor/handler/admin, setelah PR merged/ditutup
+  const kendalaMutation = useMutation({
+    mutationFn: () => errorLogApi.githubKerjakan(id, kendala.trim()),
+    onSuccess: (res) => {
+      setKendala('');
+      queryClient.invalidateQueries({ queryKey: ['error-log', id] });
+      queryClient.invalidateQueries({ queryKey: ['error-log'] });
+      toast.success(res.message);
+    },
+    onError: (e: any) => {
+      Alert.alert('Tidak bisa', e.response?.data?.message ?? 'Periksa koneksi & coba lagi.');
+    },
+  });
+
+  const confirmKendala = () => {
+    if (!kendala.trim()) { Alert.alert('Catatan wajib', 'Tulis dulu apa yang masih bermasalah — Claude memakai catatan itu.'); return; }
+    Alert.alert(
+      'Minta Claude perbaiki lagi?',
+      'Catatanmu dikirim ke issue, issue dibuka kembali, dan Claude membuat PR baru. Merge tetap oleh tim IT.',
+      [
+        { text: 'Batal', style: 'cancel' },
+        { text: 'Ya, kirim', onPress: () => kendalaMutation.mutate() },
+      ],
+    );
+  };
 
   const confirmClaim = () => {
     Alert.alert(
@@ -453,7 +480,32 @@ export default function ErrorLogDetailScreen() {
                     </Text>
                   </TouchableOpacity>
                 )}
-                <Text style={ghStyles.hint}>Kirim, nilai ulang, dan "setuju — kerjakan" dilakukan dari HUB web.</Text>
+                {/* §27: setelah PR merged/ditutup, pelapor/handler bisa minta perbaikan ulang dari HP */}
+                {log.github.pr && log.github.pr.state !== 'open' && !log.github.sedang && (
+                  <View style={ghStyles.kendalaBox}>
+                    <Text style={ghStyles.kendalaLabel}>Masih ada kendala setelah perbaikan?</Text>
+                    <TextInput
+                      style={ghStyles.kendalaInput}
+                      placeholder="Wajib: apa yang masih bermasalah? (mis. tombol muncul tapi tidak bisa ditekan di Android 12)"
+                      placeholderTextColor="#6b7280"
+                      value={kendala}
+                      onChangeText={setKendala}
+                      multiline
+                      maxLength={3000}
+                    />
+                    <TouchableOpacity
+                      style={[ghStyles.kendalaBtn, (!kendala.trim() || kendalaMutation.isPending) && { opacity: 0.5 }]}
+                      disabled={!kendala.trim() || kendalaMutation.isPending}
+                      onPress={confirmKendala}
+                    >
+                      {kendalaMutation.isPending
+                        ? <ActivityIndicator size="small" color="#111827" />
+                        : <Ionicons name="refresh" size={16} color="#111827" />}
+                      <Text style={ghStyles.kendalaBtnText}>Masih ada kendala — minta Claude perbaiki lagi</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                <Text style={ghStyles.hint}>Kirim ke GitHub, nilai ulang, dan persetujuan awal triase dilakukan dari HUB web.</Text>
               </View>
             </>
           )}
@@ -918,6 +970,11 @@ const ghStyles = StyleSheet.create({
   prRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' },
   prText: { fontSize: 12, fontWeight: '600', flex: 1 },
   hint:  { color: '#6b7280', fontSize: 10 },
+  kendalaBox:   { gap: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' },
+  kendalaLabel: { color: '#fbbf24', fontSize: 12, fontWeight: '600' },
+  kendalaInput: { minHeight: 64, maxHeight: 140, color: '#fff', fontSize: 13, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: 10, textAlignVertical: 'top' },
+  kendalaBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#fbbf24', borderRadius: 8, paddingVertical: 10 },
+  kendalaBtnText: { color: '#111827', fontSize: 13, fontWeight: '700' },
 });
 
 const dokStyles = StyleSheet.create({

@@ -239,6 +239,16 @@ export const errorLogApi = {
     return data;
   },
 
+  /**
+   * Minta Claude kerjakan (HUB docs/40 §25–27). Belum ada PR → hanya handler/admin (setuju
+   * triase). PR sudah merged/ditutup → handler/admin/PELAPOR, catatan wajib ("masih ada kendala").
+   * 422 = ditolak dengan pesan siap tampil.
+   */
+  githubKerjakan: async (id: number, catatan: string): Promise<{ message: string; ulang: boolean; data: ErrorLog }> => {
+    const { data } = await apiClient.post(`/error-log/${id}/github/kerjakan`, { catatan });
+    return data;
+  },
+
   /** Alihkan handler ke PIC lain (overhandle). picKaryawanId = karyawan.id PIC baru. */
   reassign: async (
     id: number,
