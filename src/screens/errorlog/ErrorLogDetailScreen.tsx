@@ -394,6 +394,70 @@ export default function ErrorLogDetailScreen() {
             </>
           )}
 
+          {/* GitHub Issue + PR Claude (baca-saja; aksi di web) — HUB docs/40 §25 */}
+          {log.github && (
+            <>
+              <Text style={styles.sectionLabel}>GITHUB ISSUE</Text>
+              <View style={ghStyles.card}>
+                <View style={ghStyles.row}>
+                  <View style={[ghStyles.badge, log.github.issue_state === 'closed' ? ghStyles.badgeMuted : ghStyles.badgeOpen]}>
+                    <Text style={[ghStyles.badgeText, log.github.issue_state === 'closed' ? ghStyles.badgeMutedText : ghStyles.badgeOpenText]}>
+                      {log.github.issue_state === 'closed' ? 'Closed' : 'Open'}
+                    </Text>
+                  </View>
+                  <Text style={ghStyles.nomor}>#{log.github.issue_number}</Text>
+                  {log.github.repo ? <Text style={ghStyles.repo}>{log.github.repo.split('/').pop()}</Text> : null}
+                  <TouchableOpacity
+                    style={{ marginLeft: 'auto' }}
+                    hitSlop={8}
+                    onPress={() => log.github?.issue_url && Linking.openURL(log.github.issue_url).catch(() => Alert.alert('Error', 'Gagal buka GitHub.'))}
+                  >
+                    <Ionicons name="open-outline" size={18} color="#8a94a6" />
+                  </TouchableOpacity>
+                </View>
+
+                {log.github.sedang ? (
+                  <View style={ghStyles.row}>
+                    <ActivityIndicator size="small" color="#38bdf8" />
+                    <Text style={ghStyles.info}>
+                      {log.github.sedang === 'kerjakan' ? 'Claude sedang mengerjakan perbaikan…' : 'Claude sedang menilai laporan ini…'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={[ghStyles.row, { flexWrap: 'wrap' }]}>
+                    {log.github.labels
+                      .filter((l) => ['ai:minor', 'ai:butuh-review', 'ai:kurang-jelas', 'ai:pr'].includes(l))
+                      .map((l) => (
+                        <View key={l} style={ghStyles.aiChip}>
+                          <Ionicons name="sparkles" size={10} color="#fbbf24" />
+                          <Text style={ghStyles.aiChipText}>
+                            {l === 'ai:minor' ? 'AI: perbaikan kecil' : l === 'ai:butuh-review' ? 'AI: butuh review IT' : l === 'ai:kurang-jelas' ? 'AI: laporan kurang jelas' : 'AI: PR dibuat'}
+                          </Text>
+                        </View>
+                      ))}
+                  </View>
+                )}
+
+                {log.github.pr && (
+                  <TouchableOpacity
+                    style={ghStyles.prRow}
+                    onPress={() => log.github?.pr?.url && Linking.openURL(log.github.pr.url).catch(() => Alert.alert('Error', 'Gagal buka PR.'))}
+                  >
+                    <Ionicons
+                      name={log.github.pr.state === 'merged' ? 'git-merge-outline' : 'git-pull-request-outline'}
+                      size={16}
+                      color={log.github.pr.state === 'merged' ? '#22c55e' : log.github.pr.state === 'open' ? '#38bdf8' : '#8a94a6'}
+                    />
+                    <Text style={[ghStyles.prText, { color: log.github.pr.state === 'merged' ? '#22c55e' : log.github.pr.state === 'open' ? '#38bdf8' : '#8a94a6' }]}>
+                      PR #{log.github.pr.number} · {log.github.pr.state === 'merged' ? 'Merged — sudah masuk ke kode' : log.github.pr.state === 'open' ? 'Menunggu review & merge' : 'Ditutup tanpa merge'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <Text style={ghStyles.hint}>Kirim, nilai ulang, dan "setuju — kerjakan" dilakukan dari HUB web.</Text>
+              </View>
+            </>
+          )}
+
           {/* Lampiran Dokumen */}
           {log.dokumen && log.dokumen.length > 0 && (
             <>
@@ -837,6 +901,23 @@ const komStyles = StyleSheet.create({
   aiBadgeText: { color: '#fbbf24', fontSize: 10, fontWeight: '700' },
   text:    { color: '#c5cdd9', fontSize: 13, marginTop: 2, lineHeight: 18 },
   time:    { color: '#6b7280', fontSize: 10, marginTop: 4 },
+});
+
+const ghStyles = StyleSheet.create({
+  card:  { backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: 12, padding: 12, gap: 8, marginBottom: 14 },
+  row:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  badge: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  badgeOpen: { backgroundColor: 'rgba(34,197,94,0.15)' }, badgeOpenText: { color: '#22c55e' },
+  badgeMuted: { backgroundColor: 'rgba(138,148,166,0.15)' }, badgeMutedText: { color: '#8a94a6' },
+  badgeText: { fontSize: 11, fontWeight: '700' },
+  nomor: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  repo:  { color: '#8a94a6', fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  info:  { color: '#38bdf8', fontSize: 12 },
+  aiChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(251,191,36,.12)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  aiChipText: { color: '#fbbf24', fontSize: 11, fontWeight: '600' },
+  prRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' },
+  prText: { fontSize: 12, fontWeight: '600', flex: 1 },
+  hint:  { color: '#6b7280', fontSize: 10 },
 });
 
 const dokStyles = StyleSheet.create({

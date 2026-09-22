@@ -33,6 +33,17 @@ export type ErrorLog = {
   foto_ids?: number[];
   dokumen?: { id: number; nama: string; url: string; ukuran: number }[];
   video_url: string | null;
+  /** Panel GitHub baca-saja (HUB docs/40 §25) — null kalau laporan belum jadi issue */
+  github?: {
+    issue_number: number;
+    issue_url: string | null;
+    issue_state: 'open' | 'closed' | null;
+    repo: string | null;
+    labels: string[];
+    sedang: 'triase' | 'kerjakan' | null;
+    pr: { number: number; url: string | null; state: 'open' | 'merged' | 'closed' | null } | null;
+    synced_at: string | null;
+  } | null;
   video_thumbnail_url: string | null;
   video_duration_sec: number | null;
   jumlah_komentar?: number;
