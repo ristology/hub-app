@@ -7,10 +7,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, type RouteProp } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import * as ImagePicker from 'expo-image-picker';
 
 import { invoiceApi } from '../../api/invoice';
-import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
+import TandaiLunasSheet, { type BuktiFile } from './components/TandaiLunasSheet';
 
 type RouteParams = { id: number };
 
@@ -36,7 +35,7 @@ export default function InvoiceDetailScreen() {
   const navigation = useNavigation<any>();
   const { id } = route.params;
   const queryClient = useQueryClient();
-  const [uploading, setUploading] = useState(false);
+  const [lunasOpen, setLunasOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['invoice', id],
@@ -44,56 +43,21 @@ export default function InvoiceDetailScreen() {
   });
 
   const toggleMut = useMutation({
-    mutationFn: (bukti?: { uri: string; name: string; type: string }) =>
-      invoiceApi.toggleLunas(id, bukti),
+    mutationFn: (payload?: { bukti: BuktiFile; tanggalBayar: string }) =>
+      invoiceApi.toggleLunas(id, payload?.bukti, payload?.tanggalBayar),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoice', id] });
       queryClient.invalidateQueries({ queryKey: ['invoice'] });
       queryClient.invalidateQueries({ queryKey: ['invoice-stats'] });
-      setUploading(false);
+      setLunasOpen(false);
     },
     onError: (e: any) => {
-      setUploading(false);
       const msg = e.response?.data?.message
         ?? Object.values(e.response?.data?.errors ?? {}).flat().join('\n')
         ?? 'Gagal update status bayar.';
       Alert.alert('Error', msg);
     },
   });
-
-  const pickAndUpload = async (source: 'camera' | 'gallery') => {
-    const perm = source === 'camera'
-      ? await ImagePicker.requestCameraPermissionsAsync()
-      : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Izin ditolak', 'Aplikasi butuh akses kamera/galeri untuk upload bukti.');
-      return;
-    }
-
-    const result = source === 'camera'
-      ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
-
-    if (result.canceled || !result.assets?.[0]) return;
-    const asset = result.assets[0];
-    // Transcode HEIC → JPEG di iPhone sebelum upload
-    const transcoded = await transcodeHeicIfNeeded({
-      uri:  asset.uri,
-      name: asset.fileName ?? `bukti_${Date.now()}.jpg`,
-      type: asset.mimeType ?? 'image/jpeg',
-    });
-
-    setUploading(true);
-    toggleMut.mutate(transcoded);
-  };
-
-  const promptTandaiLunas = () => {
-    Alert.alert('Tandai Lunas', 'Upload bukti transfer untuk menandai invoice ini lunas.', [
-      { text: 'Batal' },
-      { text: 'Foto Kamera',  onPress: () => pickAndUpload('camera') },
-      { text: 'Pilih Galeri', onPress: () => pickAndUpload('gallery') },
-    ]);
-  };
 
   const promptResetBelum = () => {
     Alert.alert('Reset ke Belum Bayar', 'Status & bukti transfer akan dihapus. Yakin?', [
@@ -191,10 +155,10 @@ export default function InvoiceDetailScreen() {
           {!isLunas ? (
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: '#22c55e' }]}
-              onPress={promptTandaiLunas}
-              disabled={uploading}
+              onPress={() => setLunasOpen(true)}
+              disabled={toggleMut.isPending}
             >
-              {uploading
+              {toggleMut.isPending
                 ? <ActivityIndicator color="#fff" />
                 : (
                   <>
@@ -223,6 +187,14 @@ export default function InvoiceDetailScreen() {
           )}
         </View>
       </ScrollView>
+
+      <TandaiLunasSheet
+        visible={lunasOpen}
+        noInvoice={inv.no_invoice}
+        submitting={toggleMut.isPending}
+        onClose={() => setLunasOpen(false)}
+        onSubmit={(payload) => toggleMut.mutate(payload)}
+      />
     </SafeAreaView>
   );
 }

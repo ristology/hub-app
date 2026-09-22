@@ -1,18 +1,18 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet,
   TouchableOpacity, ScrollView, Alert, Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import * as ImagePicker from 'expo-image-picker';
 
-import { invoiceApi, type Invoice, type StatusBayar } from '../../api/invoice';
+import { invoiceApi, type Invoice, type StatusBayar, type KlienRingkas } from '../../api/invoice';
 import SwipeableInvoiceCard from './components/SwipeableInvoiceCard';
-import { transcodeHeicIfNeeded } from '../../utils/transcodeHeicIfNeeded';
+import KlienSearchBar from './components/KlienSearchBar';
+import TandaiLunasSheet, { type BuktiFile } from './components/TandaiLunasSheet';
 
 type ParamList = {
   InvoiceList: undefined;
@@ -40,19 +40,43 @@ export default function InvoiceScreen() {
   const insets     = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('semua');
+  const [klien, setKlien]   = useState<KlienRingkas | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
   const [pendingId, setPendingId] = useState<number | null>(null);
+  const [lunasTarget, setLunasTarget] = useState<Invoice | null>(null);
 
-  const { data, isLoading, refetch, error } = useQuery({
-    queryKey: ['invoice', filter],
-    queryFn:  () => invoiceApi.list(
-      filter === 'semua' ? {} : { status: filter as StatusBayar }
-    ),
+  const listParams = useMemo(() => ({
+    ...(filter === 'semua' ? {} : { status: filter as StatusBayar }),
+    ...(klien ? { klien_id: klien.id } : {}),
+  }), [filter, klien]);
+
+  // Pagination selaras dengan web: backend tetap paginate per halaman, mobile
+  // menariknya berurutan lewat infinite scroll (pola yang sama dipakai Feed &
+  // Aktivitas) supaya invoice lama tetap bisa dibuka — sebelumnya mobile hanya
+  // pernah menampilkan halaman pertama.
+  const {
+    data, isLoading, refetch, error,
+    fetchNextPage, hasNextPage, isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['invoice', listParams],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => invoiceApi.list({ ...listParams, page: pageParam as number }),
+    getNextPageParam: (lastPage) => {
+      const meta = lastPage.meta;
+      if (!meta) return undefined;
+      return meta.current_page < meta.last_page ? meta.current_page + 1 : undefined;
+    },
   });
 
+  const invoices = useMemo(
+    () => data?.pages.flatMap((p) => p.data) ?? [],
+    [data],
+  );
+  const totalItem = data?.pages[0]?.meta?.total ?? invoices.length;
+
   const { data: stats } = useQuery({
-    queryKey: ['invoice-stats'],
-    queryFn:  () => invoiceApi.stats(),
+    queryKey: ['invoice-stats', klien?.id ?? null],
+    queryFn:  () => invoiceApi.stats(klien ? { klien_id: klien.id } : {}),
   });
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
@@ -64,8 +88,10 @@ export default function InvoiceScreen() {
   }, [refetch]);
 
   const toggleMut = useMutation({
-    mutationFn: ({ id, bukti }: { id: number; bukti?: { uri: string; name: string; type: string } }) =>
-      invoiceApi.toggleLunas(id, bukti),
+    mutationFn: ({ id, bukti, tanggalBayar }: {
+      id: number; bukti?: BuktiFile; tanggalBayar?: string;
+    }) => invoiceApi.toggleLunas(id, bukti, tanggalBayar),
+    onSuccess: () => setLunasTarget(null),
     onSettled: () => {
       setPendingId(null);
       queryClient.invalidateQueries({ queryKey: ['invoice'] });
@@ -79,32 +105,6 @@ export default function InvoiceScreen() {
     },
   });
 
-  const pickAndUpload = async (id: number, source: 'camera' | 'gallery') => {
-    const perm = source === 'camera'
-      ? await ImagePicker.requestCameraPermissionsAsync()
-      : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Izin ditolak', 'Aplikasi butuh akses kamera/galeri.');
-      return;
-    }
-    const result = source === 'camera'
-      ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
-    if (result.canceled || !result.assets?.[0]) return;
-    const asset = result.assets[0];
-    // Transcode HEIC → JPEG di iPhone sebelum upload
-    const transcoded = await transcodeHeicIfNeeded({
-      uri:  asset.uri,
-      name: asset.fileName ?? `bukti_${Date.now()}.jpg`,
-      type: asset.mimeType ?? 'image/jpeg',
-    });
-    setPendingId(id);
-    toggleMut.mutate({
-      id,
-      bukti: transcoded,
-    });
-  };
-
   const handleToggleLunas = (inv: Invoice) => {
     setOpenId(null);
     if (inv.status_bayar === 'lunas') {
@@ -117,11 +117,8 @@ export default function InvoiceScreen() {
         },
       ]);
     } else {
-      Alert.alert('Tandai Lunas', `Upload bukti transfer untuk invoice ${inv.no_invoice}.`, [
-        { text: 'Batal' },
-        { text: 'Foto Kamera',  onPress: () => pickAndUpload(inv.id, 'camera') },
-        { text: 'Pilih Galeri', onPress: () => pickAndUpload(inv.id, 'gallery') },
-      ]);
+      // Tanggal transfer wajib → pakai sheet, bukan Alert 3 tombol
+      setLunasTarget(inv);
     }
   };
 
@@ -174,6 +171,12 @@ export default function InvoiceScreen() {
       <View style={styles.topBar}>
         <Text style={styles.topTitle}>Invoice</Text>
       </View>
+
+      <KlienSearchBar
+        selected={klien}
+        onSelect={setKlien}
+        placeholder="Cari nama klien..."
+      />
 
       {stats && (
         <View style={styles.statsWrap}>
@@ -229,19 +232,50 @@ export default function InvoiceScreen() {
       </View>
 
       <FlatList
-        data={data?.data ?? []}
+        data={invoices}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />
         }
+        onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={
+          invoices.length === 0 ? null : (
+            <View style={styles.footer}>
+              {isFetchingNextPage ? (
+                <ActivityIndicator color="#3b82f6" />
+              ) : (
+                <Text style={styles.footerText}>
+                  {hasNextPage
+                    ? `Menampilkan ${invoices.length} dari ${totalItem} invoice`
+                    : `${totalItem} invoice — semua sudah dimuat`}
+                </Text>
+              )}
+            </View>
+          )
+        }
         ListEmptyComponent={
           <View style={styles.center}>
             <Ionicons name="receipt-outline" size={48} color="#3b3f4a" />
-            <Text style={styles.empty}>Tidak ada invoice.</Text>
+            <Text style={styles.empty}>
+              {klien ? `Tidak ada invoice untuk ${klien.nama}.` : 'Tidak ada invoice.'}
+            </Text>
           </View>
         }
+      />
+
+      <TandaiLunasSheet
+        visible={!!lunasTarget}
+        noInvoice={lunasTarget?.no_invoice ?? ''}
+        submitting={toggleMut.isPending}
+        onClose={() => setLunasTarget(null)}
+        onSubmit={({ bukti, tanggalBayar }) => {
+          if (!lunasTarget) return;
+          setPendingId(lunasTarget.id);
+          toggleMut.mutate({ id: lunasTarget.id, bukti, tanggalBayar });
+        }}
       />
     </SafeAreaView>
   );
@@ -298,5 +332,8 @@ const styles = StyleSheet.create({
   chipText: { color: '#c5cdd9', fontSize: 12 },
 
   list:  { padding: 16, paddingTop: 4 },
-  empty: { color: '#8a94a6', fontSize: 14 },
+  empty: { color: '#8a94a6', fontSize: 14, textAlign: 'center' },
+
+  footer:     { paddingVertical: 16, alignItems: 'center' },
+  footerText: { color: '#6b7280', fontSize: 11 },
 });

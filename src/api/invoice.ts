@@ -37,11 +37,13 @@ export type InvoiceStats = {
   count_belum: number;
 };
 
-type Paginated<T> = {
+export type Paginated<T> = {
   data: T[];
-  meta?: { current_page: number; last_page: number; total: number };
+  meta?: { current_page: number; last_page: number; total: number; per_page: number };
   links?: any;
 };
+
+export type KlienRingkas = { id: number; nama: string };
 
 export const invoiceApi = {
   list: async (params?: {
@@ -62,7 +64,7 @@ export const invoiceApi = {
     return data;
   },
 
-  klienList: async (q?: string): Promise<{ data: { id: number; nama: string }[] }> => {
+  klienList: async (q?: string): Promise<{ data: KlienRingkas[] }> => {
     const { data } = await apiClient.get('/invoice/klien', { params: q ? { q } : {} });
     return data;
   },
@@ -73,17 +75,20 @@ export const invoiceApi = {
   },
 
   /**
-   * Tandai lunas — wajib upload bukti transfer (jpg/jpeg/png/pdf, max 5MB).
+   * Tandai lunas — wajib upload bukti transfer (jpg/jpeg/png/pdf, max 5MB)
+   * DAN tanggal transfer (YYYY-MM-DD). Backend menolak kalau salah satu kosong.
    * `bukti` parameter dari hasil expo-image-picker / DocumentPicker (uri + name + type).
    */
   toggleLunas: async (
     id: number,
     bukti?: { uri: string; name: string; type: string },
+    tanggalBayar?: string,
   ): Promise<{ data: Invoice }> => {
     if (bukti) {
       const form = new FormData();
       // @ts-expect-error - RN FormData expects {uri, name, type}
       form.append('bukti_transfer', { uri: bukti.uri, name: bukti.name, type: bukti.type });
+      if (tanggalBayar) form.append('tanggal_bayar', tanggalBayar);
       const { data } = await apiClient.post(`/invoice/${id}/toggle-lunas`, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
