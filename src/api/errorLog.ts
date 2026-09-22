@@ -48,6 +48,8 @@ export type ErrorLogKomentar = {
   foto: string | null;
   created_at: string;
   edited_at?: string | null;
+  /** Komentar cermin penilaian Claude dari GitHub Issue (docs/40 §23) → badge AI */
+  is_ai?: boolean;
   can_edit?: boolean;
   can_delete?: boolean;
   replies?: ErrorLogKomentar[];

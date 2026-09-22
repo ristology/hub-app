@@ -781,7 +781,17 @@ function KomentarItem({ k, bindRef, highlighted, onReply, onLongPress }: {
         </View>
       )}
       <View style={{ flex: 1, marginLeft: 10 }}>
-        <Text style={komStyles.nama}>{k.nama}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={komStyles.nama}>{k.nama}</Text>
+          {k.is_ai ? (
+            // Penilaian otomatis Claude (dicermin dari GitHub Issue). Pelapor bisa membalas di
+            // sini; handler yang membaca balasan lalu minta penilaian ulang lewat web.
+            <View style={komStyles.aiBadge}>
+              <Ionicons name="sparkles" size={10} color="#fbbf24" />
+              <Text style={komStyles.aiBadgeText}>AI</Text>
+            </View>
+          ) : null}
+        </View>
         <MentionText text={k.komentar} style={komStyles.text} />
         <Text style={komStyles.time}>
           {formatRelativeDanTanggal(k.created_at)}
@@ -823,6 +833,8 @@ const komStyles = StyleSheet.create({
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#fff', fontWeight: '700' },
   nama:    { color: '#fff', fontWeight: '600', fontSize: 13 },
+  aiBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(251,191,36,.15)', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
+  aiBadgeText: { color: '#fbbf24', fontSize: 10, fontWeight: '700' },
   text:    { color: '#c5cdd9', fontSize: 13, marginTop: 2, lineHeight: 18 },
   time:    { color: '#6b7280', fontSize: 10, marginTop: 4 },
 });
