@@ -43,6 +43,19 @@ export type ErrorLog = {
     sedang: 'triase' | 'kerjakan' | null;
     pr: { number: number; url: string | null; state: 'open' | 'merged' | 'closed' | null } | null;
     synced_at: string | null;
+    /**
+     * Proses Claude berhenti tanpa hasil (HUB docs/40 §30) — kuota token habis, run dibatalkan,
+     * runner mati. null = normal. Kalau terisi, JANGAN tampilkan spinner `sedang`: labelnya
+     * masih menempel, jadi spinner itu akan berputar selamanya.
+     */
+    macet: {
+      sejak: string;
+      /** Berapa menit menggantung sebelum dinyatakan macet (dihitung server). */
+      menit: number;
+      jenis: 'triase' | 'kerjakan';
+      /** Server sudah menimbang peran (pelapor/handler/PIC/admin) + saklar AI. */
+      boleh_jalankan_ulang: boolean;
+    } | null;
   } | null;
   video_thumbnail_url: string | null;
   video_duration_sec: number | null;
@@ -246,6 +259,17 @@ export const errorLogApi = {
    */
   githubKerjakan: async (id: number, catatan: string): Promise<{ message: string; ulang: boolean; data: ErrorLog }> => {
     const { data } = await apiClient.post(`/error-log/${id}/github/kerjakan`, { catatan });
+    return data;
+  },
+
+  /**
+   * Jalankan ulang proses Claude yang macet (HUB docs/40 §30). Boleh ditekan pelapor, handler,
+   * PIC kategori, atau admin — hanya setelah penjaga di server menyatakannya macet.
+   * `selesai: true` = ternyata Claude sudah menyelesaikannya, tidak ada yang dipicu ulang.
+   * 422 = ditolak dengan pesan siap tampil.
+   */
+  githubJalankanUlang: async (id: number): Promise<{ message: string; selesai: boolean; data: ErrorLog }> => {
+    const { data } = await apiClient.post(`/error-log/${id}/github/jalankan-ulang`);
     return data;
   },
 

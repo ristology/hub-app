@@ -162,6 +162,35 @@ export default function ErrorLogDetailScreen() {
     },
   });
 
+  // §30: proses Claude macet -> jalankan ulang. Tidak ada input: yang dipicu ulang adalah
+  // pekerjaan yang sama, bukan permintaan baru.
+  const jalankanUlangMutation = useMutation({
+    mutationFn: () => errorLogApi.githubJalankanUlang(id),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['error-log', id] });
+      queryClient.invalidateQueries({ queryKey: ['error-log'] });
+      // `selesai` = ternyata sudah beres; itu kabar baik, bukan kegagalan.
+      toast.success(res.message);
+    },
+    onError: (e: any) => {
+      // Invalidate juga saat gagal: penolakan tersering adalah "sudah tidak macet lagi",
+      // dan layar harus berhenti menampilkan tombol yang sudah tidak berlaku.
+      queryClient.invalidateQueries({ queryKey: ['error-log', id] });
+      Alert.alert('Tidak bisa', e.response?.data?.message ?? 'Periksa koneksi & coba lagi.');
+    },
+  });
+
+  const confirmJalankanUlang = () => {
+    Alert.alert(
+      'Jalankan ulang?',
+      'Claude mengerjakan lagi dari awal. Tidak ada data laporan yang hilang, dan komentar sebelumnya tetap ada.',
+      [
+        { text: 'Batal', style: 'cancel' },
+        { text: 'Jalankan', onPress: () => jalankanUlangMutation.mutate() },
+      ],
+    );
+  };
+
   const confirmKendala = () => {
     if (!kendala.trim()) { Alert.alert('Catatan wajib', 'Tulis dulu apa yang masih bermasalah — Claude memakai catatan itu.'); return; }
     Alert.alert(
@@ -443,7 +472,36 @@ export default function ErrorLogDetailScreen() {
                   </TouchableOpacity>
                 </View>
 
-                {log.github.sedang ? (
+                {/* §30: prosesnya berhenti tanpa hasil. Diperiksa SEBELUM `sedang` — label pemicu
+                    yang tertinggal membuat spinner berputar selamanya, dan pelapor tidak punya
+                    akses repo untuk mengetahuinya sendiri. */}
+                {log.github.macet ? (
+                  <View style={ghStyles.macetBox}>
+                    <View style={ghStyles.row}>
+                      <Ionicons name="alert-circle" size={16} color="#f87171" />
+                      <Text style={ghStyles.macetTitle}>Claude berhenti di tengah jalan</Text>
+                    </View>
+                    <Text style={ghStyles.macetText}>
+                      Proses {log.github.macet.jenis === 'kerjakan' ? 'perbaikan' : 'penilaian'} tidak selesai
+                      setelah {log.github.macet.menit} menit. Penyebab tersering: kuota token habis atau
+                      proses dibatalkan. Tidak ada data yang hilang — cukup dijalankan ulang.
+                    </Text>
+                    {log.github.macet.boleh_jalankan_ulang ? (
+                      <TouchableOpacity
+                        style={[ghStyles.macetBtn, jalankanUlangMutation.isPending && { opacity: 0.5 }]}
+                        disabled={jalankanUlangMutation.isPending}
+                        onPress={confirmJalankanUlang}
+                      >
+                        {jalankanUlangMutation.isPending
+                          ? <ActivityIndicator size="small" color="#fff" />
+                          : <Ionicons name="refresh" size={16} color="#fff" />}
+                        <Text style={ghStyles.macetBtnText}>Jalankan ulang</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <Text style={ghStyles.hint}>Pelapor, handler, atau PIC kategori bisa menjalankannya ulang.</Text>
+                    )}
+                  </View>
+                ) : log.github.sedang ? (
                   <View style={ghStyles.row}>
                     <ActivityIndicator size="small" color="#38bdf8" />
                     <Text style={ghStyles.info}>
@@ -481,7 +539,7 @@ export default function ErrorLogDetailScreen() {
                   </TouchableOpacity>
                 )}
                 {/* §27: setelah PR merged/ditutup, pelapor/handler bisa minta perbaikan ulang dari HP */}
-                {log.github.pr && log.github.pr.state !== 'open' && !log.github.sedang && (
+                {log.github.pr && log.github.pr.state !== 'open' && !log.github.sedang && !log.github.macet && (
                   <View style={ghStyles.kendalaBox}>
                     <Text style={ghStyles.kendalaLabel}>Masih ada kendala setelah perbaikan?</Text>
                     <TextInput
@@ -975,6 +1033,11 @@ const ghStyles = StyleSheet.create({
   kendalaInput: { minHeight: 64, maxHeight: 140, color: '#fff', fontSize: 13, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: 10, textAlignVertical: 'top' },
   kendalaBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#fbbf24', borderRadius: 8, paddingVertical: 10 },
   kendalaBtnText: { color: '#111827', fontSize: 13, fontWeight: '700' },
+  macetBox:   { gap: 6, backgroundColor: 'rgba(248,113,113,0.1)', borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)', borderRadius: 8, padding: 10 },
+  macetTitle: { color: '#f87171', fontSize: 12, fontWeight: '700' },
+  macetText:  { color: '#cbd5e1', fontSize: 12, lineHeight: 17 },
+  macetBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#dc2626', borderRadius: 8, paddingVertical: 10, marginTop: 2 },
+  macetBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 });
 
 const dokStyles = StyleSheet.create({
