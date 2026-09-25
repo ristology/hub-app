@@ -44,6 +44,25 @@ export type ErrorLog = {
     pr: { number: number; url: string | null; state: 'open' | 'merged' | 'closed' | null } | null;
     synced_at: string | null;
     /**
+     * Tombol AI mana yang boleh digambar bagi pemakai ini — dihitung SERVER (HUB docs/40 §30).
+     * Jangan menyusun ulang aturannya di sini: versi klien yang menyimpang berakhir sebagai
+     * tombol yang tampil lalu ditolak 422.
+     */
+    aksi: {
+      /** §29 "Diskusikan dulu" — hanya kelas butuh-review & kurang-jelas */
+      diskusi: boolean;
+      /** §21 "Minta triase AI" / "Nilai ulang oleh Claude" */
+      triase: boolean;
+      /** §25/§27 tombol kerjakan (ragamnya lihat kerjakan_ulang) */
+      kerjakan: boolean;
+      /** §30 proses macet */
+      jalankan_ulang: boolean;
+      /** true = PR sebelumnya merged/ditutup → "Masih ada kendala" (catatan WAJIB) */
+      kerjakan_ulang: boolean;
+      /** sudah pernah dinilai Claude — dipakai untuk memilih kata tombol triase */
+      sudah_ditriase: boolean;
+    };
+    /**
      * Proses Claude berhenti tanpa hasil (HUB docs/40 §30) — kuota token habis, run dibatalkan,
      * runner mati. null = normal. Kalau terisi, JANGAN tampilkan spinner `sedang`: labelnya
      * masih menempel, jadi spinner itu akan berputar selamanya.
@@ -259,6 +278,25 @@ export const errorLogApi = {
    */
   githubKerjakan: async (id: number, catatan: string): Promise<{ message: string; ulang: boolean; data: ErrorLog }> => {
     const { data } = await apiClient.post(`/error-log/${id}/github/kerjakan`, { catatan });
+    return data;
+  },
+
+  /**
+   * Diskusikan dulu dengan Claude (HUB docs/40 §29) — bertanya/mengusulkan pendekatan SEBELUM
+   * eksekusi. Claude menjawab sebagai komentar tanpa menulis kode. Catatan WAJIB.
+   * Tidak mengklaim laporan; pelapor pun boleh bertanya. 422 = ditolak dengan pesan siap tampil.
+   */
+  githubDiskusi: async (id: number, catatan: string): Promise<{ message: string; data: ErrorLog }> => {
+    const { data } = await apiClient.post(`/error-log/${id}/github/diskusi`, { catatan });
+    return data;
+  },
+
+  /**
+   * Minta Claude menilai laporan (triase / nilai ulang) — HUB docs/40 §21. Hanya memasang label
+   * pemicu; yang bekerja GitHub Action di repo tujuan. PIC kategori, handler, atau admin.
+   */
+  githubMintaAi: async (id: number): Promise<{ message: string; data: ErrorLog }> => {
+    const { data } = await apiClient.post(`/error-log/${id}/github/ai`);
     return data;
   },
 
