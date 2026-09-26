@@ -4,6 +4,7 @@ import {
   ActivityIndicator, KeyboardAvoidingView, Platform, Keyboard, Alert, Modal, FlatList, Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import GithubAiCard from '../../components/GithubAiCard';
 import { useToast } from '../../components/Toast';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, useFocusEffect, type RouteProp } from '@react-navigation/native';
@@ -420,6 +421,22 @@ export default function RequestDetailScreen() {
               </View>
             </>
           )}
+
+          {/* Kartu GitHub + Claude — komponen yang SAMA dengan layar Error Log (HUB docs/40 §32).
+              Ditaruh sebelum riwayat respon: inilah yang paling sering ditindaklanjuti untuk
+              request Next, sedangkan riwayat sifatnya arsip. */}
+          <GithubAiCard
+            id={id}
+            github={r.github}
+            api={{
+              kerjakan: requestApi.githubKerjakan,
+              diskusi: requestApi.githubDiskusi,
+              triase: requestApi.githubMintaAi,
+              jalankanUlang: requestApi.githubJalankanUlang,
+            }}
+            queryKeys={[['request', id], ['request'], ['request-stats'], ['home-request']]}
+            sebutan="request"
+          />
 
           {/* Riwayat respon */}
           {r.respon && r.respon.length > 0 && (

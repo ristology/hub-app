@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import type { GithubPayload } from '../components/GithubAiCard';
 
 export type RequestStatus = 'menunggu' | 'diterima' | 'proses' | 'selesai' | 'ditolak';
 export type RequestTipe   = 'baru' | 'terkait_fitur';
@@ -40,6 +41,12 @@ export type ClientRequest = {
     user: { id: number; nama: string; foto: string | null } | null;
     created_at: string;
   }[];
+  /**
+   * Panel GitHub + tombol Claude (HUB docs/40 §32). null = request ini belum jadi issue —
+   * biasanya karena kliennya Legacy, tidak terdaftar, atau saklar AI mati.
+   * Bentuknya SAMA PERSIS dengan ErrorLog.github; keduanya disusun satu tempat di server.
+   */
+  github?: GithubPayload | null;
   jumlah_komentar?: number;
   jumlah_lampiran?: number;
   created_at: string;
@@ -107,6 +114,28 @@ export type UpdateRequestPayload = Partial<Omit<CreateRequestPayload, 'gambar' |
 type Paginated<T> = { data: T[]; meta?: { current_page: number; last_page: number; total: number } };
 
 export const requestApi = {
+  /**
+   * Jalur AI / Claude (HUB docs/40 §32) — bentuknya sengaja sama dengan errorLogApi supaya
+   * keduanya bisa disuntikkan ke komponen GithubAiCard yang sama.
+   * 422 = ditolak dengan pesan siap tampil.
+   */
+  githubDiskusi: async (id: number, catatan: string): Promise<{ message: string; data: ClientRequest }> => {
+    const { data } = await apiClient.post(`/request/${id}/github/diskusi`, { catatan });
+    return data;
+  },
+  githubMintaAi: async (id: number): Promise<{ message: string; data: ClientRequest }> => {
+    const { data } = await apiClient.post(`/request/${id}/github/ai`);
+    return data;
+  },
+  githubKerjakan: async (id: number, catatan: string): Promise<{ message: string; data: ClientRequest }> => {
+    const { data } = await apiClient.post(`/request/${id}/github/kerjakan`, { catatan });
+    return data;
+  },
+  githubJalankanUlang: async (id: number): Promise<{ message: string; selesai: boolean; data: ClientRequest }> => {
+    const { data } = await apiClient.post(`/request/${id}/github/jalankan-ulang`);
+    return data;
+  },
+
   list: async (params?: {
     tipe?: RequestTipe;
     status?: RequestStatus;

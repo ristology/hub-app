@@ -4,6 +4,7 @@ import {
   ActivityIndicator, Platform, Keyboard, Alert, Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import GithubAiCard from '../../components/GithubAiCard';
 import { useToast } from '../../components/Toast';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, type RouteProp } from '@react-navigation/native';
@@ -82,8 +83,6 @@ export default function ErrorLogDetailScreen() {
   }, []);
   const { scrollRef, onScroll, registerKomRef, highlightedId, onContentReady, scrollToKomentar } = useKomentarHighlight(highlightKomentarId);
   const [komentar, setKomentar] = useState('');
-  const [kendala,  setKendala]  = useState('');   // catatan "masih ada kendala" → Claude (§27)
-  const [tanya,    setTanya]    = useState('');   // pertanyaan/usulan sebelum eksekusi (§29)
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionAt,   setMentionAt]   = useState<number | null>(null);
   const [replyTo,     setReplyTo]     = useState<{ id: number; nama: string } | null>(null);
@@ -148,119 +147,6 @@ export default function ErrorLogDetailScreen() {
       Alert.alert('Gagal ambil', e.response?.data?.message ?? 'Periksa koneksi & coba lagi.');
     },
   });
-
-  // "Masih ada kendala — minta Claude perbaiki lagi" (§27): pelapor/handler/admin, setelah PR merged/ditutup
-  const kendalaMutation = useMutation({
-    mutationFn: () => errorLogApi.githubKerjakan(id, kendala.trim()),
-    onSuccess: (res) => {
-      setKendala('');
-      queryClient.invalidateQueries({ queryKey: ['error-log', id] });
-      queryClient.invalidateQueries({ queryKey: ['error-log'] });
-      toast.success(res.message);
-    },
-    onError: (e: any) => {
-      Alert.alert('Tidak bisa', e.response?.data?.message ?? 'Periksa koneksi & coba lagi.');
-    },
-  });
-
-  // §29: bertanya/mengusulkan pendekatan SEBELUM eksekusi. Claude menjawab sebagai komentar,
-  // jadi daftar komentar ikut disegarkan — jawabannya muncul di sana, bukan di kartu GitHub.
-  const diskusiMutation = useMutation({
-    mutationFn: () => errorLogApi.githubDiskusi(id, tanya.trim()),
-    onSuccess: (res) => {
-      setTanya('');
-      queryClient.invalidateQueries({ queryKey: ['error-log', id] });
-      queryClient.invalidateQueries({ queryKey: ['error-log'] });
-      toast.success(res.message);
-    },
-    onError: (e: any) => {
-      queryClient.invalidateQueries({ queryKey: ['error-log', id] });
-      Alert.alert('Tidak bisa', e.response?.data?.message ?? 'Periksa koneksi & coba lagi.');
-    },
-  });
-
-  const confirmDiskusi = () => {
-    if (!tanya.trim()) {
-      Alert.alert('Catatan wajib', 'Tulis dulu pertanyaan atau usulanmu — Claude menjawab berdasarkan catatan itu.');
-      return;
-    }
-    Alert.alert(
-      'Kirim ke Claude?',
-      'Claude menjawab sebagai komentar dalam 1–3 menit. Ia TIDAK menulis kode dan tidak membuat PR — eksekusi baru terjadi kalau tombol hijau ditekan.',
-      [
-        { text: 'Batal', style: 'cancel' },
-        { text: 'Kirim', onPress: () => diskusiMutation.mutate() },
-      ],
-    );
-  };
-
-  // §21: minta Claude menilai laporan. Tanpa input — yang dinilai isi laporannya sendiri.
-  const triaseMutation = useMutation({
-    mutationFn: () => errorLogApi.githubMintaAi(id),
-    onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['error-log', id] });
-      queryClient.invalidateQueries({ queryKey: ['error-log'] });
-      toast.success(res.message);
-    },
-    onError: (e: any) => {
-      queryClient.invalidateQueries({ queryKey: ['error-log', id] });
-      Alert.alert('Tidak bisa', e.response?.data?.message ?? 'Periksa koneksi & coba lagi.');
-    },
-  });
-
-  const confirmTriase = (sudah: boolean) => {
-    Alert.alert(
-      sudah ? 'Nilai ulang oleh Claude?' : 'Minta Claude menilai?',
-      sudah
-        ? 'Penilaian sebelumnya diganti hasil yang baru. Pakai ini setelah laporan diperjelas di komentar.'
-        : 'Claude membaca laporan dan menilai tingkat kesulitannya. Ia tidak menulis kode pada langkah ini.',
-      [
-        { text: 'Batal', style: 'cancel' },
-        { text: sudah ? 'Nilai ulang' : 'Minta', onPress: () => triaseMutation.mutate() },
-      ],
-    );
-  };
-
-  // §30: proses Claude macet -> jalankan ulang. Tidak ada input: yang dipicu ulang adalah
-  // pekerjaan yang sama, bukan permintaan baru.
-  const jalankanUlangMutation = useMutation({
-    mutationFn: () => errorLogApi.githubJalankanUlang(id),
-    onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['error-log', id] });
-      queryClient.invalidateQueries({ queryKey: ['error-log'] });
-      // `selesai` = ternyata sudah beres; itu kabar baik, bukan kegagalan.
-      toast.success(res.message);
-    },
-    onError: (e: any) => {
-      // Invalidate juga saat gagal: penolakan tersering adalah "sudah tidak macet lagi",
-      // dan layar harus berhenti menampilkan tombol yang sudah tidak berlaku.
-      queryClient.invalidateQueries({ queryKey: ['error-log', id] });
-      Alert.alert('Tidak bisa', e.response?.data?.message ?? 'Periksa koneksi & coba lagi.');
-    },
-  });
-
-  const confirmJalankanUlang = () => {
-    Alert.alert(
-      'Jalankan ulang?',
-      'Claude mengerjakan lagi dari awal. Tidak ada data laporan yang hilang, dan komentar sebelumnya tetap ada.',
-      [
-        { text: 'Batal', style: 'cancel' },
-        { text: 'Jalankan', onPress: () => jalankanUlangMutation.mutate() },
-      ],
-    );
-  };
-
-  const confirmKendala = () => {
-    if (!kendala.trim()) { Alert.alert('Catatan wajib', 'Tulis dulu apa yang masih bermasalah — Claude memakai catatan itu.'); return; }
-    Alert.alert(
-      'Minta Claude perbaiki lagi?',
-      'Catatanmu dikirim ke issue, issue dibuka kembali, dan Claude membuat PR baru. Merge tetap oleh tim IT.',
-      [
-        { text: 'Batal', style: 'cancel' },
-        { text: 'Ya, kirim', onPress: () => kendalaMutation.mutate() },
-      ],
-    );
-  };
 
   const confirmClaim = () => {
     Alert.alert(
@@ -509,192 +395,19 @@ export default function ErrorLogDetailScreen() {
             </>
           )}
 
-          {/* GitHub Issue + PR Claude (baca-saja; aksi di web) — HUB docs/40 §25 */}
-          {log.github && (
-            <>
-              <Text style={styles.sectionLabel}>GITHUB ISSUE</Text>
-              <View style={ghStyles.card}>
-                <View style={ghStyles.row}>
-                  <View style={[ghStyles.badge, log.github.issue_state === 'closed' ? ghStyles.badgeMuted : ghStyles.badgeOpen]}>
-                    <Text style={[ghStyles.badgeText, log.github.issue_state === 'closed' ? ghStyles.badgeMutedText : ghStyles.badgeOpenText]}>
-                      {log.github.issue_state === 'closed' ? 'Closed' : 'Open'}
-                    </Text>
-                  </View>
-                  <Text style={ghStyles.nomor}>#{log.github.issue_number}</Text>
-                  {log.github.repo ? <Text style={ghStyles.repo}>{log.github.repo.split('/').pop()}</Text> : null}
-                  <TouchableOpacity
-                    style={{ marginLeft: 'auto' }}
-                    hitSlop={8}
-                    onPress={() => log.github?.issue_url && Linking.openURL(log.github.issue_url).catch(() => Alert.alert('Error', 'Gagal buka GitHub.'))}
-                  >
-                    <Ionicons name="open-outline" size={18} color="#8a94a6" />
-                  </TouchableOpacity>
-                </View>
+          {/* Kartu GitHub + Claude — komponen yang SAMA dengan layar Request (HUB docs/40 §32) */}
+          <GithubAiCard
+            id={id}
+            github={log.github}
+            api={{
+              kerjakan: errorLogApi.githubKerjakan,
+              diskusi: errorLogApi.githubDiskusi,
+              triase: errorLogApi.githubMintaAi,
+              jalankanUlang: errorLogApi.githubJalankanUlang,
+            }}
+            queryKeys={[['error-log', id], ['error-log'], ['error-log-stats'], ['home-errorlog']]}
+          />
 
-                {/* §30: prosesnya berhenti tanpa hasil. Diperiksa SEBELUM `sedang` — label pemicu
-                    yang tertinggal membuat spinner berputar selamanya, dan pelapor tidak punya
-                    akses repo untuk mengetahuinya sendiri. */}
-                {log.github.macet ? (
-                  <View style={ghStyles.macetBox}>
-                    <View style={ghStyles.row}>
-                      <Ionicons name="alert-circle" size={16} color="#f87171" />
-                      <Text style={ghStyles.macetTitle}>Claude berhenti di tengah jalan</Text>
-                    </View>
-                    <Text style={ghStyles.macetText}>
-                      Proses {log.github.macet.jenis === 'kerjakan' ? 'perbaikan' : 'penilaian'} tidak selesai
-                      setelah {log.github.macet.menit} menit. Penyebab tersering: kuota token habis atau
-                      proses dibatalkan. Tidak ada data yang hilang — cukup dijalankan ulang.
-                    </Text>
-                    {log.github.macet.boleh_jalankan_ulang ? (
-                      <TouchableOpacity
-                        style={[ghStyles.macetBtn, jalankanUlangMutation.isPending && { opacity: 0.5 }]}
-                        disabled={jalankanUlangMutation.isPending}
-                        onPress={confirmJalankanUlang}
-                      >
-                        {jalankanUlangMutation.isPending
-                          ? <ActivityIndicator size="small" color="#fff" />
-                          : <Ionicons name="refresh" size={16} color="#fff" />}
-                        <Text style={ghStyles.macetBtnText}>Jalankan ulang</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <Text style={ghStyles.hint}>Pelapor, handler, atau PIC kategori bisa menjalankannya ulang.</Text>
-                    )}
-                  </View>
-                ) : log.github.sedang ? (
-                  <View style={ghStyles.row}>
-                    <ActivityIndicator size="small" color="#38bdf8" />
-                    <Text style={ghStyles.info}>
-                      {log.github.sedang === 'kerjakan' ? 'Claude sedang mengerjakan perbaikan…' : 'Claude sedang menilai laporan ini…'}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={[ghStyles.row, { flexWrap: 'wrap' }]}>
-                    {log.github.labels
-                      .filter((l) => ['ai:minor', 'ai:butuh-review', 'ai:kurang-jelas', 'ai:pr'].includes(l))
-                      .map((l) => (
-                        <View key={l} style={ghStyles.aiChip}>
-                          <Ionicons name="sparkles" size={10} color="#fbbf24" />
-                          <Text style={ghStyles.aiChipText}>
-                            {l === 'ai:minor' ? 'AI: perbaikan kecil' : l === 'ai:butuh-review' ? 'AI: butuh review IT' : l === 'ai:kurang-jelas' ? 'AI: laporan kurang jelas' : 'AI: PR dibuat'}
-                          </Text>
-                        </View>
-                      ))}
-                  </View>
-                )}
-
-                {log.github.pr && (
-                  <TouchableOpacity
-                    style={ghStyles.prRow}
-                    onPress={() => log.github?.pr?.url && Linking.openURL(log.github.pr.url).catch(() => Alert.alert('Error', 'Gagal buka PR.'))}
-                  >
-                    <Ionicons
-                      name={log.github.pr.state === 'merged' ? 'git-merge-outline' : 'git-pull-request-outline'}
-                      size={16}
-                      color={log.github.pr.state === 'merged' ? '#22c55e' : log.github.pr.state === 'open' ? '#38bdf8' : '#8a94a6'}
-                    />
-                    <Text style={[ghStyles.prText, { color: log.github.pr.state === 'merged' ? '#22c55e' : log.github.pr.state === 'open' ? '#38bdf8' : '#8a94a6' }]}>
-                      PR #{log.github.pr.number} · {log.github.pr.state === 'merged' ? 'Merged — sudah masuk ke kode' : log.github.pr.state === 'open' ? 'Menunggu review & merge' : 'Ditutup tanpa merge'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                {/* §29: bertanya dulu sebelum eksekusi. Hanya untuk kelas yang memang butuh
-                    pertimbangan manusia — `minor` sengaja tidak dapat tombol ini. */}
-                {log.github.aksi?.diskusi && (
-                  <View style={ghStyles.kendalaBox}>
-                    <Text style={ghStyles.diskusiLabel}>Ada yang ingin ditanyakan dulu?</Text>
-                    <TextInput
-                      style={ghStyles.kendalaInput}
-                      placeholder="Mis. 'opsi 1 atau 2 yang lebih aman?' atau 'bisa pakai pola tab per kelas seperti Kode Masuk?'"
-                      placeholderTextColor="#6b7280"
-                      value={tanya}
-                      onChangeText={setTanya}
-                      multiline
-                      maxLength={3000}
-                    />
-                    <TouchableOpacity
-                      style={[ghStyles.diskusiBtn, (!tanya.trim() || diskusiMutation.isPending) && { opacity: 0.5 }]}
-                      disabled={!tanya.trim() || diskusiMutation.isPending}
-                      onPress={confirmDiskusi}
-                    >
-                      {diskusiMutation.isPending
-                        ? <ActivityIndicator size="small" color="#38bdf8" />
-                        : <Ionicons name="chatbubble-ellipses-outline" size={16} color="#38bdf8" />}
-                      <Text style={ghStyles.diskusiBtnText}>Diskusikan dulu dengan Claude</Text>
-                    </TouchableOpacity>
-                    <Text style={ghStyles.hint}>
-                      Claude menjawab sebagai komentar (1–3 menit) tanpa menulis kode.
-                    </Text>
-                  </View>
-                )}
-
-                {/* §25/§27: satu tombol, dua ragam. `kerjakan_ulang` = PR sebelumnya sudah
-                    merged/ditutup → catatan WAJIB; persetujuan awal → catatan opsional. */}
-                {log.github.aksi?.kerjakan && (
-                  <View style={ghStyles.kendalaBox}>
-                    <Text style={ghStyles.kendalaLabel}>
-                      {log.github.aksi.kerjakan_ulang ? 'Masih ada kendala setelah perbaikan?' : 'Setuju dengan penilaian Claude?'}
-                    </Text>
-                    <TextInput
-                      style={ghStyles.kendalaInput}
-                      placeholder={log.github.aksi.kerjakan_ulang
-                        ? 'Wajib: apa yang masih bermasalah? (mis. tombol muncul tapi tidak bisa ditekan di Android 12)'
-                        : 'Opsional: catatan supaya eksekusinya tepat (mis. jangan ubah warna, cukup lebarnya)'}
-                      placeholderTextColor="#6b7280"
-                      value={kendala}
-                      onChangeText={setKendala}
-                      multiline
-                      maxLength={3000}
-                    />
-                    <TouchableOpacity
-                      style={[
-                        log.github.aksi.kerjakan_ulang ? ghStyles.kendalaBtn : ghStyles.setujuBtn,
-                        ((log.github.aksi.kerjakan_ulang && !kendala.trim()) || kendalaMutation.isPending) && { opacity: 0.5 },
-                      ]}
-                      disabled={(log.github.aksi.kerjakan_ulang && !kendala.trim()) || kendalaMutation.isPending}
-                      onPress={confirmKendala}
-                    >
-                      {kendalaMutation.isPending
-                        ? <ActivityIndicator size="small" color={log.github.aksi.kerjakan_ulang ? '#111827' : '#fff'} />
-                        : <Ionicons
-                            name={log.github.aksi.kerjakan_ulang ? 'refresh' : 'checkmark-circle-outline'}
-                            size={16}
-                            color={log.github.aksi.kerjakan_ulang ? '#111827' : '#fff'}
-                          />}
-                      <Text style={log.github.aksi.kerjakan_ulang ? ghStyles.kendalaBtnText : ghStyles.setujuBtnText}>
-                        {log.github.aksi.kerjakan_ulang
-                          ? 'Masih ada kendala — minta Claude perbaiki lagi'
-                          : 'Setuju — minta Claude kerjakan & buat PR'}
-                      </Text>
-                    </TouchableOpacity>
-                    {!log.github.aksi.kerjakan_ulang && (
-                      <Text style={ghStyles.hint}>
-                        Kamu tercatat sebagai handler, dan merge tetap dilakukan tim IT.
-                      </Text>
-                    )}
-                  </View>
-                )}
-
-                {/* §21: minta penilaian / nilai ulang. Paling bawah — ini langkah paling awal,
-                    jadi pada laporan yang sudah ditriase ia jarang dipakai. */}
-                {log.github.aksi?.triase && (
-                  <TouchableOpacity
-                    style={[ghStyles.triaseBtn, triaseMutation.isPending && { opacity: 0.5 }]}
-                    disabled={triaseMutation.isPending}
-                    onPress={() => confirmTriase(!!log.github?.aksi?.sudah_ditriase)}
-                  >
-                    {triaseMutation.isPending
-                      ? <ActivityIndicator size="small" color="#fbbf24" />
-                      : <Ionicons name="sparkles-outline" size={15} color="#fbbf24" />}
-                    <Text style={ghStyles.triaseBtnText}>
-                      {log.github.aksi.sudah_ditriase ? 'Nilai ulang oleh Claude' : 'Minta triase AI'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                <Text style={ghStyles.hint}>Membuat issue baru di GitHub tetap dilakukan dari HUB web.</Text>
-              </View>
-            </>
-          )}
 
           {/* Lampiran Dokumen */}
           {log.dokumen && log.dokumen.length > 0 && (
@@ -1141,39 +854,6 @@ const komStyles = StyleSheet.create({
   time:    { color: '#6b7280', fontSize: 10, marginTop: 4 },
 });
 
-const ghStyles = StyleSheet.create({
-  card:  { backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: 12, padding: 12, gap: 8, marginBottom: 14 },
-  row:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  badge: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
-  badgeOpen: { backgroundColor: 'rgba(34,197,94,0.15)' }, badgeOpenText: { color: '#22c55e' },
-  badgeMuted: { backgroundColor: 'rgba(138,148,166,0.15)' }, badgeMutedText: { color: '#8a94a6' },
-  badgeText: { fontSize: 11, fontWeight: '700' },
-  nomor: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  repo:  { color: '#8a94a6', fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
-  info:  { color: '#38bdf8', fontSize: 12 },
-  aiChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(251,191,36,.12)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
-  aiChipText: { color: '#fbbf24', fontSize: 11, fontWeight: '600' },
-  prRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' },
-  prText: { fontSize: 12, fontWeight: '600', flex: 1 },
-  hint:  { color: '#6b7280', fontSize: 10 },
-  kendalaBox:   { gap: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' },
-  kendalaLabel: { color: '#fbbf24', fontSize: 12, fontWeight: '600' },
-  kendalaInput: { minHeight: 64, maxHeight: 140, color: '#fff', fontSize: 13, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: 10, textAlignVertical: 'top' },
-  kendalaBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#fbbf24', borderRadius: 8, paddingVertical: 10 },
-  kendalaBtnText: { color: '#111827', fontSize: 13, fontWeight: '700' },
-  macetBox:   { gap: 6, backgroundColor: 'rgba(248,113,113,0.1)', borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)', borderRadius: 8, padding: 10 },
-  macetTitle: { color: '#f87171', fontSize: 12, fontWeight: '700' },
-  macetText:  { color: '#cbd5e1', fontSize: 12, lineHeight: 17 },
-  macetBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#dc2626', borderRadius: 8, paddingVertical: 10, marginTop: 2 },
-  macetBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  diskusiLabel: { color: '#38bdf8', fontSize: 12, fontWeight: '600' },
-  diskusiBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(56,189,248,0.5)', borderRadius: 8, paddingVertical: 10 },
-  diskusiBtnText: { color: '#38bdf8', fontSize: 13, fontWeight: '700' },
-  setujuBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#16a34a', borderRadius: 8, paddingVertical: 10 },
-  setujuBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  triaseBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(251,191,36,0.4)', borderRadius: 8, paddingVertical: 9, marginTop: 2 },
-  triaseBtnText: { color: '#fbbf24', fontSize: 12, fontWeight: '600' },
-});
 
 const dokStyles = StyleSheet.create({
   row: {
