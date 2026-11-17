@@ -45,22 +45,49 @@ export type Paginated<T> = {
 
 export type KlienRingkas = { id: number; nama: string };
 
+export type RekeningRingkas = {
+  id: number;
+  nama_bank: string;
+  nama_pemilik: string;
+  nomor_rekening: string;
+};
+
+/** Nilai khusus filter rekening: invoice lama yang tidak punya snapshot bank_info */
+export const REKENING_KOSONG = '__kosong__';
+
+export type InvoiceFilter = {
+  klien_id?: number;
+  bulan?: number;
+  tahun?: number;
+  status?: StatusBayar;
+  ppn?: 'kena' | 'tanpa';
+  search?: string;
+  /** Rentang tanggal transfer, format YYYY-MM-DD */
+  bayar_dari?: string;
+  bayar_sampai?: string;
+  /** Nomor rekening penerima, atau REKENING_KOSONG */
+  rekening?: string;
+  page?: number;
+};
+
 export const invoiceApi = {
-  list: async (params?: {
-    klien_id?: number;
-    bulan?: number;
-    tahun?: number;
-    status?: StatusBayar;
-    ppn?: 'kena' | 'tanpa';
-    search?: string;
-    page?: number;
-  }): Promise<Paginated<Invoice>> => {
+  list: async (params?: InvoiceFilter): Promise<Paginated<Invoice>> => {
     const { data } = await apiClient.get('/invoice', { params });
     return data;
   },
 
-  stats: async (params?: { tahun?: number; klien_id?: number }): Promise<InvoiceStats> => {
+  /**
+   * Stat box memakai filter yang SAMA dengan daftarnya (kecuali `status`, yang
+   * memang dipecah sendiri jadi Lunas vs Belum Bayar) supaya angka ringkasan
+   * tidak pernah berbeda dengan isi daftar yang sedang terlihat.
+   */
+  stats: async (params?: Omit<InvoiceFilter, 'status' | 'page'>): Promise<InvoiceStats> => {
     const { data } = await apiClient.get('/invoice/stats', { params });
+    return data;
+  },
+
+  rekeningList: async (): Promise<{ data: RekeningRingkas[] }> => {
+    const { data } = await apiClient.get('/invoice/rekening');
     return data;
   },
 

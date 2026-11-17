@@ -9,10 +9,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { invoiceApi, type Invoice, type StatusBayar, type KlienRingkas } from '../../api/invoice';
+import {
+  invoiceApi, REKENING_KOSONG,
+  type Invoice, type StatusBayar, type KlienRingkas,
+} from '../../api/invoice';
 import SwipeableInvoiceCard from './components/SwipeableInvoiceCard';
 import KlienSearchBar from '../../components/KlienSearchBar';
 import TandaiLunasSheet, { type BuktiFile } from './components/TandaiLunasSheet';
+import InvoiceFilterSheet, { type InvoiceFilters, hitungFilterAktif } from './components/InvoiceFilterSheet';
+import PickerSheet, { type PickerOption } from '../../components/PickerSheet';
 
 type ParamList = {
   InvoiceList: undefined;
@@ -47,10 +52,27 @@ export default function InvoiceScreen() {
   // 'lunas' = tandai lunas pertama kali, 'ganti' = perbaiki bukti yang salah
   const [sheetMode, setSheetMode] = useState<'lunas' | 'ganti'>('lunas');
 
+  // Filter lanjutan (rentang tanggal transfer + rekening). `draft` adalah isian
+  // yang sedang diubah di sheet; `filters` yang benar-benar dipakai query.
+  const [filters, setFilters]   = useState<InvoiceFilters>({});
+  const [draft, setDraft]       = useState<InvoiceFilters>({});
+  const [filterOpen, setFilterOpen]     = useState(false);
+  const [rekeningOpen, setRekeningOpen] = useState(false);
+
   const listParams = useMemo(() => ({
     ...(filter === 'semua' ? {} : { status: filter as StatusBayar }),
     ...(klien ? { klien_id: klien.id } : {}),
-  }), [filter, klien]);
+    ...(filters.bayar_dari   ? { bayar_dari: filters.bayar_dari }     : {}),
+    ...(filters.bayar_sampai ? { bayar_sampai: filters.bayar_sampai } : {}),
+    ...(filters.rekening     ? { rekening: filters.rekening }         : {}),
+  }), [filter, klien, filters]);
+
+  // Stat box memakai filter yang sama dengan daftar, KECUALI status — stat box
+  // memang memecah angkanya sendiri jadi Lunas vs Belum Bayar.
+  const statsParams = useMemo(() => {
+    const { status, ...tanpaStatus } = listParams as Record<string, unknown>;
+    return tanpaStatus;
+  }, [listParams]);
 
   // Pagination selaras dengan web: backend tetap paginate per halaman, mobile
   // menariknya berurutan lewat infinite scroll (pola yang sama dipakai Feed &
@@ -77,9 +99,35 @@ export default function InvoiceScreen() {
   const totalItem = data?.pages[0]?.meta?.total ?? invoices.length;
 
   const { data: stats } = useQuery({
-    queryKey: ['invoice-stats', klien?.id ?? null],
-    queryFn:  () => invoiceApi.stats(klien ? { klien_id: klien.id } : {}),
+    queryKey: ['invoice-stats', statsParams],
+    queryFn:  () => invoiceApi.stats(statsParams),
   });
+
+  // Daftar rekening hanya ditarik saat picker-nya pertama kali dibuka.
+  const { data: rekeningData } = useQuery({
+    queryKey: ['invoice-rekening'],
+    queryFn:  () => invoiceApi.rekeningList(),
+    enabled:  rekeningOpen,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const rekeningOptions: PickerOption[] = useMemo(() => [
+    { id: REKENING_KOSONG, label: '(Tanpa info rekening)', sublabel: 'Invoice lama tanpa data bank' },
+    ...(rekeningData?.data ?? []).map((r) => ({
+      id: r.nomor_rekening,
+      label: `${r.nama_bank} — ${r.nomor_rekening}`,
+      sublabel: `a.n. ${r.nama_pemilik}`,
+    })),
+  ], [rekeningData]);
+
+  const labelRekening = (nomor?: string | null): string | undefined => {
+    if (!nomor) return undefined;
+    if (nomor === REKENING_KOSONG) return '(Tanpa info rekening)';
+    const r = rekeningData?.data.find((x) => x.nomor_rekening === nomor);
+    return r ? `${r.nama_bank} — ${r.nomor_rekening}` : nomor;
+  };
+
+  const jumlahFilter = hitungFilterAktif(filters);
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
@@ -166,6 +214,18 @@ export default function InvoiceScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.topBar}>
         <Text style={styles.topTitle}>Invoice</Text>
+        <TouchableOpacity
+          onPress={() => { setDraft(filters); setFilterOpen(true); }}
+          style={styles.filterBtn}
+          hitSlop={8}
+        >
+          <Ionicons name="options-outline" size={22} color={jumlahFilter > 0 ? '#3b82f6' : '#fff'} />
+          {jumlahFilter > 0 && (
+            <View style={styles.filterDot}>
+              <Text style={styles.filterDotText}>{jumlahFilter}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       <KlienSearchBar
@@ -228,6 +288,34 @@ export default function InvoiceScreen() {
         </ScrollView>
       </View>
 
+      {jumlahFilter > 0 && (
+        <View style={styles.aktifWrap}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.aktifContent}>
+            {filters.bayar_dari && (
+              <ChipAktif
+                label={`Dari ${formatTanggalSingkat(filters.bayar_dari)}`}
+                onClear={() => setFilters({ ...filters, bayar_dari: null })}
+              />
+            )}
+            {filters.bayar_sampai && (
+              <ChipAktif
+                label={`Sampai ${formatTanggalSingkat(filters.bayar_sampai)}`}
+                onClear={() => setFilters({ ...filters, bayar_sampai: null })}
+              />
+            )}
+            {filters.rekening && (
+              <ChipAktif
+                label={labelRekening(filters.rekening) ?? 'Rekening'}
+                onClear={() => setFilters({ ...filters, rekening: null })}
+              />
+            )}
+            <TouchableOpacity onPress={() => setFilters({})} style={styles.hapusSemua}>
+              <Text style={styles.hapusSemuaText}>Hapus semua</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      )}
+
       <FlatList
         data={invoices}
         keyExtractor={(item) => String(item.id)}
@@ -263,6 +351,33 @@ export default function InvoiceScreen() {
         }
       />
 
+      <InvoiceFilterSheet
+        visible={filterOpen}
+        draft={draft}
+        rekeningLabel={labelRekening(draft.rekening)}
+        onDraftChange={setDraft}
+        onOpenRekening={() => setRekeningOpen(true)}
+        onClose={() => setFilterOpen(false)}
+        onApply={(f) => { setFilters(f); setFilterOpen(false); }}
+        onReset={() => { setDraft({}); setFilters({}); setFilterOpen(false); }}
+      />
+
+      {/* Picker tetap <Modal> (PickerSheet) di atas sheet Animated — pola yang
+          sama dipakai modul Request. */}
+      <PickerSheet
+        visible={rekeningOpen}
+        onClose={() => setRekeningOpen(false)}
+        title="Pilih Rekening Penerima"
+        options={rekeningOptions}
+        selectedId={draft.rekening ?? null}
+        onPick={(opt) => {
+          setDraft({ ...draft, rekening: opt.id == null ? null : String(opt.id) });
+          setRekeningOpen(false);
+        }}
+        searchable
+        searchPlaceholder="Cari bank / nomor rekening..."
+      />
+
       <TandaiLunasSheet
         visible={!!lunasTarget}
         noInvoice={lunasTarget?.no_invoice ?? ''}
@@ -279,6 +394,23 @@ export default function InvoiceScreen() {
         }}
       />
     </SafeAreaView>
+  );
+}
+
+function formatTanggalSingkat(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+}
+
+function ChipAktif({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <View style={styles.chipAktif}>
+      <Text style={styles.chipAktifText} numberOfLines={1}>{label}</Text>
+      <TouchableOpacity onPress={onClear} hitSlop={8}>
+        <Ionicons name="close-circle" size={14} color="#93c5fd" />
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -334,6 +466,29 @@ const styles = StyleSheet.create({
 
   list:  { padding: 16, paddingTop: 4 },
   empty: { color: '#8a94a6', fontSize: 14, textAlign: 'center' },
+
+  filterBtn: { padding: 6, marginRight: 4 },
+  filterDot: {
+    position: 'absolute', top: 0, right: 0,
+    minWidth: 15, height: 15, borderRadius: 8,
+    backgroundColor: '#3b82f6',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  filterDotText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+
+  aktifWrap:    { marginBottom: 6 },
+  aktifContent: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, alignItems: 'center' },
+  chipAktif: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(59,130,246,0.18)',
+    borderWidth: 1, borderColor: 'rgba(59,130,246,0.45)',
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14,
+    maxWidth: 230,
+  },
+  chipAktifText: { color: '#93c5fd', fontSize: 11, fontWeight: '600', flexShrink: 1 },
+  hapusSemua:     { paddingHorizontal: 8, paddingVertical: 5 },
+  hapusSemuaText: { color: '#8a94a6', fontSize: 11, textDecorationLine: 'underline' },
 
   footer:     { paddingVertical: 16, alignItems: 'center' },
   footerText: { color: '#6b7280', fontSize: 11 },
