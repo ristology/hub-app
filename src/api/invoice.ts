@@ -98,4 +98,27 @@ export const invoiceApi = {
     const { data } = await apiClient.post(`/invoice/${id}/toggle-lunas`);
     return data;
   },
+
+  /**
+   * Perbaiki bukti & tanggal transfer pada invoice yang SUDAH lunas, tanpa
+   * mengubah statusnya.
+   *
+   * JANGAN pakai toggleLunas untuk ini: mengembalikan invoice ke belum_bayar
+   * membuat backend menghapus record cashback invoice tsb berikut status Paid
+   * dan bukti transfer cashback yang sudah diupload.
+   */
+  gantiBukti: async (
+    id: number,
+    bukti: { uri: string; name: string; type: string },
+    tanggalBayar: string,
+  ): Promise<{ data: Invoice }> => {
+    const form = new FormData();
+    // @ts-expect-error - RN FormData expects {uri, name, type}
+    form.append('bukti_transfer', { uri: bukti.uri, name: bukti.name, type: bukti.type });
+    form.append('tanggal_bayar', tanggalBayar);
+    const { data } = await apiClient.post(`/invoice/${id}/ganti-bukti`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
 };

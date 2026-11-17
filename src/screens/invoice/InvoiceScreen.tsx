@@ -44,6 +44,8 @@ export default function InvoiceScreen() {
   const [openId, setOpenId] = useState<number | null>(null);
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [lunasTarget, setLunasTarget] = useState<Invoice | null>(null);
+  // 'lunas' = tandai lunas pertama kali, 'ganti' = perbaiki bukti yang salah
+  const [sheetMode, setSheetMode] = useState<'lunas' | 'ganti'>('lunas');
 
   const listParams = useMemo(() => ({
     ...(filter === 'semua' ? {} : { status: filter as StatusBayar }),
@@ -88,9 +90,11 @@ export default function InvoiceScreen() {
   }, [refetch]);
 
   const toggleMut = useMutation({
-    mutationFn: ({ id, bukti, tanggalBayar }: {
-      id: number; bukti?: BuktiFile; tanggalBayar?: string;
-    }) => invoiceApi.toggleLunas(id, bukti, tanggalBayar),
+    mutationFn: ({ id, bukti, tanggalBayar, ganti }: {
+      id: number; bukti?: BuktiFile; tanggalBayar?: string; ganti?: boolean;
+    }) => ganti && bukti && tanggalBayar
+      ? invoiceApi.gantiBukti(id, bukti, tanggalBayar)
+      : invoiceApi.toggleLunas(id, bukti, tanggalBayar),
     onSuccess: () => setLunasTarget(null),
     onSettled: () => {
       setPendingId(null);
@@ -107,19 +111,11 @@ export default function InvoiceScreen() {
 
   const handleToggleLunas = (inv: Invoice) => {
     setOpenId(null);
-    if (inv.status_bayar === 'lunas') {
-      Alert.alert('Reset ke Belum Bayar', `Reset status invoice ${inv.no_invoice}? Bukti transfer akan dihapus.`, [
-        { text: 'Batal' },
-        { text: 'Reset', style: 'destructive', onPress: () => {
-            setPendingId(inv.id);
-            toggleMut.mutate({ id: inv.id });
-          },
-        },
-      ]);
-    } else {
-      // Tanggal transfer wajib → pakai sheet, bukan Alert 3 tombol
-      setLunasTarget(inv);
-    }
+    // Invoice yang sudah lunas → GANTI bukti, bukan reset. Reset membuat backend
+    // menghapus record cashback invoice ini berikut status Paid & buktinya;
+    // aksi itu sengaja disimpan di halaman detail saja.
+    setSheetMode(inv.status_bayar === 'lunas' ? 'ganti' : 'lunas');
+    setLunasTarget(inv);
   };
 
   const handlePreview = (inv: Invoice) => {
@@ -271,11 +267,15 @@ export default function InvoiceScreen() {
         visible={!!lunasTarget}
         noInvoice={lunasTarget?.no_invoice ?? ''}
         submitting={toggleMut.isPending}
+        mode={sheetMode}
         onClose={() => setLunasTarget(null)}
         onSubmit={({ bukti, tanggalBayar }) => {
           if (!lunasTarget) return;
           setPendingId(lunasTarget.id);
-          toggleMut.mutate({ id: lunasTarget.id, bukti, tanggalBayar });
+          toggleMut.mutate({
+            id: lunasTarget.id, bukti, tanggalBayar,
+            ganti: sheetMode === 'ganti',
+          });
         }}
       />
     </SafeAreaView>

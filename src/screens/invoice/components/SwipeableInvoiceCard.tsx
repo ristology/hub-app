@@ -69,8 +69,12 @@ export default function SwipeableInvoiceCard({
     <View style={styles.wrap}>
       {/* Action buttons di belakang */}
       <View style={styles.actions}>
+        {/* Invoice yang sudah lunas: aksi swipe-nya GANTI BUKTI, bukan Reset.
+            Reset mengembalikan invoice ke belum bayar, dan itu membuat backend
+            menghapus record cashback-nya berikut status Paid & bukti transfer
+            cashback. Reset tetap tersedia di halaman detail. */}
         <TouchableOpacity
-          style={[styles.action, { backgroundColor: isLunas ? '#ef4444' : '#22c55e' }]}
+          style={[styles.action, { backgroundColor: isLunas ? '#3b82f6' : '#22c55e' }]}
           onPress={onToggleLunas}
           disabled={isPending}
         >
@@ -79,12 +83,12 @@ export default function SwipeableInvoiceCard({
             : (
               <>
                 <Ionicons
-                  name={isLunas ? 'refresh' : 'checkmark-circle'}
+                  name={isLunas ? 'swap-horizontal' : 'checkmark-circle'}
                   size={20}
                   color="#fff"
                 />
                 <Text style={styles.actionText}>
-                  {isLunas ? 'Reset' : 'Lunas'}
+                  {isLunas ? 'Ganti' : 'Lunas'}
                 </Text>
               </>
             )

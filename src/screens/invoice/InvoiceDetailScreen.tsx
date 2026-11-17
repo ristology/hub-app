@@ -36,6 +36,7 @@ export default function InvoiceDetailScreen() {
   const { id } = route.params;
   const queryClient = useQueryClient();
   const [lunasOpen, setLunasOpen] = useState(false);
+  const [sheetMode, setSheetMode] = useState<'lunas' | 'ganti'>('lunas');
 
   const { data, isLoading } = useQuery({
     queryKey: ['invoice', id],
@@ -43,8 +44,10 @@ export default function InvoiceDetailScreen() {
   });
 
   const toggleMut = useMutation({
-    mutationFn: (payload?: { bukti: BuktiFile; tanggalBayar: string }) =>
-      invoiceApi.toggleLunas(id, payload?.bukti, payload?.tanggalBayar),
+    mutationFn: (payload?: { bukti: BuktiFile; tanggalBayar: string; ganti?: boolean }) =>
+      payload?.ganti
+        ? invoiceApi.gantiBukti(id, payload.bukti, payload.tanggalBayar)
+        : invoiceApi.toggleLunas(id, payload?.bukti, payload?.tanggalBayar),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoice', id] });
       queryClient.invalidateQueries({ queryKey: ['invoice'] });
@@ -155,7 +158,7 @@ export default function InvoiceDetailScreen() {
           {!isLunas ? (
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: '#22c55e' }]}
-              onPress={() => setLunasOpen(true)}
+              onPress={() => { setSheetMode('lunas'); setLunasOpen(true); }}
               disabled={toggleMut.isPending}
             >
               {toggleMut.isPending
@@ -169,6 +172,18 @@ export default function InvoiceDetailScreen() {
               }
             </TouchableOpacity>
           ) : (
+            <>
+            {/* Jalan aman memperbaiki bukti yang salah upload. Reset di bawahnya
+                mengembalikan invoice ke belum bayar, dan itu menghapus record
+                cashback invoice ini berikut status Paid & buktinya. */}
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: '#3b82f6', marginBottom: 10 }]}
+              onPress={() => { setSheetMode('ganti'); setLunasOpen(true); }}
+              disabled={toggleMut.isPending}
+            >
+              <Ionicons name="swap-horizontal" size={20} color="#fff" />
+              <Text style={styles.actionText}>Ganti Bukti Transfer</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: 'rgba(239,68,68,0.15)', borderWidth: 1, borderColor: '#ef4444' }]}
               onPress={promptResetBelum}
@@ -184,6 +199,7 @@ export default function InvoiceDetailScreen() {
                 )
               }
             </TouchableOpacity>
+            </>
           )}
         </View>
       </ScrollView>
@@ -192,8 +208,9 @@ export default function InvoiceDetailScreen() {
         visible={lunasOpen}
         noInvoice={inv.no_invoice}
         submitting={toggleMut.isPending}
+        mode={sheetMode}
         onClose={() => setLunasOpen(false)}
-        onSubmit={(payload) => toggleMut.mutate(payload)}
+        onSubmit={(payload) => toggleMut.mutate({ ...payload, ganti: sheetMode === 'ganti' })}
       />
     </SafeAreaView>
   );

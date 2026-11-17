@@ -16,6 +16,8 @@ type Props = {
   visible: boolean;
   noInvoice: string;
   submitting?: boolean;
+  /** 'lunas' = tandai lunas pertama kali; 'ganti' = perbaiki bukti yang salah */
+  mode?: 'lunas' | 'ganti';
   onClose: () => void;
   onSubmit: (payload: { bukti: BuktiFile; tanggalBayar: string }) => void;
 };
@@ -37,8 +39,9 @@ function todayISO(): string {
  * muncul. Pola yang sama dipakai FilterSheet di modul Request.
  */
 export default function TandaiLunasSheet({
-  visible, noInvoice, submitting = false, onClose, onSubmit,
+  visible, noInvoice, submitting = false, mode = 'lunas', onClose, onSubmit,
 }: Props) {
+  const isGanti = mode === 'ganti';
   const insets  = useSafeAreaInsets();
   const screenH = Dimensions.get('window').height;
 
@@ -135,7 +138,7 @@ export default function TandaiLunasSheet({
         <View style={styles.handle} />
         <View style={styles.titleRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.title}>Tandai Lunas</Text>
+            <Text style={styles.title}>{isGanti ? 'Ganti Bukti Transfer' : 'Tandai Lunas'}</Text>
             <Text style={styles.subtitle} numberOfLines={1}>{noInvoice}</Text>
           </View>
           <TouchableOpacity onPress={onClose} hitSlop={8} disabled={submitting}>
@@ -152,7 +155,13 @@ export default function TandaiLunasSheet({
           />
           <Text style={styles.hint}>Tanggal uang benar-benar ditransfer klien.</Text>
 
-          <Text style={styles.label}>BUKTI TRANSFER *</Text>
+          {isGanti && (
+            <Text style={styles.hint}>
+              Status tetap LUNAS dan catatan cashback-nya tidak terganggu.
+            </Text>
+          )}
+
+          <Text style={styles.label}>{isGanti ? 'BUKTI TRANSFER BARU *' : 'BUKTI TRANSFER *'}</Text>
           {bukti ? (
             <View style={styles.fileBox}>
               <Ionicons name="document-attach-outline" size={18} color="#22c55e" />
@@ -193,7 +202,7 @@ export default function TandaiLunasSheet({
         >
           {submitting
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.submitText}>Tandai Lunas</Text>}
+            : <Text style={styles.submitText}>{isGanti ? 'Ganti Bukti' : 'Tandai Lunas'}</Text>}
         </TouchableOpacity>
       </Animated.View>
     </View>
